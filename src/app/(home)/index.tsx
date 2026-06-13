@@ -1,3 +1,4 @@
+import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
   FlatList,
@@ -7,7 +8,13 @@ import {
   View,
 } from "react-native";
 
-type StatusType = "pendente" | "visitado" | "discutido" | "evoluido";
+import {
+  BorderWidth,
+  ClinicalColors,
+  Radius,
+  StatusColors,
+  type StatusType,
+} from "@/constants/clinicalTheme";
 
 type Paciente = {
   id: string;
@@ -15,13 +22,6 @@ type Paciente = {
   leito: string;
   idade: number;
   status: StatusType;
-};
-
-const statusConfig = {
-  pendente: { label: "Pendente", cor: "#FF6B6B" },
-  visitado: { label: "Visitado", cor: "#FFD93D" },
-  discutido: { label: "Discutido", cor: "#6BCB77" },
-  evoluido: { label: "Evoluído", cor: "#4D96FF" },
 };
 
 const pacientesIniciais: Paciente[] = [
@@ -37,6 +37,7 @@ const pacientesIniciais: Paciente[] = [
 ];
 
 export default function Index() {
+  const router = useRouter();
   const [pacientes, setPacientes] = useState<Paciente[]>(pacientesIniciais);
 
   const avancarStatus = (id: string) => {
@@ -71,7 +72,9 @@ export default function Index() {
         renderItem={({ item }) => (
           <TouchableOpacity
             style={styles.card}
-            onPress={() => avancarStatus(item.id)}
+            onPress={() =>
+              router.push({ pathname: "/paciente/[id]", params: { id: item.id } })
+            }
           >
             <View style={styles.cardLeft}>
               <Text style={styles.leito}>Leito {item.leito}</Text>
@@ -81,11 +84,16 @@ export default function Index() {
             <View
               style={[
                 styles.badge,
-                { backgroundColor: statusConfig[item.status].cor },
+                { backgroundColor: StatusColors[item.status].bg },
               ]}
             >
-              <Text style={styles.badgeTexto}>
-                {statusConfig[item.status].label}
+              <Text
+                style={[
+                  styles.badgeTexto,
+                  { color: StatusColors[item.status].text },
+                ]}
+              >
+                {StatusColors[item.status].label}
               </Text>
             </View>
           </TouchableOpacity>
@@ -98,25 +106,27 @@ export default function Index() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0F172A",
+    backgroundColor: ClinicalColors.background,
     paddingTop: 60,
     paddingHorizontal: 16,
   },
   titulo: {
     fontSize: 28,
     fontWeight: "bold",
-    color: "#F8FAFC",
+    color: ClinicalColors.text,
     marginBottom: 4,
   },
   subtitulo: {
     fontSize: 14,
-    color: "#94A3B8",
+    color: ClinicalColors.textMuted,
     marginBottom: 24,
     textTransform: "capitalize",
   },
   card: {
-    backgroundColor: "#1E293B",
-    borderRadius: 12,
+    backgroundColor: ClinicalColors.surface,
+    borderRadius: Radius.card,
+    borderWidth: BorderWidth.hairline,
+    borderColor: ClinicalColors.border,
     padding: 16,
     marginBottom: 12,
     flexDirection: "row",
@@ -124,9 +134,18 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   cardLeft: { flex: 1 },
-  leito: { fontSize: 12, color: "#64748B", marginBottom: 2 },
-  nome: { fontSize: 16, fontWeight: "600", color: "#F8FAFC", marginBottom: 2 },
-  idade: { fontSize: 13, color: "#94A3B8" },
-  badge: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
-  badgeTexto: { fontSize: 12, fontWeight: "600", color: "#0F172A" },
+  leito: { fontSize: 12, color: ClinicalColors.textMuted, marginBottom: 2 },
+  nome: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: ClinicalColors.text,
+    marginBottom: 2,
+  },
+  idade: { fontSize: 13, color: ClinicalColors.textMuted },
+  badge: {
+    borderRadius: Radius.badge,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  badgeTexto: { fontSize: 12, fontWeight: "600" },
 });

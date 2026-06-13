@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "passandocaso",
-    "slug": "passandocaso",
+    "slug": "passandocaso-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -39,6 +39,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "e8fd9518-cd72-44e1-b428-777bce0bee42"
+      }
     }
   }
 }
