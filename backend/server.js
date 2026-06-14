@@ -7,8 +7,17 @@ const Anthropic = require("@anthropic-ai/sdk");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// CORS restrito aos domínios de produção + desenvolvimento local.
+const ORIGENS_PERMITIDAS = [
+  "https://passandocaso.com.br",
+  "https://www.passandocaso.com.br",
+  "https://passandocaso.vercel.app",
+  "http://localhost:8080",
+  "http://localhost:3000",
+];
+app.use(cors({ origin: ORIGENS_PERMITIDAS }));
+
 // Imagens em base64 são grandes — aumenta o limite do corpo JSON.
-app.use(cors());
 app.use(express.json({ limit: "15mb" }));
 
 // Inicialização preguiçosa: o construtor do SDK lança erro se não houver apiKey.
