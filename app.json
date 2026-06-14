@@ -34,6 +34,13 @@
             "imageWidth": 76
           }
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "O PassandoCaso usa a câmera para fotografar o cabeçalho e o prontuário do paciente.",
+          "photosPermission": "O PassandoCaso acessa suas fotos para importar imagens de prontuário."
+        }
       ]
     ],
     "experiments": {

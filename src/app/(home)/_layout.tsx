@@ -1,5 +1,11 @@
 import { Stack } from "expo-router";
 
+import { PacientesProvider } from "@/store/PacientesContext";
+
 export default function HomeStackLayout() {
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return (
+    <PacientesProvider>
+      <Stack screenOptions={{ headerShown: false }} />
+    </PacientesProvider>
+  );
 }
