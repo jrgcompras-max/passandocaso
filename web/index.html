@@ -6,138 +6,243 @@
     <title>Passando o Caso — Companion</title>
     <style>
       :root {
-        --azul: #1a6b8a;
-        --azul-escuro: #155772;
-        --verde: #0e7a5a;
-        --verde-escuro: #0b6249;
-        --texto: #0f2d52;
+        --bg: #f8fafb;
+        --surface: #ffffff;
+        --border: #e2e8f0;
+        --primary: #1a6b8a;
+        --primary-d: #155772;
+        --accent: #0e7a5a;
+        --accent-d: #0b6249;
+        --text: #0f2d52;
         --muted: #64748b;
-        --borda: #e2e8f0;
-        --fundo: #f8fafb;
-        --card: #ffffff;
+        --danger: #991b1b;
+        --warn-bg: #fef3c7;
+        --warn-fg: #b45309;
+        --chevron: #94a3b8;
       }
       * { box-sizing: border-box; }
+      html, body { height: 100%; }
       body {
         margin: 0;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        background: var(--fundo);
-        color: var(--texto);
+        background: var(--bg);
+        color: var(--text);
         line-height: 1.5;
       }
-      header {
-        background: var(--azul);
-        color: #fff;
-        padding: 16px 20px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-      }
-      header h1 { font-size: 18px; margin: 0; font-weight: 700; }
-      header .quem { font-size: 13px; opacity: 0.95; }
-      header .quem a { color: #fff; }
-      .container { max-width: 880px; margin: 0 auto; padding: 24px 16px 64px; }
+      button { cursor: pointer; border: none; font-weight: 600; border-radius: 8px; font-family: inherit; }
+      input, textarea, select { font-family: inherit; }
+      .label { font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+      .hidden { display: none !important; }
 
-      .login {
-        max-width: 380px;
-        margin: 64px auto;
-        background: var(--card);
-        border: 1px solid var(--borda);
-        border-radius: 12px;
-        padding: 28px;
-        box-shadow: 0 4px 20px rgba(15, 45, 82, 0.06);
-      }
+      /* Login */
+      .login-wrap { min-height: 100%; display: flex; align-items: center; justify-content: center; padding: 24px; }
+      .login { width: 100%; max-width: 380px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; box-shadow: 0 4px 20px rgba(15,45,82,.06); }
       .login h2 { margin: 0 0 4px; font-size: 20px; }
       .login p { margin: 0 0 20px; color: var(--muted); font-size: 14px; }
-      label { display: block; font-size: 12px; color: var(--muted); margin: 12px 0 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; }
-      input {
-        width: 100%;
-        padding: 11px 12px;
-        border: 1px solid var(--borda);
-        border-radius: 8px;
-        font-size: 15px;
-        color: var(--texto);
-        background: #fff;
+      .field { margin-bottom: 12px; }
+      .field label { display: block; margin-bottom: 6px; }
+      input, textarea, select { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; color: var(--text); background: #fff; }
+      textarea { resize: vertical; min-height: 64px; }
+      input:focus, textarea:focus, select:focus { outline: 2px solid var(--primary); border-color: var(--primary); }
+      .btn-primario { width: 100%; margin-top: 8px; background: var(--primary); color: #fff; padding: 12px; font-size: 15px; }
+      .btn-primario:hover { background: var(--primary-d); }
+
+      /* App shell */
+      #app { display: flex; height: 100vh; overflow: hidden; }
+      .sidebar { width: 340px; flex-shrink: 0; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
+      .sb-head { padding: 18px 16px 12px; border-bottom: 1px solid var(--border); }
+      .sb-head h1 { margin: 0; font-size: 20px; font-weight: 700; }
+      .sb-head .data { font-size: 13px; color: var(--muted); }
+      .sb-acoes { display: flex; gap: 8px; margin-top: 12px; }
+      .btn-add { background: var(--primary); color: #fff; padding: 8px 12px; font-size: 14px; }
+      .btn-add:hover { background: var(--primary-d); }
+      .btn-ghost { background: #fff; border: 1px solid var(--border); color: var(--primary); padding: 8px 12px; font-size: 14px; }
+      .btn-ghost:hover { background: #f1f5f9; }
+      .sb-lista { overflow-y: auto; padding: 8px; flex: 1; }
+      .sep { text-align: center; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--chevron); margin: 14px 6px 8px; }
+
+      .pcard { background: #fff; border: 1px solid var(--border); border-left: 3px solid transparent; border-radius: 10px; padding: 12px; margin-bottom: 8px; cursor: pointer; }
+      .pcard:hover { background: #fafcfe; }
+      .pcard.ativo { border-left-color: var(--primary); background: #f0f7fa; }
+      .pcard .leito { font-size: 11px; color: var(--muted); }
+      .pcard .nome { font-size: 15px; font-weight: 600; margin: 1px 0; }
+      .pcard .sub { font-size: 12px; color: var(--muted); }
+      .pcard .diag { font-size: 13px; font-weight: 500; margin-top: 3px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+      .pcard .meta { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+      .chip-dia { font-size: 11px; font-weight: 700; color: var(--primary); background: var(--bg); border-radius: 6px; padding: 1px 7px; }
+      .chip-pend { font-size: 11px; font-weight: 600; color: var(--warn-fg); background: var(--warn-bg); border-radius: 6px; padding: 1px 7px; }
+      .badge { font-size: 11px; font-weight: 600; border-radius: 6px; padding: 3px 9px; white-space: nowrap; }
+
+      /* Main */
+      .main { flex: 1; overflow-y: auto; }
+      .main-inner { max-width: 760px; margin: 0 auto; padding: 24px 20px 80px; }
+      .vazio-main { color: var(--muted); text-align: center; padding: 80px 24px; }
+
+      .topbar-mobile { display: none; align-items: center; gap: 12px; padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 5; }
+      .hamburger { background: var(--surface); border: 1px solid var(--border); color: var(--primary); padding: 6px 12px; font-size: 18px; }
+
+      /* Cabeçalho do paciente */
+      .pac-cab { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+      .pac-cab h2 { margin: 0; font-size: 24px; }
+      .pac-acoes { display: flex; align-items: center; gap: 10px; }
+      .icone-btn { background: none; padding: 6px; font-size: 20px; line-height: 1; }
+      .diag-print { font-size: 18px; font-weight: 700; margin-top: 8px; }
+      .diag-vazio { font-size: 15px; color: var(--muted); font-style: italic; margin-top: 8px; }
+      .motivo { font-size: 14px; color: var(--muted); margin-top: 4px; }
+
+      .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+      .chip-sel { border: 1px solid var(--border); border-radius: 8px; padding: 7px 12px; font-size: 13px; font-weight: 600; background: #fff; color: var(--muted); }
+
+      .ident { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin: 16px 0; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px 12px; }
+      .ident .it .label { margin-bottom: 2px; }
+      .ident .it .v { font-size: 15px; }
+      .ident input { padding: 6px 8px; font-size: 14px; }
+
+      .secao-bloco { margin-bottom: 16px; }
+      .secao-bloco > .label { margin-bottom: 8px; display: block; }
+
+      /* Resumo */
+      .resumo { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+      .resumo .top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+      .resumo textarea { background: #fff; border-color: #bae6fd; min-height: 90px; }
+      .btn-gerar { background: #fff; border: 1px solid var(--primary); color: var(--primary); padding: 6px 10px; font-size: 13px; min-width: 110px; }
+
+      /* Acordeão */
+      .acc { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 12px; overflow: hidden; }
+      .acc-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; cursor: pointer; }
+      .acc-head h3 { margin: 0; font-size: 15px; font-weight: 600; }
+      .acc-head .chev { color: var(--chevron); font-size: 12px; }
+      .acc-add { background: var(--primary); color: #fff; width: 28px; height: 28px; border-radius: 14px; font-size: 18px; line-height: 1; display: flex; align-items: center; justify-content: center; margin-left: auto; margin-right: 10px; }
+      .acc-body { padding: 0 16px 16px; border-top: 1px solid var(--border); padding-top: 14px; }
+
+      .prob { border-left: 4px solid; border-radius: 8px; padding: 12px; margin-bottom: 10px; }
+      .prob .ptopo { display: flex; justify-content: space-between; gap: 8px; }
+      .prob .ptit { font-weight: 700; font-size: 15px; }
+      .prob .pbadges { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0; }
+      .mini { font-size: 11px; font-weight: 600; border: 1px solid; border-radius: 6px; padding: 1px 8px; }
+      .prob .pobs { font-size: 13px; }
+      .prob .pcond { font-size: 13px; color: var(--muted); font-style: italic; }
+      .acoes-icone { display: flex; gap: 10px; }
+
+      .pend { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); }
+      .pend .cb { font-size: 20px; cursor: pointer; color: var(--primary); }
+      .pend .txt { flex: 1; font-size: 14px; }
+      .pend.feito .txt { text-decoration: line-through; color: var(--muted); }
+      .dot { width: 8px; height: 8px; border-radius: 4px; }
+
+      .blocoex { margin-bottom: 4px; }
+      .blocoex b { color: var(--primary); font-size: 13px; }
+      .blocoex ul { margin: 2px 0 0; padding-left: 18px; }
+      .blocoex li { font-size: 14px; }
+
+      .anot { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-top: 8px; display: flex; justify-content: space-between; gap: 8px; }
+      .anot .hora { font-size: 11px; color: var(--muted); }
+      .anot .at { font-size: 14px; }
+
+      table.labs { width: 100%; border-collapse: collapse; font-size: 13px; }
+      table.labs th, table.labs td { border: 1px solid var(--border); padding: 6px 8px; text-align: center; }
+      table.labs th { background: var(--bg); color: var(--muted); font-weight: 600; }
+      table.labs td.ex { text-align: left; font-weight: 600; }
+
+      .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+      .frase-box { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 10px 12px; margin-top: 12px; font-size: 14px; }
+      .grupo-tit { font-size: 12px; color: var(--primary); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; margin: 14px 0 8px; }
+
+      .check { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); cursor: pointer; }
+      .check .cb { font-size: 20px; }
+      .check.ok .cb, .check.ok .ct { color: var(--accent); }
+      .check.ok .ct { text-decoration: line-through; }
+      .check .ct { font-size: 14px; flex: 1; }
+
+      .btn-passar { width: 100%; background: var(--accent); color: #fff; padding: 16px; font-size: 16px; font-weight: 700; border-radius: 12px; margin-top: 8px; }
+      .btn-passar:hover { background: var(--accent-d); }
+
+      /* Modais */
+      .modal-bg { position: fixed; inset: 0; background: rgba(15,45,82,.45); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 20; }
+      .modal { background: var(--surface); border-radius: 14px; width: 100%; max-width: 520px; max-height: 88vh; overflow-y: auto; padding: 20px; }
+      .modal h3 { margin: 0 0 14px; font-size: 18px; }
+      .modal-acoes { display: flex; gap: 12px; margin-top: 14px; }
+      .btn-sec { flex: 1; background: #fff; border: 1px solid var(--border); color: var(--muted); padding: 12px; }
+      .btn-ok { flex: 1; background: var(--primary); color: #fff; padding: 12px; }
+      .btn-ok.verde { background: var(--accent); }
+      .opc-btn { width: 100%; padding: 16px; font-size: 16px; margin-bottom: 12px; }
+      .opc-foto { background: #fff; border: 1px solid var(--border); color: var(--muted); }
+      pre { white-space: pre-wrap; word-wrap: break-word; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; background: var(--bg); border-radius: 8px; padding: 12px; }
+
+      /* Rodapé de sync */
+      .sync { position: fixed; bottom: 14px; right: 18px; background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 6px 14px; font-size: 12px; color: var(--muted); box-shadow: 0 2px 8px rgba(15,45,82,.08); z-index: 10; }
+      .erro { color: var(--danger); }
+      .vazio { color: var(--muted); font-size: 14px; }
+
+      @media (max-width: 800px) {
+        .sidebar { position: fixed; z-index: 15; height: 100%; transform: translateX(-100%); transition: transform .2s; box-shadow: 0 0 30px rgba(0,0,0,.15); }
+        .sidebar.aberta { transform: translateX(0); }
+        .topbar-mobile { display: flex; }
+        .ident { grid-template-columns: 1fr 1fr; }
+        .grid2 { grid-template-columns: 1fr; }
       }
-      input:focus { outline: 2px solid var(--azul); border-color: var(--azul); }
-      button { cursor: pointer; border: none; font-weight: 600; border-radius: 8px; }
-      .btn-primario { width: 100%; margin-top: 20px; background: var(--azul); color: #fff; padding: 12px; font-size: 15px; }
-      .btn-primario:hover { background: var(--azul-escuro); }
-
-      .filtros { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 20px; }
-      .filtros .campo { flex: 1; min-width: 160px; }
-      .filtros label { margin-top: 0; }
-      .btn-sec { background: #fff; border: 1px solid var(--azul); color: var(--azul); padding: 10px 16px; font-size: 14px; }
-      .btn-sec:hover { background: #eef5f8; }
-
-      .card {
-        background: var(--card);
-        border: 1px solid var(--borda);
-        border-radius: 12px;
-        margin-bottom: 14px;
-        box-shadow: 0 2px 8px rgba(15, 45, 82, 0.04);
-        overflow: hidden;
-      }
-      .card-cab { padding: 16px 18px; cursor: pointer; display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; }
-      .card-cab:hover { background: #fafcfe; }
-      .card-info h3 { margin: 0 0 2px; font-size: 16px; }
-      .card-meta { font-size: 13px; color: var(--muted); }
-      .card-diag { font-size: 14px; color: var(--texto); font-weight: 500; margin-top: 4px; }
-      .pill { font-size: 12px; font-weight: 600; border-radius: 8px; padding: 3px 9px; white-space: nowrap; }
-      .dia { font-size: 12px; font-weight: 700; color: var(--azul); background: var(--fundo); border-radius: 8px; padding: 2px 8px; margin-top: 6px; display: inline-block; }
-      .card-dir { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
-
-      .detalhe { border-top: 1px solid var(--borda); padding: 16px 18px; display: none; }
-      .detalhe.aberto { display: block; }
-      .bloco { margin-bottom: 16px; }
-      .bloco h4 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted); }
-      .bloco p, .bloco li { font-size: 14px; color: var(--texto); margin: 2px 0; }
-      .bloco ul { margin: 0; padding-left: 18px; }
-      .frase { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 10px 12px; font-size: 14px; }
-      .btn-copiar { background: var(--verde); color: #fff; padding: 8px 14px; font-size: 13px; white-space: nowrap; }
-      .btn-copiar:hover { background: var(--verde-escuro); }
-      .btn-copiar.ok { background: var(--verde-escuro); }
-      pre { margin: 8px 0 0; white-space: pre-wrap; word-wrap: break-word; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; background: var(--fundo); border-radius: 8px; padding: 12px; max-height: 320px; overflow: auto; }
-      .vazio, .erro { text-align: center; color: var(--muted); padding: 48px 16px; font-size: 15px; }
-      .erro { color: #991b1b; }
-      .hidden { display: none; }
     </style>
   </head>
   <body>
-    <div id="tela-login">
+    <!-- LOGIN -->
+    <div id="tela-login" class="login-wrap">
       <div class="login">
         <h2>Passando o Caso</h2>
-        <p>Companion web — entre com seu ID de médico para ver os pacientes.</p>
-        <label for="medicoId">ID do médico</label>
-        <input id="medicoId" type="text" placeholder="ex.: medico-001" autocomplete="username" />
+        <p>Companion web — entre com seu ID de médico.</p>
+        <div class="field">
+          <label class="label" for="medicoId">ID do médico</label>
+          <input id="medicoId" type="text" placeholder="ex.: medico-001" autocomplete="username" />
+        </div>
         <button class="btn-primario" onclick="entrar()">Entrar</button>
+        <p id="login-erro" class="erro" style="margin-top:12px"></p>
       </div>
     </div>
 
-    <div id="tela-app" class="hidden">
-      <header>
-        <h1>📋 Passando o Caso</h1>
-        <span class="quem"><span id="quem"></span> · <a href="#" onclick="sair()">sair</a></span>
-      </header>
-      <div class="container">
-        <div class="filtros">
-          <div class="campo">
-            <label for="data">Evolução do dia</label>
-            <input id="data" type="date" />
+    <!-- APP -->
+    <div id="app" class="hidden">
+      <aside class="sidebar" id="sidebar">
+        <div class="sb-head">
+          <h1>Rotina do Dia</h1>
+          <div class="data" id="data-extenso"></div>
+          <div class="sb-acoes">
+            <button class="btn-add" onclick="abrirModalAdd()">+ Paciente</button>
+            <button class="btn-ghost" onclick="recarregar()">↻ Atualizar</button>
+            <button class="btn-ghost" onclick="sair()">Sair</button>
           </div>
-          <button class="btn-sec" onclick="carregar()">Atualizar</button>
         </div>
-        <div id="lista"></div>
-      </div>
+        <div class="sb-lista" id="sb-lista"></div>
+      </aside>
+
+      <main class="main">
+        <div class="topbar-mobile">
+          <button class="hamburger" onclick="toggleSidebar()">☰</button>
+          <strong>Passando o Caso</strong>
+        </div>
+        <div class="main-inner" id="detalhe">
+          <div class="vazio-main">Selecione um paciente na lista.</div>
+        </div>
+      </main>
     </div>
+
+    <div id="modais"></div>
+    <div id="sync" class="sync hidden"></div>
 
     <script>
-      // URL da API (temporariamente o Railway até o SSL do domínio custom resolver).
+      // ======== CONFIG ========
       const API_URL = "https://passandocaso-production.up.railway.app";
+      const MEDICO_ID_PADRAO = "medico-001";
+      let medicoId = sessionStorage.getItem("pc_medicoId") || "";
 
-      let medicoId = "";
+      // ======== ESTADO ========
       let pacientes = [];
+      let ativoId = null;
       let evolucoesDia = {}; // pacienteId -> texto
+      const abertos = new Set(); // chaves de acordeões abertos
+      let dataSV = hojeISO();
+      let dataEvo = hojeISO();
+      const syncTimers = {};
 
+      // ======== CONSTANTES ========
       const STATUS = {
         naoVisitado: { label: "Não visitado", bg: "#FEE2E2", fg: "#991B1B" },
         visitado: { label: "Visitado", bg: "#FEF9C3", fg: "#854D0E" },
@@ -146,261 +251,629 @@
         altaProvavel: { label: "Alta provável", bg: "#DCFCE7", fg: "#166534" },
         altaRealizada: { label: "Alta realizada", bg: "#F1F5F9", fg: "#475569" },
       };
+      const ORDEM_GRUPOS = ["naoVisitado", "revisar", "pendente", "visitado", "altaProvavel", "altaRealizada"];
+      const ORDEM_AVANCO = ["naoVisitado", "visitado", "revisar", "pendente", "altaProvavel", "altaRealizada"];
       const STATUS_CLINICO = {
-        melhora: "Melhora clínica",
-        estavel: "Estável",
-        piora: "Em piora",
-        critico: "Crítico",
+        melhora: { label: "Melhora clínica", cor: "#0E7A5A", bg: "#DCFCE7" },
+        estavel: { label: "Estável", cor: "#1A6B8A", bg: "#DBEAFE" },
+        piora: { label: "Em piora", cor: "#9A3412", bg: "#FFEDD5" },
+        critico: { label: "Crítico", cor: "#991B1B", bg: "#FEE2E2" },
       };
-      const SECOES = [
-        ["comorbidadesMedicacoes", "Comorbidades e MUC"],
-        ["historia", "HDA — História da Doença Atual"],
-        ["examesLaboratoriais", "Exames Laboratoriais"],
-        ["prescricaoHospitalar", "Prescrição Hospitalar"],
-        ["imagem", "Imagem"],
-        ["sinaisVitaisIntercorrencias", "Sinais Vitais e Intercorrências"],
+      const PRIO = {
+        alta: { label: "Alta", bg: "#FEE2E2", fg: "#991B1B", bd: "#FCA5A5" },
+        media: { label: "Média", bg: "#FEF9C3", fg: "#854D0E", bd: "#FDE047" },
+        baixa: { label: "Baixa", bg: "#DCFCE7", fg: "#166534", bd: "#86EFAC" },
+      };
+      const PROB_STATUS = { ativo: "Ativo", resolvendo: "Resolvendo", resolvido: "Resolvido" };
+      const SECOES_FOTO = [
+        { id: "comorbidadesMedicacoes", titulo: "Comorbidades e MUC" },
+        { id: "historia", titulo: "HDA — História da Doença Atual" },
+        { id: "examesLaboratoriais", titulo: "Exames Laboratoriais" },
+        { id: "prescricaoHospitalar", titulo: "Prescrição Hospitalar", medicacao: true },
+        { id: "imagem", titulo: "Imagem" },
+        { id: "sinaisVitaisIntercorrencias", titulo: "Sinais Vitais e Intercorrências" },
+      ];
+      const OPC = {
+        consciencia: [["lucido", "Lúcido"], ["torporoso", "Torporoso"], ["comatoso", "Comatoso"]],
+        orientacao: [["orientado", "Orientado"], ["desorientado", "Desorientado"]],
+        alimentacao: [["viaOral", "Via oral"], ["sne", "SNE"], ["npt", "NPT"], ["jejum", "Jejum"]],
+        diurese: [["presente", "Presente"], ["ausente", "Ausente"], ["sondaVesical", "Sonda vesical"]],
+        evacuacao: [["presente", "Presente"], ["ausente", "Ausente"]],
+      };
+      const DISPOSITIVOS = ["Acesso venoso periférico", "Acesso venoso central", "Sonda nasogástrica", "Sonda nasoenteral", "Sonda vesical", "Dreno", "Traqueostomia", "VM (ventilação mecânica)", "Diálise"];
+      const O2_OPCOES = [["ar", "Ar ambiente"], ["cateter", "Cateter"], ["mascara", "Máscara"], ["vm", "VM"]];
+      const O2_FRASE = { ar: "em ar ambiente", cateter: "em cateter de O2", mascara: "em máscara de O2", vm: "em ventilação mecânica" };
+      const CHECKLIST_ALTA = [
+        ["criterios", "Critérios clínicos atingidos"], ["afebril", "Afebril"], ["arAmbiente", "Em ar ambiente"],
+        ["dieta", "Aceitando dieta"], ["deambulando", "Deambulando"], ["antibiotico", "Antibiótico concluído ou prescrito para casa"],
+        ["receita", "Receita feita"], ["atestado", "Atestado/relatório feito"], ["orientacoes", "Orientações dadas ao paciente/família"],
+        ["retorno", "Retorno ambulatorial marcado"], ["familia", "Família comunicada"],
       ];
 
-      function hojeISO() {
-        const d = new Date();
-        const mes = String(d.getMonth() + 1).padStart(2, "0");
-        const dia = String(d.getDate()).padStart(2, "0");
-        return `${d.getFullYear()}-${mes}-${dia}`;
+      // ======== UTILS ========
+      function hojeISO() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
+      function esc(s) { return (s == null ? "" : String(s)).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]); }
+      function dataExtenso() { const t = new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" }); return t.charAt(0).toUpperCase() + t.slice(1); }
+      function formatarNome(nome) {
+        const p = (nome || "").trim().split(/\s+/).filter(Boolean);
+        if (!p.length) return "";
+        if (p.length === 1) return p[0];
+        return p[0] + " " + p.slice(1).map((x) => x[0].toUpperCase() + ".").join(" ");
       }
-
-      function escapeHtml(s) {
-        return (s || "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
+      function parseData(txt) {
+        if (!txt) return null;
+        let m = String(txt).match(/(\d{4})-(\d{2})-(\d{2})/);
+        if (m) return new Date(+m[1], +m[2] - 1, +m[3], 12);
+        m = String(txt).match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+        if (m) { const a = m[3].length === 2 ? 2000 + +m[3] : +m[3]; return new Date(a, +m[2] - 1, +m[1], 12); }
+        return null;
       }
-
       function diaInternacao(dataEntrada) {
-        if (!dataEntrada) return null;
-        let m = String(dataEntrada).match(/(\d{4})-(\d{2})-(\d{2})/);
-        let d;
-        if (m) d = new Date(+m[1], +m[2] - 1, +m[3], 12);
-        else {
-          m = String(dataEntrada).match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
-          if (!m) return null;
-          const ano = m[3].length === 2 ? 2000 + +m[3] : +m[3];
-          d = new Date(ano, +m[2] - 1, +m[1], 12);
-        }
-        if (isNaN(d.getTime())) return null;
-        const hoje = new Date();
-        const h = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(), 12);
-        return Math.max(1, Math.round((h - d) / 86400000) + 1);
+        const d = parseData(dataEntrada); if (!d) return null;
+        const h = new Date(); const hh = new Date(h.getFullYear(), h.getMonth(), h.getDate(), 12);
+        return Math.max(1, Math.round((hh - d) / 86400000) + 1);
+      }
+      function formatarDataBR(txt) { const m = String(txt || "").match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}/${m[2]}/${m[1]}` : (txt || ""); }
+      function numero(v) { const m = String(v).replace(",", ".").match(/-?\d+(\.\d+)?/); return m ? parseFloat(m[0]) : null; }
+
+      function parseBlocos(extraido) {
+        const t = String(extraido || "").trim();
+        if (!t) return [];
+        if (!t.startsWith("[")) return [{ titulo: "", itens: [t] }];
+        try {
+          const v = JSON.parse(t);
+          return v.map((b) => ({ titulo: b.titulo || "", itens: (b.itens || []).filter(Boolean) }));
+        } catch { return [{ titulo: "", itens: [t] }]; }
       }
 
-      function blocosTexto(extraido) {
-        if (!extraido) return [];
-        const t = String(extraido).trim();
-        if (!t.startsWith("[")) return t ? [t] : [];
-        try {
-          const blocos = JSON.parse(t);
-          return blocos
-            .map((b) => {
-              const itens = (b.itens || []).filter(Boolean);
-              if (!itens.length) return "";
-              return (b.titulo ? b.titulo + ": " : "") + itens.join("; ");
-            })
-            .filter(Boolean);
-        } catch {
-          return [t];
-        }
+      function agruparLab(resultados) {
+        const mapa = {};
+        for (const r of resultados || []) { const k = (r.exame || "").trim(); if (!k) continue; (mapa[k] = mapa[k] || []).push(r); }
+        return Object.keys(mapa).sort().map((exame) => {
+          const pontos = mapa[exame].slice().sort((a, b) => String(a.data).localeCompare(String(b.data)));
+          return { exame, pontos, tendencia: tendencia(pontos) };
+        });
+      }
+      function tendencia(pontos) {
+        const ns = pontos.map((p) => numero(p.valor)).filter((n) => n != null);
+        if (ns.length < 2) return null;
+        const a = ns[0], b = ns[ns.length - 1], lim = Math.abs(a) * 0.05;
+        if (b < a - lim) return { icone: "↓", cor: "#166534", rotulo: "em queda" };
+        if (b > a + lim) return { icone: "↑", cor: "#991B1B", rotulo: "em elevação" };
+        return { icone: "→", cor: "#64748B", rotulo: "estável" };
       }
 
       function fraseSinaisVitais(sv) {
         if (!sv) return "";
         const p = [];
-        if (sv.temp) {
-          const t = parseFloat(String(sv.temp).replace(",", "."));
-          const q = isNaN(t) ? null : t < 37.8 ? "afebril" : "febril";
-          p.push(q ? `${q} (Tax ${sv.temp}°C)` : `Tax ${sv.temp}°C`);
-        }
+        if ((sv.temp || "").trim()) { const t = numero(sv.temp); const q = t == null ? null : t < 37.8 ? "afebril" : "febril"; p.push(q ? `${q} (Tax ${sv.temp}°C)` : `Tax ${sv.temp}°C`); }
         const h = [];
-        if (sv.paSist && sv.paDiast) h.push(`PA ${sv.paSist}/${sv.paDiast}`);
-        if (sv.fc) h.push(`FC ${sv.fc}`);
-        if (h.length) p.push(`(${h.join(", ")})`);
-        if (sv.fr) p.push(`FR ${sv.fr} irpm`);
-        const o2map = { ar: "em ar ambiente", cateter: "em cateter de O2", mascara: "em máscara de O2", vm: "em ventilação mecânica" };
+        if ((sv.paSist || "").trim() && (sv.paDiast || "").trim()) h.push(`PA ${sv.paSist}/${sv.paDiast}`);
+        if ((sv.fc || "").trim()) h.push(`FC ${sv.fc}`);
+        if (h.length) { const s = numero(sv.paSist), f = numero(sv.fc); const est = s != null && s >= 90 && (f == null || (f >= 50 && f <= 100)); p.push(`${est ? "hemodinamicamente estável " : ""}(${h.join(", ")})`.trim()); }
+        if ((sv.fr || "").trim()) p.push(`FR ${sv.fr} irpm`);
         const o2 = [];
-        if (sv.o2) o2.push(o2map[sv.o2] || "");
-        if (sv.sato2) o2.push(`SatO2 ${sv.sato2}%`);
-        if (o2.length) p.push(o2.filter(Boolean).join(" com "));
-        if (!p.length) return "";
-        return "Paciente " + p.join(", ") + ".";
+        if (sv.o2) o2.push(O2_FRASE[sv.o2]);
+        if ((sv.sato2 || "").trim()) o2.push(`SatO2 ${sv.sato2}%`);
+        if (o2.length) p.push(o2.join(" com "));
+        if ((sv.glicemia || "").trim()) p.push(`glicemia ${sv.glicemia} mg/dL`);
+        if ((sv.diurese || "").trim()) p.push(`diurese ${sv.diurese} mL/24h`);
+        return p.length ? "Paciente " + p.join(", ") + "." : "";
+      }
+      function svVazio(sv) { return !sv || !(sv.temp || sv.paSist || sv.paDiast || sv.fc || sv.fr || sv.sato2 || sv.glicemia || sv.diurese || sv.o2 || sv.intercorrencias); }
+
+      // Replica montarTextoEvolucao do app (versão crua; o /api/formatar padroniza).
+      function gerarTextoEvolucao(p, data) {
+        const partes = [];
+        const ident = [`PASSAGEM DE CASO — ${p.nomeCompleto || "Sem nome"}`];
+        const l2 = [p.numeroProntuario && `Prontuário ${p.numeroProntuario}`, p.idade != null && `${p.idade} anos`].filter(Boolean).join(" · ");
+        if (l2) ident.push(l2);
+        const l3 = [p.leito && `Leito ${p.leito}`, p.setor].filter(Boolean).join(" · ");
+        if (l3) ident.push(l3);
+        const dia = diaInternacao(p.dataEntrada);
+        if (dia != null) ident.push(`Dia ${dia} de internação`);
+        partes.push(ident.join("\n"));
+
+        for (const s of SECOES_FOTO) {
+          const sec = (p.secoes || {})[s.id];
+          const linhas = parseBlocos(sec && sec.extraido).map((b) => b.itens.length ? (b.titulo ? `${b.titulo}: ${b.itens.join("; ")}` : b.itens.join("; ")) : "").filter(Boolean);
+          const anots = ((sec && sec.anotacoes) || []).map((a) => (a.texto || "").trim()).filter(Boolean);
+          const extras = extrasEstruturados(s.id, p, data);
+          if (!linhas.length && !anots.length && !extras.length) continue;
+          const bloco = [s.titulo.toUpperCase(), ...linhas, ...extras];
+          if (anots.length) bloco.push(`Anotações: ${anots.join("; ")}`);
+          partes.push(bloco.join("\n"));
+        }
+
+        const evo = (p.evolucoes || {})[data];
+        const el = blocoEvolucao(evo);
+        if (el.length) partes.push([`EVOLUÇÃO BEIRA-LEITO — ${formatarDataBR(data)}`, ...el].join("\n"));
+        return partes.join("\n\n");
+      }
+      function extrasEstruturados(sid, p, data) {
+        if (sid === "sinaisVitaisIntercorrencias") {
+          const sv = (p.sinaisVitais || {})[data]; const out = [];
+          const f = fraseSinaisVitais(sv); if (f) out.push(f);
+          if (sv && (sv.intercorrencias || "").trim()) out.push(`Intercorrências: ${sv.intercorrencias.trim()}`);
+          return out;
+        }
+        if (sid === "examesLaboratoriais") {
+          return agruparLab(p.resultadosLab || []).map((s) => {
+            const seq = s.pontos.map((pt) => `${pt.valor} (${formatarDataBR(pt.data).slice(0, 5)})`).join(" → ");
+            return `${s.exame}: ${seq}${s.tendencia ? " " + s.tendencia.icone : ""}`;
+          });
+        }
+        return [];
+      }
+      function rotulo(grupo, valor) { const o = (OPC[grupo] || []).find((x) => x[0] === valor); return o ? o[1] : valor; }
+      function blocoEvolucao(e) {
+        if (!e) return [];
+        const l = [];
+        if ((e.estadoGeral || "").trim()) l.push(`Estado geral: ${e.estadoGeral.trim()}`);
+        if (e.nivelConsciencia) l.push(`Nível de consciência: ${rotulo("consciencia", e.nivelConsciencia)}`);
+        if (e.orientacao) l.push(`Orientação: ${rotulo("orientacao", e.orientacao)}`);
+        const el = [e.alimentacao && `Alimentação: ${rotulo("alimentacao", e.alimentacao)}`, e.diurese && `Diurese: ${rotulo("diurese", e.diurese)}`, e.evacuacao && `Evacuação: ${rotulo("evacuacao", e.evacuacao)}`].filter(Boolean);
+        if (el.length) l.push(el.join(" | "));
+        if ((e.dispositivos || []).length) l.push(`Dispositivos: ${e.dispositivos.map((d) => { const o = (e.dispositivosObs || {})[d]; return o && o.trim() ? `${d} (${o.trim()})` : d; }).join("; ")}`);
+        if ((e.exameFisico || "").trim()) l.push(`Exame físico: ${e.exameFisico.trim()}`);
+        if ((e.condutaDoDia || "").trim()) l.push(`Conduta do dia: ${e.condutaDoDia.trim()}`);
+        return l;
       }
 
+      // ======== API ========
+      async function apiGet(rota) { const r = await fetch(API_URL + rota); if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); }
+      async function apiPost(rota, body) { const r = await fetch(API_URL + rota, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); }
+      async function apiDelete(rota) { const r = await fetch(API_URL + rota, { method: "DELETE" }); if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); }
+
+      function setSync(estado) {
+        const el = document.getElementById("sync");
+        const txt = { salvando: "Salvando…", salvo: "✓ Salvo", erro: "⚠️ Não salvo (offline)" }[estado];
+        if (!txt) { el.classList.add("hidden"); return; }
+        el.textContent = txt; el.className = "sync" + (estado === "erro" ? " erro" : "");
+      }
+      // Sincroniza um paciente (debounced) com o backend.
+      function agendarSync(p) {
+        setSync("salvando");
+        clearTimeout(syncTimers[p.id]);
+        syncTimers[p.id] = setTimeout(async () => {
+          try { await apiPost("/api/pacientes/sync", { medicoId, pacientes: [p] }); setSync("salvo"); setTimeout(() => setSync(null), 1500); }
+          catch { setSync("erro"); }
+        }, 1500);
+      }
+      function pa() { return pacientes.find((p) => p.id === ativoId); }
+      function mut(fn) { const p = pa(); if (!p) return; fn(p); agendarSync(p); }
+
+      // ======== LOGIN / CARGA ========
       function entrar() {
-        const valor = document.getElementById("medicoId").value.trim();
-        if (!valor) return alert("Informe o ID do médico.");
-        medicoId = valor;
-        document.getElementById("quem").textContent = medicoId;
+        const v = document.getElementById("medicoId").value.trim() || MEDICO_ID_PADRAO;
+        medicoId = v; sessionStorage.setItem("pc_medicoId", v);
+        iniciar();
+      }
+      function sair() { sessionStorage.removeItem("pc_medicoId"); medicoId = ""; ativoId = null; document.getElementById("app").classList.add("hidden"); document.getElementById("tela-login").classList.remove("hidden"); }
+      async function iniciar() {
         document.getElementById("tela-login").classList.add("hidden");
-        document.getElementById("tela-app").classList.remove("hidden");
-        document.getElementById("data").value = hojeISO();
-        carregar();
+        document.getElementById("app").classList.remove("hidden");
+        document.getElementById("data-extenso").textContent = dataExtenso();
+        await recarregar();
       }
-
-      function sair() {
-        medicoId = "";
-        document.getElementById("tela-app").classList.add("hidden");
-        document.getElementById("tela-login").classList.remove("hidden");
-      }
-
-      async function carregar() {
-        const data = document.getElementById("data").value || hojeISO();
-        const lista = document.getElementById("lista");
-        lista.innerHTML = '<div class="vazio">Carregando...</div>';
+      async function recarregar() {
+        const lista = document.getElementById("sb-lista");
+        lista.innerHTML = '<div class="vazio" style="padding:16px">Carregando...</div>';
         try {
           const [rp, re] = await Promise.all([
-            fetch(`${API_URL}/api/pacientes/${encodeURIComponent(medicoId)}`),
-            fetch(`${API_URL}/api/evolucao/${encodeURIComponent(medicoId)}/${data}`),
+            apiGet("/api/pacientes/" + encodeURIComponent(medicoId)),
+            apiGet("/api/evolucao/" + encodeURIComponent(medicoId) + "/" + hojeISO()).catch(() => ({ evolucoes: [] })),
           ]);
-          if (!rp.ok) throw new Error("HTTP " + rp.status);
-          pacientes = (await rp.json()).pacientes || [];
+          pacientes = rp.pacientes || [];
           evolucoesDia = {};
-          if (re.ok) {
-            for (const e of (await re.json()).evolucoes || []) {
-              evolucoesDia[e.pacienteId] = e.texto;
-            }
-          }
-          renderizar();
+          for (const e of re.evolucoes || []) evolucoesDia[e.pacienteId] = e.texto;
+          renderSidebar();
+          if (ativoId && pa()) renderDetalhe(); else { ativoId = null; document.getElementById("detalhe").innerHTML = '<div class="vazio-main">Selecione um paciente na lista.</div>'; }
         } catch (e) {
-          lista.innerHTML =
-            '<div class="erro">Não foi possível conectar à API (' +
-            escapeHtml(API_URL) + ").</div>";
+          lista.innerHTML = '<div class="erro" style="padding:16px">Falha ao conectar à API.</div>';
         }
       }
 
-      function renderizar() {
-        const lista = document.getElementById("lista");
-        if (!pacientes.length) {
-          lista.innerHTML = '<div class="vazio">Nenhum paciente para este médico.</div>';
-          return;
+      // ======== SIDEBAR ========
+      function renderSidebar() {
+        const lista = document.getElementById("sb-lista");
+        if (!pacientes.length) { lista.innerHTML = '<div class="vazio" style="padding:16px">Nenhum paciente.</div>'; return; }
+        let html = "";
+        for (const st of ORDEM_GRUPOS) {
+          const grupo = pacientes.filter((p) => p.status === st);
+          if (!grupo.length) continue;
+          html += `<div class="sep">— ${STATUS[st].label} (${grupo.length}) —</div>`;
+          html += grupo.map(cardSidebar).join("");
         }
-        lista.innerHTML = pacientes.map((p, i) => cardHtml(p, i)).join("");
+        lista.innerHTML = html;
       }
-
-      function cardHtml(p, i) {
-        const st = STATUS[p.status] || { label: p.status || "—", bg: "#F1F5F9", fg: "#475569" };
+      function cardSidebar(p) {
+        const st = STATUS[p.status] || { label: p.status, bg: "#F1F5F9", fg: "#475569" };
         const dia = diaInternacao(p.dataEntrada);
         const pend = (p.pendencias || []).filter((x) => !x.feito).length;
-        return `
-          <div class="card">
-            <div class="card-cab" onclick="toggle(${i})">
-              <div class="card-info">
-                <h3>${escapeHtml(p.nomeCompleto || "Sem nome")}</h3>
-                <div class="card-meta">${[
-                  p.idade != null ? p.idade + " anos" : null,
-                  p.leito ? "Leito " + escapeHtml(p.leito) : null,
-                  escapeHtml(p.setor || ""),
-                ].filter(Boolean).join(" · ")}</div>
-                ${p.diagnosticoPrincipal ? `<div class="card-diag">${escapeHtml(p.diagnosticoPrincipal)}</div>` : ""}
-                ${dia ? `<span class="dia">D${dia}</span>` : ""}
-                ${pend ? `<span class="dia" style="color:#b45309;background:#fef3c7">${pend} pendência${pend > 1 ? "s" : ""}</span>` : ""}
-              </div>
-              <div class="card-dir">
-                <span class="pill" style="background:${st.bg};color:${st.fg}">${st.label}</span>
-              </div>
+        return `<div class="pcard ${p.id === ativoId ? "ativo" : ""}" onclick="selecionar('${esc(p.id)}')">
+          ${p.leito || p.setor ? `<div class="leito">${[p.leito && "Leito " + esc(p.leito), esc(p.setor || "")].filter(Boolean).join(" · ")}</div>` : ""}
+          <div class="nome">${esc(formatarNome(p.nomeCompleto) || "Sem nome")}</div>
+          <div class="sub">${[p.idade != null ? p.idade + " anos" : "Idade —", p.numeroProntuario ? "Prontuário " + esc(p.numeroProntuario) : ""].filter(Boolean).join(" · ")}</div>
+          ${p.diagnosticoPrincipal ? `<div class="diag">${esc(p.diagnosticoPrincipal)}</div>` : ""}
+          <div class="meta">
+            ${dia ? `<span class="chip-dia">D${dia}</span>` : ""}
+            ${pend ? `<span class="chip-pend">${pend} pendência${pend > 1 ? "s" : ""}</span>` : ""}
+            <span class="badge" style="background:${st.bg};color:${st.fg}" onclick="event.stopPropagation();avancarStatus('${esc(p.id)}')">${st.label}</span>
+          </div>
+        </div>`;
+      }
+      function selecionar(id) { ativoId = id; if (window.innerWidth <= 800) document.getElementById("sidebar").classList.remove("aberta"); renderSidebar(); renderDetalhe(); document.querySelector(".main").scrollTop = 0; }
+      function toggleSidebar() { document.getElementById("sidebar").classList.toggle("aberta"); }
+      function avancarStatus(id) {
+        const p = pacientes.find((x) => x.id === id); if (!p) return;
+        const i = ORDEM_AVANCO.indexOf(p.status);
+        p.status = ORDEM_AVANCO[(i + 1) % ORDEM_AVANCO.length];
+        agendarSync(p); renderSidebar(); if (id === ativoId) renderDetalhe();
+      }
+
+      // ======== ACORDEÃO HELPERS ========
+      function accAberto(chave) { return abertos.has(chave); }
+      function toggleAcc(chave) { if (abertos.has(chave)) abertos.delete(chave); else abertos.add(chave); renderDetalhe(); }
+      function acc(chave, titulo, contador, corpoHtml, addFn) {
+        const ab = accAberto(chave);
+        return `<div class="acc">
+          <div class="acc-head" onclick="toggleAcc('${chave}')">
+            <h3>${esc(titulo)}${contador != null ? ` (${contador})` : ""}</h3>
+            ${addFn ? `<button class="acc-add" onclick="event.stopPropagation();${addFn}">+</button>` : ""}
+            <span class="chev">${ab ? "▲" : "▼"}</span>
+          </div>
+          ${ab ? `<div class="acc-body">${corpoHtml}</div>` : ""}
+        </div>`;
+      }
+
+      // ======== DETALHE ========
+      function renderDetalhe() {
+        const p = pa(); const c = document.getElementById("detalhe");
+        if (!p) { c.innerHTML = '<div class="vazio-main">Selecione um paciente na lista.</div>'; return; }
+        const st = STATUS[p.status]; const dia = diaInternacao(p.dataEntrada);
+        const ehAlta = p.status === "altaProvavel" || p.status === "altaRealizada";
+
+        let h = `
+          <div class="pac-cab">
+            <h2>${esc(formatarNome(p.nomeCompleto) || "Sem nome")}</h2>
+            <div class="pac-acoes">
+              <span class="badge" style="background:${st.bg};color:${st.fg}">${st.label}</span>
+              <button class="icone-btn" title="Editar" onclick="abrirModalEdit()">✏️</button>
+              <button class="icone-btn" title="Excluir" onclick="excluirPaciente()">🗑️</button>
             </div>
-            <div class="detalhe" id="det-${i}">${detalheHtml(p, i)}</div>
-          </div>`;
+          </div>
+          ${p.diagnosticoPrincipal ? `<div class="diag-print">${esc(p.diagnosticoPrincipal)}</div>` : `<div class="diag-vazio">Sem diagnóstico principal</div>`}
+          ${p.motivoInternacao ? `<div class="motivo">${esc(p.motivoInternacao)}</div>` : ""}
+
+          <div class="secao-bloco" style="margin-top:16px">
+            <span class="label">Status clínico</span>
+            <div class="chips">${Object.keys(STATUS_CLINICO).map((k) => {
+              const sc = STATUS_CLINICO[k], at = p.statusClinico === k;
+              return `<button class="chip-sel" style="border-color:${sc.cor};${at ? `background:${sc.bg};color:${sc.cor}` : ""}" onclick="setStatusClinico('${k}')">${sc.label}</button>`;
+            }).join("")}</div>
+          </div>
+
+          <div class="ident">
+            <div class="it"><div class="label">Leito</div><input value="${esc(p.leito || "")}" onblur="setLeito(this.value)" placeholder="—"></div>
+            <div class="it"><div class="label">Setor</div><div class="v">${esc(p.setor || "—")}</div></div>
+            <div class="it"><div class="label">Idade</div><div class="v">${p.idade != null ? p.idade + " anos" : "—"}</div></div>
+            <div class="it"><div class="label">Prontuário</div><div class="v">${esc(p.numeroProntuario || "—")}</div></div>
+            <div class="it"><div class="label">Entrada</div><div class="v">${esc(formatarDataBR(p.dataEntrada) || "—")}</div></div>
+            <div class="it"><div class="label">Internação</div><div class="v">${dia ? "Dia " + dia : "—"}</div></div>
+          </div>
+
+          <div class="resumo">
+            <div class="top"><span class="label">Resumo rápido</span>
+              <button class="btn-gerar" id="btn-gerar" onclick="gerarResumo()">✨ Gerar resumo</button></div>
+            <textarea id="resumo-input" onblur="setResumo(this.value)" placeholder="Ex: D8 internação. Afebril há 48h. PCR em queda.">${esc(p.resumoRapido || "")}</textarea>
+          </div>
+
+          ${secProblemas(p)}
+          ${secPendencias(p)}
+          ${SECOES_FOTO.map((s) => s.id === "examesLaboratoriais" ? secExames(p, s) : s.id === "sinaisVitaisIntercorrencias" ? secSinaisVitais(p, s) : secFoto(p, s)).join("")}
+          ${secEvolucao(p)}
+          ${ehAlta ? secChecklist(p) : ""}
+          <button class="btn-passar" onclick="abrirPassarCaso()">📋 Passar o Caso</button>
+        `;
+        c.innerHTML = h;
       }
 
-      function detalheHtml(p, i) {
-        let h = "";
-        if (p.statusClinico)
-          h += bloco("Status clínico", `<p>${STATUS_CLINICO[p.statusClinico] || p.statusClinico}</p>`);
-        if (p.motivoInternacao)
-          h += bloco("Motivo da internação", `<p>${escapeHtml(p.motivoInternacao)}</p>`);
-        if (p.resumoRapido)
-          h += bloco("Resumo rápido", `<div class="frase">${escapeHtml(p.resumoRapido)}</div>`);
-
+      // ---- Problemas ----
+      function secProblemas(p) {
         const probs = p.problemas || [];
-        if (probs.length)
-          h += bloco("Problemas ativos", "<ul>" + probs.map((x) =>
-            `<li><b>${escapeHtml(x.titulo)}</b> (${x.status}, ${x.prioridade})${x.conduta ? " — " + escapeHtml(x.conduta) : ""}</li>`).join("") + "</ul>");
+        const corpo = (probs.length ? probs.map(cardProblema).join("") : '<div class="vazio">Nenhum problema ativo.</div>') +
+          `<div id="form-prob"></div>`;
+        return acc("problemas", "Problemas Ativos", probs.length, corpo, "novoProblema()");
+      }
+      function cardProblema(x) {
+        const c = PRIO[x.prioridade] || PRIO.media;
+        return `<div class="prob" style="background:${c.bg};border-left-color:${c.bd}">
+          <div class="ptopo"><span class="ptit">${esc(x.titulo)}</span>
+            <span class="acoes-icone"><span onclick="editProblema('${x.id}')" style="cursor:pointer">✏️</span><span onclick="delProblema('${x.id}')" style="cursor:pointer">🗑️</span></span></div>
+          <div class="pbadges">
+            <span class="mini" style="color:${c.fg};border-color:${c.fg}">${PROB_STATUS[x.status] || x.status}</span>
+            <span class="mini" style="color:${c.fg};border-color:${c.fg}">Prioridade ${c.label.toLowerCase()}</span></div>
+          ${x.observacao ? `<div class="pobs">${esc(x.observacao)}</div>` : ""}
+          ${x.conduta ? `<div class="pcond">Conduta: ${esc(x.conduta)}</div>` : ""}
+        </div>`;
+      }
+      function formProblema(x) {
+        x = x || { titulo: "", status: "ativo", prioridade: "media", observacao: "", conduta: "" };
+        return `<div class="field"><label class="label">Título *</label><input id="pf-tit" value="${esc(x.titulo)}"></div>
+          <div class="grid2">
+            <div class="field"><label class="label">Status</label><select id="pf-st">${Object.keys(PROB_STATUS).map((k) => `<option value="${k}" ${x.status === k ? "selected" : ""}>${PROB_STATUS[k]}</option>`).join("")}</select></div>
+            <div class="field"><label class="label">Prioridade</label><select id="pf-pr">${Object.keys(PRIO).map((k) => `<option value="${k}" ${x.prioridade === k ? "selected" : ""}>${PRIO[k].label}</option>`).join("")}</select></div>
+          </div>
+          <div class="field"><label class="label">Observação</label><textarea id="pf-obs">${esc(x.observacao)}</textarea></div>
+          <div class="field"><label class="label">Conduta</label><textarea id="pf-cond">${esc(x.conduta)}</textarea></div>
+          <div class="modal-acoes"><button class="btn-sec" onclick="renderDetalhe()">Cancelar</button><button class="btn-ok" onclick="salvarProblema('${x.id || ""}')">Salvar</button></div>`;
+      }
+      function novoProblema() { abertos.add("problemas"); renderDetalhe(); document.getElementById("form-prob").innerHTML = formProblema(); }
+      function editProblema(id) { abertos.add("problemas"); renderDetalhe(); const x = (pa().problemas || []).find((p) => p.id === id); document.getElementById("form-prob").innerHTML = formProblema(x); }
+      function salvarProblema(id) {
+        const tit = document.getElementById("pf-tit").value.trim(); if (!tit) return;
+        const obj = { titulo: tit, status: document.getElementById("pf-st").value, prioridade: document.getElementById("pf-pr").value, observacao: document.getElementById("pf-obs").value.trim(), conduta: document.getElementById("pf-cond").value.trim() };
+        mut((p) => { p.problemas = p.problemas || []; if (id) { const i = p.problemas.findIndex((x) => x.id === id); p.problemas[i] = { ...obj, id }; } else { p.problemas.push({ ...obj, id: "w" + Date.now() }); } });
+        renderDetalhe();
+      }
+      function delProblema(id) { if (!confirm("Excluir problema?")) return; mut((p) => { p.problemas = (p.problemas || []).filter((x) => x.id !== id); }); renderDetalhe(); }
 
+      // ---- Pendências ----
+      function secPendencias(p) {
         const pend = p.pendencias || [];
-        if (pend.length)
-          h += bloco("Pendências", "<ul>" + pend.map((x) =>
-            `<li>${x.feito ? "☑" : "☐"} ${escapeHtml(x.descricao)} (${x.prioridade})</li>`).join("") + "</ul>");
+        const abertasN = pend.filter((x) => !x.feito).length;
+        const corpo = (pend.length ? pend.map((x) => {
+          const c = PRIO[x.prioridade] || PRIO.media;
+          return `<div class="pend ${x.feito ? "feito" : ""}">
+            <span class="cb" onclick="togglePend('${x.id}')">${x.feito ? "☑" : "☐"}</span>
+            <span class="txt">${esc(x.descricao)}</span>
+            ${x.feito ? "" : `<span class="dot" style="background:${c.fg}"></span>`}
+            <span onclick="delPend('${x.id}')" style="cursor:pointer">🗑️</span></div>`;
+        }).join("") : '<div class="vazio">Nenhuma pendência.</div>') + `<div id="form-pend"></div>`;
+        return acc("pendencias", "Pendências", abertasN, corpo, "novaPend()");
+      }
+      function novaPend() {
+        abertos.add("pendencias"); renderDetalhe();
+        document.getElementById("form-pend").innerHTML = `<div class="field" style="margin-top:8px"><label class="label">Descrição *</label><input id="pd-desc"></div>
+          <div class="field"><label class="label">Prioridade</label><select id="pd-pr">${Object.keys(PRIO).map((k) => `<option value="${k}" ${k === "media" ? "selected" : ""}>${PRIO[k].label}</option>`).join("")}</select></div>
+          <div class="modal-acoes"><button class="btn-sec" onclick="renderDetalhe()">Cancelar</button><button class="btn-ok" onclick="salvarPend()">Adicionar</button></div>`;
+      }
+      function salvarPend() { const d = document.getElementById("pd-desc").value.trim(); if (!d) return; const pr = document.getElementById("pd-pr").value; mut((p) => { p.pendencias = p.pendencias || []; p.pendencias.push({ id: "w" + Date.now(), descricao: d, prioridade: pr, feito: false }); }); renderSidebar(); renderDetalhe(); }
+      function togglePend(id) { mut((p) => { const x = (p.pendencias || []).find((y) => y.id === id); if (x) x.feito = !x.feito; }); renderSidebar(); renderDetalhe(); }
+      function delPend(id) { mut((p) => { p.pendencias = (p.pendencias || []).filter((x) => x.id !== id); }); renderSidebar(); renderDetalhe(); }
 
-        // Exames laboratoriais por data (evolução temporal)
-        const labs = agruparLab(p.resultadosLab || []);
-        if (labs.length)
-          h += bloco("Evolução laboratorial", "<ul>" + labs.map((s) =>
-            `<li><b>${escapeHtml(s.exame)}</b>: ${s.pontos.map((pt) => escapeHtml(pt.valor)).join(" → ")}</li>`).join("") + "</ul>");
+      // ---- Seção foto (blocos + anotações) ----
+      function secFoto(p, s) {
+        const sec = (p.secoes || {})[s.id] || { anotacoes: [], extraido: "" };
+        return acc("sec_" + s.id, s.titulo, null, conteudoFoto(p, s, sec), null);
+      }
+      function conteudoFoto(p, s, sec) {
+        const blocos = parseBlocos(sec.extraido);
+        let h = blocos.length && blocos.some((b) => b.itens.length)
+          ? blocos.map((b) => `<div class="blocoex">${b.titulo ? `<b>${esc(b.titulo)}</b>` : ""}<ul>${b.itens.map((i) => `<li>${esc(i)}</li>`).join("")}</ul></div>`).join("")
+          : '<div class="vazio">Sem dados extraídos.</div>';
+        h += `<div style="margin-top:12px"><span class="label">Anotações</span>`;
+        h += ((sec.anotacoes || []).map((a) => `<div class="anot"><div><div class="hora">${esc(a.horario || "")}</div><div class="at">${esc(a.texto)}</div></div><span onclick="delAnot('${s.id}','${a.id}')" style="cursor:pointer">🗑️</span></div>`).join(""));
+        h += `<div class="field" style="margin-top:8px"><textarea id="anot-${s.id}" placeholder="Nova anotação..."></textarea></div>
+          <button class="btn-ghost" onclick="addAnot('${s.id}')">Salvar anotação</button></div>`;
+        return h;
+      }
+      function addAnot(sid) {
+        const ta = document.getElementById("anot-" + sid); const t = ta.value.trim(); if (!t) return;
+        const hora = new Date().toTimeString().slice(0, 5);
+        mut((p) => { p.secoes = p.secoes || {}; const sec = p.secoes[sid] || { anotacoes: [], extraido: "" }; sec.anotacoes = [{ id: "w" + Date.now(), texto: t, horario: hora }, ...(sec.anotacoes || [])]; p.secoes[sid] = sec; });
+        renderDetalhe();
+      }
+      function delAnot(sid, aid) { mut((p) => { const sec = (p.secoes || {})[sid]; if (sec) sec.anotacoes = (sec.anotacoes || []).filter((a) => a.id !== aid); }); renderDetalhe(); }
 
-        // Sinais vitais (frase do registro mais recente)
-        const sv = ultimoSV(p.sinaisVitais);
-        const frase = fraseSinaisVitais(sv);
-        if (frase) h += bloco("Sinais vitais", `<div class="frase">${escapeHtml(frase)}</div>`);
-
-        // Seções extraídas
-        for (const [sid, titulo] of SECOES) {
-          const sec = (p.secoes || {})[sid];
-          const linhas = blocosTexto(sec && sec.extraido);
-          if (linhas.length)
-            h += bloco(titulo, "<ul>" + linhas.map((l) => `<li>${escapeHtml(l)}</li>`).join("") + "</ul>");
+      // ---- Exames laboratoriais ----
+      function secExames(p, s) {
+        const series = agruparLab(p.resultadosLab || []);
+        const datas = [...new Set((p.resultadosLab || []).map((r) => r.data))].sort();
+        let tabela;
+        if (!series.length) tabela = '<div class="vazio">Nenhum resultado por data ainda.</div>';
+        else {
+          tabela = `<div style="overflow-x:auto"><table class="labs"><thead><tr><th>Exame</th>${datas.map((d) => `<th>${formatarDataBR(d).slice(0, 5)}</th>`).join("")}<th>Tend.</th></tr></thead><tbody>`;
+          for (const se of series) {
+            const porData = {}; se.pontos.forEach((pt) => (porData[pt.data] = pt.valor));
+            tabela += `<tr><td class="ex">${esc(se.exame)}</td>${datas.map((d) => `<td>${esc(porData[d] || "")}</td>`).join("")}<td style="color:${se.tendencia ? se.tendencia.cor : "var(--muted)"}">${se.tendencia ? se.tendencia.icone : ""}</td></tr>`;
+          }
+          tabela += "</tbody></table></div>";
         }
-
-        // Evolução do dia + copiar
-        const evo = evolucoesDia[p.id];
-        if (evo) {
-          h += `<div class="bloco"><h4>Evolução do dia</h4>
-            <button class="btn-copiar" id="cp-${i}" onclick="copiar(${i})">📋 Copiar evolução</button>
-            <pre id="evo-${i}">${escapeHtml(evo)}</pre></div>`;
-        }
-        return h || '<p class="card-meta">Sem dados adicionais.</p>';
+        const form = `<div id="form-lab" style="margin-top:12px">
+          <div class="grid2"><div class="field"><label class="label">Exame</label><input id="lab-ex" placeholder="PCR"></div>
+          <div class="field"><label class="label">Data</label><input id="lab-dt" type="date" value="${hojeISO()}"></div></div>
+          <div class="field"><label class="label">Valor</label><input id="lab-v" placeholder="42"></div>
+          <button class="btn-ghost" onclick="addLab()">+ Adicionar resultado</button></div>`;
+        const sec = (p.secoes || {})[s.id] || { anotacoes: [], extraido: "" };
+        const anot = `<div style="margin-top:14px"><span class="label">Anotações</span>${(sec.anotacoes || []).map((a) => `<div class="anot"><div><div class="hora">${esc(a.horario || "")}</div><div class="at">${esc(a.texto)}</div></div><span onclick="delAnot('${s.id}','${a.id}')" style="cursor:pointer">🗑️</span></div>`).join("")}<div class="field" style="margin-top:8px"><textarea id="anot-${s.id}" placeholder="Nova anotação..."></textarea></div><button class="btn-ghost" onclick="addAnot('${s.id}')">Salvar anotação</button></div>`;
+        return acc("sec_" + s.id, s.titulo, series.length || null, tabela + form + anot, null);
+      }
+      function addLab() {
+        const ex = document.getElementById("lab-ex").value.trim(), dt = document.getElementById("lab-dt").value || hojeISO(), v = document.getElementById("lab-v").value.trim();
+        if (!ex || !v) return;
+        mut((p) => { p.resultadosLab = p.resultadosLab || []; p.resultadosLab.push({ id: "w" + Date.now(), exame: ex, data: dt, valor: v }); });
+        renderDetalhe();
       }
 
-      function bloco(titulo, conteudo) {
-        return `<div class="bloco"><h4>${escapeHtml(titulo)}</h4>${conteudo}</div>`;
+      // ---- Sinais vitais ----
+      function secSinaisVitais(p, s) {
+        const sv = (p.sinaisVitais || {})[dataSV] || {};
+        const campos = [["temp", "Temperatura (°C)"], ["paSist", "PA Sistólica"], ["paDiast", "PA Diastólica"], ["fc", "FC (bpm)"], ["fr", "FR (irpm)"], ["sato2", "SatO2 (%)"], ["glicemia", "Glicemia (mg/dL)"], ["diurese", "Diurese (mL/24h)"]];
+        let h = `<div class="field"><label class="label">Data do registro</label><input type="date" value="${dataSV}" onchange="dataSV=this.value;renderDetalhe()"></div>
+          <div class="grid2">${campos.map(([k, l]) => `<div class="field"><label class="label">${l}</label><input value="${esc(sv[k] || "")}" oninput="svInput('${k}',this.value)" onblur="svBlur()"></div>`).join("")}</div>
+          <div class="field"><label class="label">O2 em uso</label><div class="chips">${O2_OPCOES.map(([v, l]) => `<button class="chip-sel" style="${sv.o2 === v ? "border-color:var(--primary);background:#e0f2fe;color:var(--primary)" : ""}" onclick="svO2('${v}')">${l}</button>`).join("")}</div></div>
+          <div class="field"><label class="label">Intercorrências</label><textarea oninput="svInput('intercorrencias',this.value)" onblur="svBlur()">${esc(sv.intercorrencias || "")}</textarea></div>
+          <div class="frase-box ${svVazio(sv) ? "hidden" : ""}" id="sv-frase">${esc(fraseSinaisVitais(sv))}</div>`;
+        return acc("sec_" + s.id, s.titulo, null, h, null);
       }
+      function svObj(p) { p.sinaisVitais = p.sinaisVitais || {}; if (!p.sinaisVitais[dataSV]) p.sinaisVitais[dataSV] = { temp: "", paSist: "", paDiast: "", fc: "", fr: "", sato2: "", glicemia: "", diurese: "", o2: null, intercorrencias: "" }; return p.sinaisVitais[dataSV]; }
+      function svInput(k, v) { const p = pa(); if (!p) return; svObj(p)[k] = v; const f = document.getElementById("sv-frase"); if (f) { const txt = fraseSinaisVitais(p.sinaisVitais[dataSV]); f.textContent = txt; f.classList.toggle("hidden", !txt); } }
+      function svBlur() { const p = pa(); if (p) agendarSync(p); }
+      function svO2(v) { mut((p) => { const o = svObj(p); o.o2 = o.o2 === v ? null : v; }); renderDetalhe(); }
 
-      function agruparLab(resultados) {
-        const mapa = {};
-        for (const r of resultados) {
-          const k = (r.exame || "").trim();
-          if (!k) continue;
-          (mapa[k] = mapa[k] || []).push(r);
-        }
-        return Object.keys(mapa).sort().map((exame) => ({
-          exame,
-          pontos: mapa[exame].sort((a, b) => String(a.data).localeCompare(String(b.data))),
-        }));
+      // ---- Evolução beira-leito ----
+      function secEvolucao(p) {
+        const e = (p.evolucoes || {})[dataEvo] || {};
+        const toggles = (grupo, campo, atual) => `<div class="chips">${OPC[grupo].map(([v, l]) => `<button class="chip-sel" style="${atual === v ? "border-color:var(--primary);background:#e0f2fe;color:var(--primary)" : ""}" onclick="evoToggle('${campo}','${v}')">${l}</button>`).join("")}</div>`;
+        let h = `<div class="field"><label class="label">Data</label><input type="date" value="${dataEvo}" onchange="dataEvo=this.value;renderDetalhe()"></div>
+          <div class="grupo-tit">Estado Geral</div>
+          <div class="field"><label class="label">Nível de consciência</label>${toggles("consciencia", "nivelConsciencia", e.nivelConsciencia)}</div>
+          <div class="field"><label class="label">Orientação</label>${toggles("orientacao", "orientacao", e.orientacao)}</div>
+          <div class="field"><label class="label">Estado geral</label><textarea oninput="evoInput('estadoGeral',this.value)" onblur="evoBlur()">${esc(e.estadoGeral || "")}</textarea></div>
+          <div class="grupo-tit">Alimentação e Eliminações</div>
+          <div class="field"><label class="label">Alimentação</label>${toggles("alimentacao", "alimentacao", e.alimentacao)}</div>
+          <div class="field"><label class="label">Diurese</label>${toggles("diurese", "diurese", e.diurese)}</div>
+          <div class="field"><label class="label">Evacuação</label>${toggles("evacuacao", "evacuacao", e.evacuacao)}</div>
+          <div class="grupo-tit">Invasões e Dispositivos</div>
+          <div class="chips">${DISPOSITIVOS.map((d) => { const at = (e.dispositivos || []).includes(d); return `<button class="chip-sel" style="${at ? "border-color:var(--primary);background:#e0f2fe;color:var(--primary)" : ""}" onclick="evoDisp('${esc(d).replace(/'/g, "\\'")}')">${at ? "☑ " : "☐ "}${esc(d)}</button>`; }).join("")}</div>
+          ${(e.dispositivos || []).map((d) => `<div class="field" style="margin-top:8px"><label class="label">${esc(d)}</label><input value="${esc((e.dispositivosObs || {})[d] || "")}" oninput="evoDispObs('${esc(d).replace(/'/g, "\\'")}',this.value)" onblur="evoBlur()" placeholder="Observações..."></div>`).join("")}
+          <div class="grupo-tit">Achados do Exame Físico</div>
+          <div class="field"><textarea oninput="evoInput('exameFisico',this.value)" onblur="evoBlur()">${esc(e.exameFisico || "")}</textarea></div>
+          <div class="grupo-tit">Conduta do Dia</div>
+          <div class="field"><textarea oninput="evoInput('condutaDoDia',this.value)" onblur="evoBlur()">${esc(e.condutaDoDia || "")}</textarea></div>`;
+        return acc("evolucao", "Evolução Beira-Leito", null, h, null);
       }
+      function evoObj(p) { p.evolucoes = p.evolucoes || {}; if (!p.evolucoes[dataEvo]) p.evolucoes[dataEvo] = { nivelConsciencia: null, orientacao: null, estadoGeral: "", alimentacao: null, diurese: null, evacuacao: null, dispositivos: [], dispositivosObs: {}, exameFisico: "", condutaDoDia: "" }; return p.evolucoes[dataEvo]; }
+      function evoInput(k, v) { const p = pa(); if (p) evoObj(p)[k] = v; }
+      function evoBlur() { const p = pa(); if (p) agendarSync(p); }
+      function evoToggle(campo, v) { mut((p) => { const e = evoObj(p); e[campo] = e[campo] === v ? null : v; }); renderDetalhe(); }
+      function evoDisp(d) { mut((p) => { const e = evoObj(p); const i = e.dispositivos.indexOf(d); if (i >= 0) e.dispositivos.splice(i, 1); else e.dispositivos.push(d); }); renderDetalhe(); }
+      function evoDispObs(d, v) { const p = pa(); if (p) { evoObj(p).dispositivosObs[d] = v; } }
 
-      function ultimoSV(sinaisVitais) {
-        if (!sinaisVitais) return null;
-        const datas = Object.keys(sinaisVitais).sort();
-        return datas.length ? sinaisVitais[datas[datas.length - 1]] : null;
+      // ---- Checklist de alta ----
+      function secChecklist(p) {
+        const ch = p.checklistAlta || {};
+        const feitos = CHECKLIST_ALTA.filter(([k]) => ch[k]).length;
+        const corpo = CHECKLIST_ALTA.map(([k, l]) => `<div class="check ${ch[k] ? "ok" : ""}" onclick="toggleCheck('${k}')"><span class="cb">${ch[k] ? "☑" : "☐"}</span><span class="ct">${esc(l)}</span></div>`).join("");
+        return acc("checklist", "Checklist de Alta", `${feitos}/${CHECKLIST_ALTA.length}`, corpo, null);
       }
+      function toggleCheck(k) { mut((p) => { p.checklistAlta = p.checklistAlta || {}; p.checklistAlta[k] = !p.checklistAlta[k]; }); renderDetalhe(); }
 
-      function toggle(i) {
-        document.getElementById("det-" + i).classList.toggle("aberto");
-      }
-
-      async function copiar(i) {
-        const texto = evolucoesDia[pacientes[i].id] || "";
+      // ---- Cabeçalho: ações ----
+      function setStatusClinico(k) { mut((p) => { p.statusClinico = p.statusClinico === k ? null : k; }); renderDetalhe(); }
+      function setLeito(v) { mut((p) => { p.leito = v.trim(); }); renderSidebar(); }
+      function setResumo(v) { mut((p) => { p.resumoRapido = v; }); }
+      async function gerarResumo() {
+        const p = pa(); if (!p) return; const btn = document.getElementById("btn-gerar"); btn.textContent = "Gerando…"; btn.disabled = true;
         try {
-          await navigator.clipboard.writeText(texto);
-        } catch {
-          const range = document.createRange();
-          range.selectNodeContents(document.getElementById("evo-" + i));
-          const sel = window.getSelection();
-          sel.removeAllRanges();
-          sel.addRange(range);
-          document.execCommand("copy");
-        }
-        const btn = document.getElementById("cp-" + i);
-        btn.textContent = "✓ Copiado!";
-        btn.classList.add("ok");
-        setTimeout(() => {
-          btn.textContent = "📋 Copiar evolução";
-          btn.classList.remove("ok");
-        }, 2000);
+          const dados = montarDadosResumo(p);
+          const r = await apiPost("/api/resumo", { dados });
+          mut((x) => { x.resumoRapido = r.resumo; });
+          document.getElementById("resumo-input").value = r.resumo;
+        } catch (e) { alert("Não foi possível gerar o resumo."); }
+        btn.textContent = "✨ Gerar resumo"; btn.disabled = false;
       }
+      function montarDadosResumo(p) {
+        const l = [`Nome: ${p.nomeCompleto}`];
+        if (p.idade != null) l.push(`Idade: ${p.idade} anos`);
+        const dia = diaInternacao(p.dataEntrada); if (dia) l.push(`Dia de internação: D${dia}`);
+        if (p.diagnosticoPrincipal) l.push(`Diagnóstico: ${p.diagnosticoPrincipal}`);
+        if (p.statusClinico) l.push(`Status clínico: ${STATUS_CLINICO[p.statusClinico].label}`);
+        (p.problemas || []).forEach((x) => l.push(`Problema: ${x.titulo} (${x.status})${x.conduta ? " — " + x.conduta : ""}`));
+        agruparLab(p.resultadosLab || []).forEach((s) => l.push(`Exame ${s.exame}: ${s.pontos.map((pt) => pt.valor).join(" → ")}${s.tendencia ? " (" + s.tendencia.rotulo + ")" : ""}`));
+        const f = fraseSinaisVitais((p.sinaisVitais || {})[hojeISO()]); if (f) l.push("Sinais vitais: " + f);
+        const e = (p.evolucoes || {})[hojeISO()]; if (e && e.condutaDoDia) l.push("Conduta do dia: " + e.condutaDoDia);
+        return l.join("\n");
+      }
+
+      // ======== MODAIS ========
+      function fecharModal() { document.getElementById("modais").innerHTML = ""; }
+      function abrirModalAdd() {
+        document.getElementById("modais").innerHTML = `<div class="modal-bg" onclick="if(event.target===this)fecharModal()"><div class="modal">
+          <h3>Adicionar paciente</h3>
+          <button class="opc-btn opc-foto" onclick="alert('Use o app mobile para adicionar por foto.')">📷 Fotografar prontuário</button>
+          <div class="grupo-tit">Preencher manualmente</div>
+          <div class="field"><label class="label">Nome completo *</label><input id="a-nome"></div>
+          <div class="field"><label class="label">Data de nascimento ou idade</label><input id="a-idade" placeholder="72 ou 07/06/1953"></div>
+          <div class="grid2"><div class="field"><label class="label">Leito</label><input id="a-leito"></div><div class="field"><label class="label">Setor</label><input id="a-setor"></div></div>
+          <div class="field"><label class="label">Número do prontuário</label><input id="a-pront"></div>
+          <div class="field"><label class="label">Data de internação</label><input id="a-entrada" placeholder="07/06/2026"></div>
+          <div class="field"><label class="label">Diagnóstico principal</label><input id="a-diag"></div>
+          <div class="field"><label class="label">Motivo da internação</label><textarea id="a-motivo"></textarea></div>
+          <div class="modal-acoes"><button class="btn-sec" onclick="fecharModal()">Cancelar</button><button class="btn-ok" onclick="salvarNovoPaciente()">Salvar paciente</button></div>
+        </div></div>`;
+      }
+      function idadeDeTexto(t) {
+        t = (t || "").trim(); if (!t) return null;
+        if (/^\d{1,3}$/.test(t)) return +t;
+        const d = parseData(t); if (!d) return null;
+        const h = new Date(); let i = h.getFullYear() - d.getFullYear(); const m = h.getMonth() - d.getMonth();
+        if (m < 0 || (m === 0 && h.getDate() < d.getDate())) i--; return i >= 0 ? i : null;
+      }
+      async function salvarNovoPaciente() {
+        const nome = document.getElementById("a-nome").value.trim(); if (!nome) return alert("Nome é obrigatório.");
+        const pront = document.getElementById("a-pront").value.trim();
+        const novo = {
+          id: pront || "w" + Date.now(), nomeCompleto: nome, idade: idadeDeTexto(document.getElementById("a-idade").value),
+          leito: document.getElementById("a-leito").value.trim(), setor: document.getElementById("a-setor").value.trim(),
+          numeroProntuario: pront, dataEntrada: document.getElementById("a-entrada").value.trim(),
+          diagnosticoPrincipal: document.getElementById("a-diag").value.trim(), motivoInternacao: document.getElementById("a-motivo").value.trim(),
+          status: "naoVisitado", diasAcompanhamento: [hojeISO()], dadosClinicos: null,
+        };
+        pacientes.push(novo); agendarSync(novo); fecharModal(); ativoId = novo.id; renderSidebar(); renderDetalhe();
+      }
+      function abrirModalEdit() {
+        const p = pa(); if (!p) return;
+        document.getElementById("modais").innerHTML = `<div class="modal-bg" onclick="if(event.target===this)fecharModal()"><div class="modal">
+          <h3>Editar paciente</h3>
+          <div class="field"><label class="label">Nome completo</label><input id="e-nome" value="${esc(p.nomeCompleto || "")}"></div>
+          <div class="grid2"><div class="field"><label class="label">Leito</label><input id="e-leito" value="${esc(p.leito || "")}"></div><div class="field"><label class="label">Setor</label><input id="e-setor" value="${esc(p.setor || "")}"></div></div>
+          <div class="field"><label class="label">Data de entrada</label><input id="e-entrada" value="${esc(p.dataEntrada || "")}"></div>
+          <div class="field"><label class="label">Número do prontuário</label><input id="e-pront" value="${esc(p.numeroProntuario || "")}"></div>
+          <div class="field"><label class="label">Diagnóstico principal</label><input id="e-diag" value="${esc(p.diagnosticoPrincipal || "")}"></div>
+          <div class="field"><label class="label">Motivo da internação</label><textarea id="e-motivo">${esc(p.motivoInternacao || "")}</textarea></div>
+          <div class="modal-acoes"><button class="btn-sec" onclick="fecharModal()">Cancelar</button><button class="btn-ok" onclick="salvarEdicao()">Salvar</button></div>
+        </div></div>`;
+      }
+      function salvarEdicao() {
+        mut((p) => {
+          p.nomeCompleto = document.getElementById("e-nome").value.trim();
+          p.leito = document.getElementById("e-leito").value.trim();
+          p.setor = document.getElementById("e-setor").value.trim();
+          p.dataEntrada = document.getElementById("e-entrada").value.trim();
+          p.numeroProntuario = document.getElementById("e-pront").value.trim();
+          p.diagnosticoPrincipal = document.getElementById("e-diag").value.trim();
+          p.motivoInternacao = document.getElementById("e-motivo").value.trim();
+        });
+        fecharModal(); renderSidebar(); renderDetalhe();
+      }
+      async function excluirPaciente() {
+        const p = pa(); if (!p) return; if (!confirm(`Excluir ${p.nomeCompleto}?`)) return;
+        pacientes = pacientes.filter((x) => x.id !== p.id); ativoId = null;
+        try { await apiDelete("/api/pacientes/" + encodeURIComponent(medicoId) + "/" + encodeURIComponent(p.id)); } catch {}
+        renderSidebar(); document.getElementById("detalhe").innerHTML = '<div class="vazio-main">Selecione um paciente na lista.</div>';
+      }
+
+      // ---- Passar o Caso ----
+      async function abrirPassarCaso() {
+        const p = pa(); if (!p) return;
+        const bruto = gerarTextoEvolucao(p, hojeISO());
+        document.getElementById("modais").innerHTML = `<div class="modal-bg" onclick="if(event.target===this)fecharModal()"><div class="modal">
+          <h3>Passando o Caso — ${esc(formatarNome(p.nomeCompleto))}</h3>
+          <textarea id="pc-texto" style="min-height:280px">${esc(bruto)}</textarea>
+          <p class="vazio" style="margin:8px 0">Revise e ajuste antes de copiar. Você decide o conteúdo final.</p>
+          <div class="modal-acoes"><button class="btn-sec" onclick="fecharModal()">← Fechar</button><button class="btn-ok verde" id="pc-copiar" onclick="copiarCaso()">📋 Copiar</button></div>
+          <div id="pc-status" class="vazio" style="margin-top:8px"></div>
+        </div></div>`;
+        // Padroniza via IA em segundo plano (com fallback ao texto bruto).
+        try { const r = await apiPost("/api/formatar", { texto: bruto }); const ta = document.getElementById("pc-texto"); if (ta && r.texto) ta.value = r.texto; } catch {}
+      }
+      async function copiarCaso() {
+        const p = pa(); const ta = document.getElementById("pc-texto"); const texto = ta.value;
+        try { await navigator.clipboard.writeText(texto); } catch { ta.select(); document.execCommand("copy"); }
+        const btn = document.getElementById("pc-copiar"); btn.textContent = "✓ Copiado!";
+        try {
+          await apiPost("/api/evolucao/salvar", { medicoId, data: hojeISO(), pacienteId: p.id, nome: p.nomeCompleto, texto });
+          evolucoesDia[p.id] = texto;
+          document.getElementById("pc-status").innerHTML = '<span style="color:var(--accent)">✓ Salvo na nuvem</span>';
+        } catch { document.getElementById("pc-status").innerHTML = '<span class="erro">⚠️ Não salvo</span>'; }
+        setTimeout(() => { btn.textContent = "📋 Copiar"; }, 2000);
+      }
+
+      // ======== BOOT ========
+      if (medicoId) { document.getElementById("medicoId").value = medicoId; iniciar(); }
     </script>
   </body>
 </html>
