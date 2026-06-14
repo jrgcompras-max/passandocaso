@@ -16,7 +16,7 @@ export type SecaoConfig = {
 export const SECOES: SecaoConfig[] = [
   {
     id: "comorbidadesMedicacoes",
-    titulo: "Comorbidades e Medicações de Uso Contínuo",
+    titulo: "Comorbidades e MUC",
     instrucao:
       "Extraia desta tela de prontuário as comorbidades/doenças de base e as medicações de uso contínuo. " +
       "Use dois blocos: 'Comorbidades' (uma doença por item) e 'Medicações de uso contínuo' (uma medicação com dose/posologia por item).",

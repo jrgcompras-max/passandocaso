@@ -5,11 +5,15 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  KeyboardAvoidingView,
   LayoutAnimation,
+  Modal,
   Platform,
+  ScrollView,
   SectionList,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   UIManager,
   View,
@@ -22,7 +26,9 @@ import {
   StatusColors,
   type StatusType,
 } from "@/constants/clinicalTheme";
+import { diaDeInternacao } from "@/lib/datas";
 import { extrairDadosImagem } from "@/lib/extrairDadosImagem";
+import { formatarNome } from "@/lib/formatarNome";
 import { converterParaJpegBase64 } from "@/lib/imagem";
 import { usePacientes } from "@/store/PacientesContext";
 import { type CabecalhoProntuario } from "@/types/paciente";
@@ -37,23 +43,80 @@ if (
 
 /** Ordem de prioridade (topo → fim) usada tanto para avançar quanto para ordenar. */
 const ORDEM_STATUS: StatusType[] = [
-  "pendente",
+  "naoVisitado",
   "visitado",
-  "discutido",
-  "evoluido",
+  "revisar",
+  "pendente",
+  "altaProvavel",
+  "altaRealizada",
 ];
 
-/** Rótulo do separador de grupo (plural, maiúsculas vêm do estilo). */
+/** Rótulo do separador de grupo (maiúsculas vêm do estilo). */
 const ROTULO_GRUPO: Record<StatusType, string> = {
-  pendente: "Pendentes",
+  naoVisitado: "Não visitados",
   visitado: "Visitados",
-  discutido: "Discutidos",
-  evoluido: "Evoluídos",
+  revisar: "Revisar",
+  pendente: "Pendentes",
+  altaProvavel: "Alta provável",
+  altaRealizada: "Alta realizada",
 };
 
 function proximoStatus(atual: StatusType): StatusType {
   const i = ORDEM_STATUS.indexOf(atual);
   return ORDEM_STATUS[(i + 1) % ORDEM_STATUS.length];
+}
+
+/**
+ * Data por extenso em pt-BR com apenas a primeira letra maiúscula
+ * (ex.: "Domingo, 14 de junho") — os meses/dias da semana ficam minúsculos.
+ */
+function dataPorExtenso(): string {
+  const texto = new Date().toLocaleDateString("pt-BR", {
+    weekday: "long",
+    day: "2-digit",
+    month: "long",
+  });
+  return texto.charAt(0).toUpperCase() + texto.slice(1);
+}
+
+/** Estado inicial do formulário manual de paciente. */
+const FORM_VAZIO = {
+  nome: "",
+  idadeNasc: "",
+  leito: "",
+  setor: "",
+  prontuario: "",
+  internacao: "",
+  diagnostico: "",
+  motivo: "",
+};
+
+/**
+ * Interpreta o campo "Data de nascimento ou idade": número puro vira idade;
+ * uma data (DD/MM/YYYY ou YYYY-MM-DD) é convertida em idade. Retorna null se
+ * não reconhecer.
+ */
+function idadeDeTexto(txt: string): number | null {
+  const t = txt.trim();
+  if (!t) return null;
+  if (/^\d{1,3}$/.test(t)) return Number(t);
+
+  const iso = t.match(/(\d{4})-(\d{2})-(\d{2})/);
+  const br = t.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  let nasc: Date | null = null;
+  if (iso) {
+    nasc = new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
+  } else if (br) {
+    const ano = br[3].length === 2 ? 1900 + Number(br[3]) : Number(br[3]);
+    nasc = new Date(ano, Number(br[2]) - 1, Number(br[1]));
+  }
+  if (!nasc || Number.isNaN(nasc.getTime())) return null;
+
+  const hoje = new Date();
+  let idade = hoje.getFullYear() - nasc.getFullYear();
+  const m = hoje.getMonth() - nasc.getMonth();
+  if (m < 0 || (m === 0 && hoje.getDate() < nasc.getDate())) idade--;
+  return idade >= 0 ? idade : null;
 }
 
 const INSTRUCAO_CABECALHO =
@@ -70,6 +133,11 @@ export default function Index() {
   const { pacientes, adicionarPorCabecalho, atualizarPaciente } = usePacientes();
   const [processando, setProcessando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [modalVisivel, setModalVisivel] = useState(false);
+  const [modoModal, setModoModal] = useState<"escolha" | "form">("escolha");
+  const [form, setForm] = useState(FORM_VAZIO);
+  const setCampo = (campo: keyof typeof FORM_VAZIO) => (valor: string) =>
+    setForm((f) => ({ ...f, [campo]: valor }));
 
   // Agrupa por status na ordem de prioridade; só inclui grupos não-vazios.
   const secoes = ORDEM_STATUS.map((status) => ({
@@ -127,9 +195,10 @@ export default function Index() {
     if (!result.canceled) processarImagem(result.assets[0].uri);
   };
 
-  const adicionarPaciente = () => {
+  // Sub-escolha do fluxo de foto: câmera ou galeria.
+  const escolherCaptura = () => {
     Alert.alert(
-      "Adicionar paciente",
+      "Fotografar prontuário",
       "Como você quer capturar o cabeçalho do prontuário?",
       [
         { text: "📷 Câmera", onPress: abrirCamera },
@@ -139,27 +208,57 @@ export default function Index() {
     );
   };
 
+  const abrirModal = () => {
+    setModoModal("escolha");
+    setModalVisivel(true);
+  };
+
+  const fecharModal = () => setModalVisivel(false);
+
+  // Opção "Fotografar prontuário": fecha o modal e segue o fluxo de foto atual.
+  const escolherFoto = () => {
+    setModalVisivel(false);
+    escolherCaptura();
+  };
+
+  const salvarManual = () => {
+    const nome = form.nome.trim();
+    if (!nome) return;
+    const { id } = adicionarPorCabecalho({
+      nomeCompleto: nome,
+      idade: idadeDeTexto(form.idadeNasc),
+      leito: form.leito.trim(),
+      setor: form.setor.trim(),
+      dataEntrada: form.internacao.trim(),
+      numeroProntuario: form.prontuario.trim(),
+    });
+    const diag = form.diagnostico.trim();
+    const mot = form.motivo.trim();
+    if (diag || mot) {
+      atualizarPaciente(id, {
+        diagnosticoPrincipal: diag,
+        motivoInternacao: mot,
+      });
+    }
+    setForm(FORM_VAZIO);
+    setModalVisivel(false);
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <View style={styles.headerTextos}>
           <Text style={styles.titulo}>Rotina do Dia</Text>
-          <Text style={styles.subtitulo}>
-            {new Date().toLocaleDateString("pt-BR", {
-              weekday: "long",
-              day: "2-digit",
-              month: "long",
-            })}
-          </Text>
+          <Text style={styles.subtitulo}>{dataPorExtenso()}</Text>
         </View>
         <TouchableOpacity
           style={styles.botaoAdd}
-          onPress={adicionarPaciente}
+          onPress={abrirModal}
           disabled={processando}
           accessibilityLabel="Adicionar paciente"
         >
           {processando ? (
-            <ActivityIndicator color={ClinicalColors.text} />
+            <ActivityIndicator color={ClinicalColors.textOnPrimary} />
           ) : (
             <Text style={styles.botaoAddTexto}>+</Text>
           )}
@@ -200,38 +299,189 @@ export default function Index() {
             — {section.titulo} ({section.data.length}) —
           </Text>
         )}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.card}
-            onPress={() =>
-              router.push({ pathname: "/paciente/[id]", params: { id: item.id } })
-            }
-          >
-            <View style={styles.cardLeft}>
-              {(!!item.leito || !!item.setor) && (
-                <Text style={styles.leito}>
-                  {[item.leito && `Leito ${item.leito}`, item.setor]
-                    .filter(Boolean)
-                    .join(" · ")}
+        renderItem={({ item }) => {
+          const dia = diaDeInternacao(item.dataEntrada);
+          const pendenciasAbertas =
+            item.pendencias?.filter((p) => !p.feito).length ?? 0;
+          return (
+            <TouchableOpacity
+              style={styles.card}
+              onPress={() =>
+                router.push({ pathname: "/paciente/[id]", params: { id: item.id } })
+              }
+            >
+              <View style={styles.cardLeft}>
+                {(!!item.leito || !!item.setor) && (
+                  <Text style={styles.leito}>
+                    {[item.leito && `Leito ${item.leito}`, item.setor]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </Text>
+                )}
+                <Text style={styles.nome}>
+                  {formatarNome(item.nomeCompleto) || "Sem nome"}
                 </Text>
-              )}
-              <Text style={styles.nome}>{item.nomeCompleto || "Sem nome"}</Text>
-              <Text style={styles.idade}>
-                {item.idade != null ? `${item.idade} anos` : "Idade —"}
-                {item.numeroProntuario ? ` · Prontuário ${item.numeroProntuario}` : ""}
+                <Text style={styles.idade}>
+                  {item.idade != null ? `${item.idade} anos` : "Idade —"}
+                  {item.numeroProntuario
+                    ? ` · Prontuário ${item.numeroProntuario}`
+                    : ""}
+                </Text>
+                {!!item.diagnosticoPrincipal && (
+                  <Text style={styles.diagnostico} numberOfLines={1}>
+                    {item.diagnosticoPrincipal}
+                  </Text>
+                )}
+                <View style={styles.metaRow}>
+                  {dia != null && <Text style={styles.diaBadge}>D{dia}</Text>}
+                  {pendenciasAbertas > 0 && (
+                    <Text style={styles.pendenciasIndicador}>
+                      {pendenciasAbertas}{" "}
+                      {pendenciasAbertas === 1 ? "pendência" : "pendências"}
+                    </Text>
+                  )}
+                </View>
+              </View>
+              <BadgeStatus
+                status={item.status}
+                onAvancar={() => avancarStatus(item.id, item.status)}
+              />
+            </TouchableOpacity>
+          );
+        }}
+      />
+
+      <Modal
+        visible={modalVisivel}
+        animationType="slide"
+        transparent
+        onRequestClose={fecharModal}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={styles.modalOverlay}
+        >
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitulo}>
+                {modoModal === "escolha"
+                  ? "Adicionar paciente"
+                  : "Preencher manualmente"}
               </Text>
-              {item.diasAcompanhamento.length > 1 && (
-                <Text style={styles.dias}>
-                  {item.diasAcompanhamento.length} dias de acompanhamento
-                </Text>
-              )}
+              <TouchableOpacity onPress={fecharModal} hitSlop={8}>
+                <Text style={styles.modalFechar}>✕</Text>
+              </TouchableOpacity>
             </View>
-            <BadgeStatus
-              status={item.status}
-              onAvancar={() => avancarStatus(item.id, item.status)}
-            />
-          </TouchableOpacity>
-        )}
+
+            {modoModal === "escolha" ? (
+              <View style={styles.modalOpcoes}>
+                <TouchableOpacity style={styles.opcaoBtn} onPress={escolherFoto}>
+                  <Text style={styles.opcaoBtnTexto}>
+                    📷 Fotografar prontuário
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.opcaoBtn, styles.opcaoBtnSecundaria]}
+                  onPress={() => setModoModal("form")}
+                >
+                  <Text
+                    style={[styles.opcaoBtnTexto, styles.opcaoBtnTextoSecundaria]}
+                  >
+                    ✏️ Preencher manualmente
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <ScrollView
+                style={styles.modalForm}
+                keyboardShouldPersistTaps="handled"
+              >
+                <CampoForm
+                  label="Nome completo *"
+                  value={form.nome}
+                  onChange={setCampo("nome")}
+                />
+                <CampoForm
+                  label="Data de nascimento ou idade"
+                  value={form.idadeNasc}
+                  onChange={setCampo("idadeNasc")}
+                  placeholder="Ex.: 72 ou 07/06/1953"
+                />
+                <CampoForm
+                  label="Leito"
+                  value={form.leito}
+                  onChange={setCampo("leito")}
+                />
+                <CampoForm
+                  label="Setor"
+                  value={form.setor}
+                  onChange={setCampo("setor")}
+                />
+                <CampoForm
+                  label="Número do prontuário"
+                  value={form.prontuario}
+                  onChange={setCampo("prontuario")}
+                />
+                <CampoForm
+                  label="Data de internação"
+                  value={form.internacao}
+                  onChange={setCampo("internacao")}
+                  placeholder="Ex.: 07/06/2026"
+                />
+                <CampoForm
+                  label="Diagnóstico principal"
+                  value={form.diagnostico}
+                  onChange={setCampo("diagnostico")}
+                />
+                <CampoForm
+                  label="Motivo da internação"
+                  value={form.motivo}
+                  onChange={setCampo("motivo")}
+                  multiline
+                />
+                <TouchableOpacity
+                  style={[
+                    styles.salvarBtn,
+                    !form.nome.trim() && styles.salvarBtnDesativado,
+                  ]}
+                  onPress={salvarManual}
+                  disabled={!form.nome.trim()}
+                >
+                  <Text style={styles.salvarBtnTexto}>Salvar paciente</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            )}
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+    </View>
+  );
+}
+
+/** Campo de formulário do modal de adicionar paciente (tema claro). */
+function CampoForm({
+  label,
+  value,
+  onChange,
+  placeholder,
+  multiline,
+}: {
+  label: string;
+  value: string;
+  onChange: (t: string) => void;
+  placeholder?: string;
+  multiline?: boolean;
+}) {
+  return (
+    <View style={styles.campoForm}>
+      <Text style={styles.campoFormLabel}>{label}</Text>
+      <TextInput
+        style={[styles.campoFormInput, multiline && styles.campoFormInputMulti]}
+        value={value}
+        onChangeText={onChange}
+        placeholder={placeholder ?? "—"}
+        placeholderTextColor={ClinicalColors.textMuted}
+        multiline={multiline}
       />
     </View>
   );
@@ -308,7 +558,6 @@ const styles = StyleSheet.create({
   subtitulo: {
     fontSize: 14,
     color: ClinicalColors.textMuted,
-    textTransform: "capitalize",
   },
   botaoAdd: {
     width: 48,
@@ -320,7 +569,7 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   botaoAddTexto: {
-    color: ClinicalColors.text,
+    color: ClinicalColors.textOnPrimary,
     fontSize: 28,
     fontWeight: "600",
     lineHeight: 32,
@@ -342,7 +591,7 @@ const styles = StyleSheet.create({
   vazioContainer: { flexGrow: 1, justifyContent: "center" },
   listaConteudo: { paddingBottom: 24 },
   separador: {
-    color: ClinicalColors.textMuted,
+    color: ClinicalColors.chevron,
     fontSize: 11,
     fontWeight: "600",
     textTransform: "uppercase",
@@ -384,11 +633,123 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   idade: { fontSize: 13, color: ClinicalColors.textMuted },
-  dias: { fontSize: 12, color: ClinicalColors.primary, marginTop: 4 },
+  diagnostico: {
+    fontSize: 14,
+    color: ClinicalColors.text,
+    fontWeight: "500",
+    marginTop: 4,
+  },
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 6,
+  },
+  diaBadge: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: ClinicalColors.primary,
+    backgroundColor: ClinicalColors.background,
+    borderRadius: Radius.badge,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    overflow: "hidden",
+  },
+  pendenciasIndicador: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: ClinicalColors.warning,
+    backgroundColor: ClinicalColors.warningBg,
+    borderRadius: Radius.badge,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    overflow: "hidden",
+  },
   badge: {
     borderRadius: Radius.badge,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
   badgeTexto: { fontSize: 12, fontWeight: "600" },
+
+  // Modal de adicionar paciente
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(15, 45, 82, 0.45)",
+    justifyContent: "flex-end",
+  },
+  modalCard: {
+    backgroundColor: ClinicalColors.surface,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 28,
+    maxHeight: "88%",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 16,
+  },
+  modalTitulo: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: ClinicalColors.text,
+  },
+  modalFechar: { fontSize: 18, color: ClinicalColors.textMuted },
+  modalOpcoes: { gap: 12, paddingBottom: 8 },
+  opcaoBtn: {
+    backgroundColor: ClinicalColors.buttonPrimary,
+    borderRadius: Radius.card,
+    paddingVertical: 16,
+    alignItems: "center",
+    borderWidth: BorderWidth.hairline,
+    borderColor: ClinicalColors.buttonPrimary,
+  },
+  opcaoBtnTexto: {
+    color: ClinicalColors.textOnPrimary,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  opcaoBtnSecundaria: {
+    backgroundColor: ClinicalColors.surface,
+    borderColor: ClinicalColors.primary,
+  },
+  opcaoBtnTextoSecundaria: { color: ClinicalColors.primary },
+  modalForm: {},
+  campoForm: { marginBottom: 12 },
+  campoFormLabel: {
+    fontSize: 11,
+    color: ClinicalColors.textMuted,
+    marginBottom: 6,
+    fontWeight: "600",
+    textTransform: "uppercase",
+  },
+  campoFormInput: {
+    backgroundColor: ClinicalColors.background,
+    borderColor: ClinicalColors.border,
+    borderWidth: BorderWidth.hairline,
+    borderRadius: Radius.badge,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: ClinicalColors.text,
+    fontSize: 15,
+  },
+  campoFormInputMulti: { minHeight: 64, textAlignVertical: "top" },
+  salvarBtn: {
+    backgroundColor: ClinicalColors.buttonPrimary,
+    borderRadius: Radius.card,
+    paddingVertical: 16,
+    alignItems: "center",
+    marginTop: 4,
+  },
+  salvarBtnDesativado: { opacity: 0.5 },
+  salvarBtnTexto: {
+    color: ClinicalColors.textOnPrimary,
+    fontSize: 16,
+    fontWeight: "700",
+  },
 });

@@ -1,4 +1,8 @@
-import { type StatusType } from "@/constants/clinicalTheme";
+import {
+  type Prioridade,
+  type StatusClinico,
+  type StatusType,
+} from "@/constants/clinicalTheme";
 
 /** Dados extraídos do cabeçalho do prontuário (sistema Tasy). */
 export type CabecalhoProntuario = {
@@ -50,6 +54,30 @@ export type SecaoClinica = {
   extraido: string;
 };
 
+/** Situação de um problema ativo na lista de problemas do paciente. */
+export type ProblemaStatus = "ativo" | "resolvendo" | "resolvido";
+
+/** Um problema clínico ativo do paciente (lista de problemas). */
+export type Problema = {
+  id: string;
+  titulo: string;
+  status: ProblemaStatus;
+  prioridade: Prioridade;
+  /** Observação curta sobre o problema. */
+  observacao: string;
+  /** Conduta relacionada (texto livre). */
+  conduta: string;
+};
+
+/** Uma pendência (item de checklist) do paciente. */
+export type Pendencia = {
+  id: string;
+  descricao: string;
+  prioridade: Prioridade;
+  /** true quando concluída (risca o texto e fica em cinza). */
+  feito: boolean;
+};
+
 /**
  * Evolução beira-leito de UM dia — formulário estruturado preenchido no leito,
  * 100% manual (sem foto). Guardada por data (cada dia tem a sua).
@@ -82,6 +110,16 @@ export type Paciente = CabecalhoProntuario & {
   /** Identidade estável entre dias (= numeroProntuario, ou fallback gerado). */
   id: string;
   status: StatusType;
+  /** Diagnóstico principal (texto livre, editável). */
+  diagnosticoPrincipal?: string;
+  /** Motivo da internação (texto livre, editável). */
+  motivoInternacao?: string;
+  /** Estado clínico atual (avaliação subjetiva); null até ser definido. */
+  statusClinico?: StatusClinico | null;
+  /** Lista de problemas ativos. */
+  problemas?: Problema[];
+  /** Checklist de pendências. */
+  pendencias?: Pendencia[];
   /** Datas (YYYY-MM-DD) em que o paciente foi fotografado/acompanhado. */
   diasAcompanhamento: string[];
   /** Dados clínicos da visita (formato legado); null até a primeira extração. */

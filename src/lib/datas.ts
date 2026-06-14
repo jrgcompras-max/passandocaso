@@ -8,6 +8,18 @@ export function hojeISO(): string {
 }
 
 /**
+ * Formata uma data para o padrão brasileiro DD/MM/YYYY. Aceita ISO
+ * (YYYY-MM-DD) e devolve no formato BR; qualquer outro texto é repassado
+ * sem alteração (ex.: já em BR ou formato não reconhecido).
+ */
+export function formatarDataBR(texto: string): string {
+  const t = (texto ?? "").trim();
+  if (!t) return "";
+  const iso = t.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return iso ? `${iso[3]}/${iso[2]}/${iso[1]}` : t;
+}
+
+/**
  * Tenta interpretar a data de entrada extraída pela IA (texto livre, formato
  * incerto) como um Date no meio-dia local. Aceita ISO (YYYY-MM-DD) e BR
  * (DD/MM/YYYY), com hora opcional ignorada. Retorna null se não reconhecer.

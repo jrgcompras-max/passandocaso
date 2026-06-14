@@ -12,6 +12,7 @@ import {
 
 import { ClinicalColors, Radius } from "@/constants/clinicalTheme";
 import { hojeISO } from "@/lib/datas";
+import { formatarNome } from "@/lib/formatarNome";
 import { formatarEvolucaoIA } from "@/lib/formatarEvolucaoIA";
 import { montarTextoEvolucao } from "@/lib/gerarEvolucao";
 import { salvarEvolucao } from "@/lib/salvarEvolucao";
@@ -80,7 +81,7 @@ export default function Evolucao() {
       <Text style={styles.titulo}>Passar o Caso</Text>
       <Text style={styles.subtitulo}>
         {paciente
-          ? paciente.nomeCompleto || "Sem nome"
+          ? formatarNome(paciente.nomeCompleto) || "Sem nome"
           : carregado
             ? "Paciente não encontrado"
             : "Carregando..."}
@@ -218,7 +219,7 @@ const styles = StyleSheet.create({
     borderColor: ClinicalColors.buttonPrimary,
   },
   botaoPrimarioTexto: {
-    color: ClinicalColors.text,
+    color: ClinicalColors.textOnPrimary,
     fontSize: 15,
     fontWeight: "600",
   },

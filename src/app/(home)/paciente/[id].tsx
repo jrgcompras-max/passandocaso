@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
@@ -14,8 +15,12 @@ import {
 import {
     BorderWidth,
     ClinicalColors,
+    PrioridadeColors,
     Radius,
+    StatusClinicoColors,
     StatusColors,
+    type Prioridade,
+    type StatusClinico,
     type StatusType,
 } from "@/constants/clinicalTheme";
 import {
@@ -29,18 +34,39 @@ import {
   type Opcao,
 } from "@/constants/evolucao";
 import { SECOES } from "@/constants/secoes";
-import { diaDeInternacao, hojeISO } from "@/lib/datas";
+import { diaDeInternacao, formatarDataBR, hojeISO } from "@/lib/datas";
 import { extrairDadosImagem } from "@/lib/extrairDadosImagem";
+import { formatarNome } from "@/lib/formatarNome";
 import { converterParaJpegBase64 } from "@/lib/imagem";
 import { usePacientes } from "@/store/PacientesContext";
 import {
   type Anotacao,
   type DadosClinicos,
   type EvolucaoBeiraLeito,
+  type Pendencia,
+  type Problema,
+  type ProblemaStatus,
   type SecaoId,
 } from "@/types/paciente";
 
 const STATUS_OPCOES = Object.keys(StatusColors) as StatusType[];
+const STATUS_CLINICO_OPCOES = Object.keys(StatusClinicoColors) as StatusClinico[];
+const PRIORIDADE_OPCOES = Object.keys(PrioridadeColors) as Prioridade[];
+
+/** Rótulos dos estados de um problema ativo. */
+const PROBLEMA_STATUS_LABEL: Record<ProblemaStatus, string> = {
+  ativo: "Ativo",
+  resolvendo: "Resolvendo",
+  resolvido: "Resolvido",
+};
+const PROBLEMA_STATUS_OPCOES = Object.keys(
+  PROBLEMA_STATUS_LABEL,
+) as ProblemaStatus[];
+
+/** Gera um id estável a partir do horário atual. */
+function novoId(): string {
+  return String(Date.now());
+}
 
 /** Sufixo comum: força a resposta da IA a vir como JSON estruturado em blocos. */
 const SUFIXO_JSON =
@@ -111,6 +137,8 @@ export default function Paciente() {
     getPaciente,
     atualizarSecao,
     atualizarPaciente,
+    atualizarProblemas,
+    atualizarPendencias,
     atualizarEvolucao,
     removerPaciente,
   } = usePacientes();
@@ -125,7 +153,9 @@ export default function Paciente() {
   const [setorForm, setSetorForm] = useState("");
   const [entradaForm, setEntradaForm] = useState("");
   const [prontuarioForm, setProntuarioForm] = useState("");
-  const [statusForm, setStatusForm] = useState<StatusType>("pendente");
+  const [statusForm, setStatusForm] = useState<StatusType>("naoVisitado");
+  const [diagnosticoForm, setDiagnosticoForm] = useState("");
+  const [motivoForm, setMotivoForm] = useState("");
 
   // Leito editável inline na área de identificação (preenchimento manual).
   const [leitoInline, setLeitoInline] = useState("");
@@ -142,6 +172,8 @@ export default function Paciente() {
     setEntradaForm(paciente.dataEntrada);
     setProntuarioForm(paciente.numeroProntuario);
     setStatusForm(paciente.status);
+    setDiagnosticoForm(paciente.diagnosticoPrincipal ?? "");
+    setMotivoForm(paciente.motivoInternacao ?? "");
     setEditando(true);
   };
 
@@ -156,8 +188,16 @@ export default function Paciente() {
       dataEntrada: entradaForm.trim(),
       numeroProntuario: prontuarioForm.trim(),
       status: statusForm,
+      diagnosticoPrincipal: diagnosticoForm.trim(),
+      motivoInternacao: motivoForm.trim(),
     });
     setEditando(false);
+  };
+
+  const definirStatusClinico = (sc: StatusClinico) => {
+    atualizarPaciente(id, {
+      statusClinico: paciente?.statusClinico === sc ? null : sc,
+    });
   };
 
   const salvarLeitoInline = () => {
@@ -200,23 +240,41 @@ export default function Paciente() {
         <>
           <View style={styles.cabecalho}>
             <Text style={styles.titulo}>
-              {paciente.nomeCompleto || "Sem nome"}
+              {formatarNome(paciente.nomeCompleto) || "Sem nome"}
             </Text>
-            <View
-              style={[
-                styles.badge,
-                { backgroundColor: StatusColors[paciente.status].bg },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.badgeTexto,
-                  { color: StatusColors[paciente.status].text },
-                ]}
-              >
-                {StatusColors[paciente.status].label}
-              </Text>
-            </View>
+            {!editando && (
+              <View style={styles.acoesIcones}>
+                <View
+                  style={[
+                    styles.badge,
+                    { backgroundColor: StatusColors[paciente.status].bg },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.badgeTexto,
+                      { color: StatusColors[paciente.status].text },
+                    ]}
+                  >
+                    {StatusColors[paciente.status].label}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.iconeBtn}
+                  onPress={iniciarEdicao}
+                  accessibilityLabel="Editar paciente"
+                >
+                  <Ionicons name="create-outline" size={28} color="#1A6B8A" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.iconeBtn}
+                  onPress={confirmarExclusao}
+                  accessibilityLabel="Excluir paciente"
+                >
+                  <Ionicons name="trash-outline" size={28} color="#991B1B" />
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
 
           {editando ? (
@@ -240,6 +298,16 @@ export default function Paciente() {
                   label="Nº do prontuário"
                   value={prontuarioForm}
                   onChange={setProntuarioForm}
+                />
+                <Campo
+                  label="Diagnóstico principal"
+                  value={diagnosticoForm}
+                  onChange={setDiagnosticoForm}
+                />
+                <Campo
+                  label="Motivo da internação"
+                  value={motivoForm}
+                  onChange={setMotivoForm}
                 />
 
                 <Text style={styles.campoLabel}>Status</Text>
@@ -291,6 +359,56 @@ export default function Paciente() {
             </>
           ) : (
             <>
+              <View style={styles.diagnosticoBox}>
+                {paciente.diagnosticoPrincipal ? (
+                  <Text style={styles.diagnosticoPrincipal}>
+                    {paciente.diagnosticoPrincipal}
+                  </Text>
+                ) : (
+                  <Text style={styles.diagnosticoVazio}>
+                    Toque em Editar para definir o diagnóstico principal
+                  </Text>
+                )}
+                {!!paciente.motivoInternacao && (
+                  <Text style={styles.motivoInternacao}>
+                    {paciente.motivoInternacao}
+                  </Text>
+                )}
+                <Text style={[styles.campoLabel, styles.statusClinicoLabel]}>
+                  Status clínico
+                </Text>
+                <View style={styles.statusClinicoRow}>
+                  {STATUS_CLINICO_OPCOES.map((sc) => {
+                    const ativo = paciente.statusClinico === sc;
+                    const cor = StatusClinicoColors[sc];
+                    return (
+                      <TouchableOpacity
+                        key={sc}
+                        onPress={() => definirStatusClinico(sc)}
+                        style={[
+                          styles.statusClinicoChip,
+                          {
+                            borderColor: cor.text,
+                            backgroundColor: ativo ? cor.bg : "transparent",
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.statusClinicoChipTexto,
+                            {
+                              color: ativo ? cor.text : ClinicalColors.textMuted,
+                            },
+                          ]}
+                        >
+                          {cor.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
               <View style={styles.identificacao}>
                 <View style={styles.campoIdent}>
                   <Text style={styles.campoIdentLabel}>Leito ✏️</Text>
@@ -321,7 +439,7 @@ export default function Paciente() {
                 )}
                 {!!paciente.dataEntrada && (
                   <Text style={styles.identLinha}>
-                    Entrada: {paciente.dataEntrada}
+                    Entrada: {formatarDataBR(paciente.dataEntrada)}
                   </Text>
                 )}
                 {diaInternacao != null && (
@@ -329,40 +447,16 @@ export default function Paciente() {
                     Dia {diaInternacao} de internação
                   </Text>
                 )}
-                <Text style={styles.identLinha}>
-                  Acompanhamento: {paciente.diasAcompanhamento.length}{" "}
-                  {paciente.diasAcompanhamento.length === 1 ? "dia" : "dias"}
-                </Text>
               </View>
 
-              <View style={styles.acoesRow}>
-                <TouchableOpacity
-                  style={[styles.botaoAcao, styles.botaoEditar]}
-                  onPress={iniciarEdicao}
-                >
-                  <Text style={styles.botaoEditarTexto}>✏️ Editar</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.botaoAcao, styles.botaoExcluir]}
-                  onPress={confirmarExclusao}
-                >
-                  <Text style={styles.botaoExcluirTexto}>🗑️ Excluir</Text>
-                </TouchableOpacity>
-              </View>
-
-              <TouchableOpacity
-                style={styles.botaoPassarCaso}
-                onPress={() =>
-                  router.push({
-                    pathname: "/evolucao/[id]",
-                    params: { id },
-                  })
-                }
-              >
-                <Text style={styles.botaoPassarCasoTexto}>
-                  📋 Passar o Caso
-                </Text>
-              </TouchableOpacity>
+              <ProblemasSecao
+                problemas={paciente.problemas ?? []}
+                onChange={(lista) => atualizarProblemas(id, lista)}
+              />
+              <PendenciasSecao
+                pendencias={paciente.pendencias ?? []}
+                onChange={(lista) => atualizarPendencias(id, lista)}
+              />
             </>
           )}
         </>
@@ -400,11 +494,21 @@ export default function Paciente() {
       )}
       ListFooterComponent={
         mostrarSecoes ? (
-          <EvolucaoBeiraLeitoSecao
-            key={hoje}
-            evolucao={paciente?.evolucoes?.[hoje] ?? EVOLUCAO_VAZIA}
-            onSalvar={(evo) => atualizarEvolucao(id, hoje, evo)}
-          />
+          <>
+            <EvolucaoBeiraLeitoSecao
+              key={hoje}
+              evolucao={paciente?.evolucoes?.[hoje] ?? EVOLUCAO_VAZIA}
+              onSalvar={(evo) => atualizarEvolucao(id, hoje, evo)}
+            />
+            <TouchableOpacity
+              style={styles.botaoPassarCaso}
+              onPress={() =>
+                router.push({ pathname: "/evolucao/[id]", params: { id } })
+              }
+            >
+              <Text style={styles.botaoPassarCasoTexto}>📋 Passar o Caso</Text>
+            </TouchableOpacity>
+          </>
         ) : null
       }
     />
@@ -758,7 +862,14 @@ function ToggleLinha({
               onPress={() => onSelecionar(o.valor)}
               style={[styles.toggleChip, ativo && styles.toggleChipAtivo]}
             >
-              <Text style={styles.toggleChipTexto}>{o.rotulo}</Text>
+              <Text
+                style={[
+                  styles.toggleChipTexto,
+                  ativo && styles.toggleChipTextoAtivo,
+                ]}
+              >
+                {o.rotulo}
+              </Text>
             </TouchableOpacity>
           );
         })}
@@ -900,7 +1011,12 @@ function EvolucaoBeiraLeitoSecao({
                   onPress={() => toggleDispositivo(d)}
                   style={[styles.toggleChip, ativo && styles.toggleChipAtivo]}
                 >
-                  <Text style={styles.toggleChipTexto}>
+                  <Text
+                    style={[
+                      styles.toggleChipTexto,
+                      ativo && styles.toggleChipTextoAtivo,
+                    ]}
+                  >
                     {ativo ? "☑ " : "☐ "}
                     {d}
                   </Text>
@@ -949,6 +1065,397 @@ function EvolucaoBeiraLeitoSecao({
   );
 }
 
+/** Estado inicial de um problema novo no formulário. */
+const PROBLEMA_VAZIO: Omit<Problema, "id"> = {
+  titulo: "",
+  status: "ativo",
+  prioridade: "media",
+  observacao: "",
+  conduta: "",
+};
+
+/**
+ * Seção "Problemas Ativos": lista com cor por prioridade (alta/vermelho,
+ * média/amarelo, baixa/verde) e formulário inline para adicionar/editar.
+ * A persistência fica a cargo do componente pai (via onChange).
+ */
+function ProblemasSecao({
+  problemas,
+  onChange,
+}: {
+  problemas: Problema[];
+  onChange: (lista: Problema[]) => void;
+}) {
+  const [aberto, setAberto] = useState(true);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [mostrarForm, setMostrarForm] = useState(false);
+  const [form, setForm] = useState<Omit<Problema, "id">>(PROBLEMA_VAZIO);
+
+  const abrirNovo = () => {
+    setEditId(null);
+    setForm(PROBLEMA_VAZIO);
+    setMostrarForm(true);
+    setAberto(true);
+  };
+
+  const abrirEdicao = (p: Problema) => {
+    const { id: _id, ...resto } = p;
+    setEditId(p.id);
+    setForm(resto);
+    setMostrarForm(true);
+    setAberto(true);
+  };
+
+  const cancelar = () => {
+    setMostrarForm(false);
+    setEditId(null);
+    setForm(PROBLEMA_VAZIO);
+  };
+
+  const salvar = () => {
+    const titulo = form.titulo.trim();
+    if (!titulo) return;
+    const limpo = { ...form, titulo };
+    if (editId) {
+      onChange(
+        problemas.map((p) => (p.id === editId ? { ...limpo, id: editId } : p)),
+      );
+    } else {
+      onChange([...problemas, { ...limpo, id: novoId() }]);
+    }
+    cancelar();
+  };
+
+  const excluir = (p: Problema) => {
+    Alert.alert("Excluir problema?", p.titulo, [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Excluir",
+        style: "destructive",
+        onPress: () => {
+          onChange(problemas.filter((x) => x.id !== p.id));
+          if (editId === p.id) cancelar();
+        },
+      },
+    ]);
+  };
+
+  return (
+    <View style={styles.secao}>
+      <View style={styles.secaoHeader}>
+        <TouchableOpacity
+          style={styles.secaoHeaderToque}
+          onPress={() => setAberto((v) => !v)}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.secaoHeaderTitulo}>
+            Problemas Ativos{problemas.length ? ` (${problemas.length})` : ""}
+          </Text>
+          <Text style={styles.secaoChevron}>{aberto ? "▲" : "▼"}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.botaoMais} onPress={abrirNovo} hitSlop={8}>
+          <Text style={styles.botaoMaisTexto}>+</Text>
+        </TouchableOpacity>
+      </View>
+
+      {aberto && (
+        <View style={styles.secaoBody}>
+          {problemas.length === 0 && !mostrarForm && (
+            <Text style={styles.vazioTexto}>Nenhum problema ativo.</Text>
+          )}
+
+          {problemas.map((p) => {
+            const cor = PrioridadeColors[p.prioridade];
+            return (
+              <View
+                key={p.id}
+                style={[
+                  styles.problemaCard,
+                  { backgroundColor: cor.bg, borderLeftColor: cor.border },
+                ]}
+              >
+                <View style={styles.problemaTopo}>
+                  <Text style={styles.problemaTitulo}>{p.titulo}</Text>
+                  <View style={styles.anotacaoAcoes}>
+                    <TouchableOpacity onPress={() => abrirEdicao(p)} hitSlop={8}>
+                      <Text style={styles.anotacaoIcone}>✏️</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => excluir(p)} hitSlop={8}>
+                      <Text style={styles.anotacaoIcone}>🗑️</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+                <View style={styles.problemaMeta}>
+                  <Text
+                    style={[
+                      styles.miniChip,
+                      { color: cor.text, borderColor: cor.text },
+                    ]}
+                  >
+                    {PROBLEMA_STATUS_LABEL[p.status]}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.miniChip,
+                      { color: cor.text, borderColor: cor.text },
+                    ]}
+                  >
+                    Prioridade {cor.label.toLowerCase()}
+                  </Text>
+                </View>
+                {!!p.observacao && (
+                  <Text style={styles.problemaObs}>{p.observacao}</Text>
+                )}
+                {!!p.conduta && (
+                  <Text style={styles.problemaConduta}>Conduta: {p.conduta}</Text>
+                )}
+              </View>
+            );
+          })}
+
+          {mostrarForm && (
+            <View style={styles.formInline}>
+              <TextInput
+                style={styles.campoInput}
+                value={form.titulo}
+                onChangeText={(t) => setForm((f) => ({ ...f, titulo: t }))}
+                placeholder="Título do problema"
+                placeholderTextColor={ClinicalColors.textMuted}
+              />
+              <Text style={styles.campoLabel}>Prioridade</Text>
+              <View style={styles.chipsWrap}>
+                {PRIORIDADE_OPCOES.map((pr) => {
+                  const ativo = form.prioridade === pr;
+                  const cor = PrioridadeColors[pr];
+                  return (
+                    <TouchableOpacity
+                      key={pr}
+                      onPress={() => setForm((f) => ({ ...f, prioridade: pr }))}
+                      style={[
+                        styles.statusChip,
+                        {
+                          borderColor: cor.text,
+                          backgroundColor: ativo ? cor.bg : "transparent",
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.statusChipTexto, { color: cor.text }]}>
+                        {cor.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              <Text style={styles.campoLabel}>Status</Text>
+              <View style={styles.chipsWrap}>
+                {PROBLEMA_STATUS_OPCOES.map((st) => {
+                  const ativo = form.status === st;
+                  return (
+                    <TouchableOpacity
+                      key={st}
+                      onPress={() => setForm((f) => ({ ...f, status: st }))}
+                      style={[styles.toggleChip, ativo && styles.toggleChipAtivo]}
+                    >
+                      <Text
+                        style={[
+                          styles.toggleChipTexto,
+                          ativo && styles.toggleChipTextoAtivo,
+                        ]}
+                      >
+                        {PROBLEMA_STATUS_LABEL[st]}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              <TextInput
+                style={styles.campoInput}
+                value={form.observacao}
+                onChangeText={(t) => setForm((f) => ({ ...f, observacao: t }))}
+                placeholder="Observação curta"
+                placeholderTextColor={ClinicalColors.textMuted}
+              />
+              <TextInput
+                style={styles.campoInput}
+                value={form.conduta}
+                onChangeText={(t) => setForm((f) => ({ ...f, conduta: t }))}
+                placeholder="Conduta relacionada"
+                placeholderTextColor={ClinicalColors.textMuted}
+              />
+              <View style={styles.formAcoes}>
+                <TouchableOpacity
+                  style={[styles.botaoAcao, styles.botaoSalvar]}
+                  onPress={salvar}
+                >
+                  <Text style={styles.botaoAcaoTexto}>Salvar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.botaoAcao, styles.botaoCancelar]}
+                  onPress={cancelar}
+                >
+                  <Text style={styles.botaoCancelarTexto}>Cancelar</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+        </View>
+      )}
+    </View>
+  );
+}
+
+/**
+ * Seção "Pendências": checklist com checkbox. Itens feitos ficam riscados e em
+ * cinza. A persistência fica a cargo do componente pai (via onChange).
+ */
+function PendenciasSecao({
+  pendencias,
+  onChange,
+}: {
+  pendencias: Pendencia[];
+  onChange: (lista: Pendencia[]) => void;
+}) {
+  const [aberto, setAberto] = useState(true);
+  const [mostrarForm, setMostrarForm] = useState(false);
+  const [descForm, setDescForm] = useState("");
+  const [prioForm, setPrioForm] = useState<Prioridade>("media");
+
+  const abertas = pendencias.filter((p) => !p.feito).length;
+
+  const abrirNovo = () => {
+    setDescForm("");
+    setPrioForm("media");
+    setMostrarForm(true);
+    setAberto(true);
+  };
+
+  const salvar = () => {
+    const descricao = descForm.trim();
+    if (!descricao) return;
+    onChange([
+      ...pendencias,
+      { id: novoId(), descricao, prioridade: prioForm, feito: false },
+    ]);
+    setMostrarForm(false);
+    setDescForm("");
+  };
+
+  const alternar = (p: Pendencia) => {
+    onChange(
+      pendencias.map((x) => (x.id === p.id ? { ...x, feito: !x.feito } : x)),
+    );
+  };
+
+  const excluir = (p: Pendencia) => {
+    onChange(pendencias.filter((x) => x.id !== p.id));
+  };
+
+  return (
+    <View style={styles.secao}>
+      <View style={styles.secaoHeader}>
+        <TouchableOpacity
+          style={styles.secaoHeaderToque}
+          onPress={() => setAberto((v) => !v)}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.secaoHeaderTitulo}>
+            Pendências{abertas ? ` (${abertas})` : ""}
+          </Text>
+          <Text style={styles.secaoChevron}>{aberto ? "▲" : "▼"}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.botaoMais} onPress={abrirNovo} hitSlop={8}>
+          <Text style={styles.botaoMaisTexto}>+</Text>
+        </TouchableOpacity>
+      </View>
+
+      {aberto && (
+        <View style={styles.secaoBody}>
+          {pendencias.length === 0 && !mostrarForm && (
+            <Text style={styles.vazioTexto}>Nenhuma pendência.</Text>
+          )}
+
+          {pendencias.map((p) => {
+            const cor = PrioridadeColors[p.prioridade];
+            return (
+              <View key={p.id} style={styles.pendenciaLinha}>
+                <TouchableOpacity onPress={() => alternar(p)} hitSlop={8}>
+                  <Text style={styles.checkbox}>{p.feito ? "☑" : "☐"}</Text>
+                </TouchableOpacity>
+                <Text
+                  style={[
+                    styles.pendenciaTexto,
+                    p.feito && styles.pendenciaFeita,
+                  ]}
+                >
+                  {p.descricao}
+                </Text>
+                {!p.feito && (
+                  <View
+                    style={[styles.prioridadePonto, { backgroundColor: cor.text }]}
+                  />
+                )}
+                <TouchableOpacity onPress={() => excluir(p)} hitSlop={8}>
+                  <Text style={styles.anotacaoIcone}>🗑️</Text>
+                </TouchableOpacity>
+              </View>
+            );
+          })}
+
+          {mostrarForm && (
+            <View style={styles.formInline}>
+              <TextInput
+                style={styles.campoInput}
+                value={descForm}
+                onChangeText={setDescForm}
+                placeholder="Descrição da pendência"
+                placeholderTextColor={ClinicalColors.textMuted}
+              />
+              <Text style={styles.campoLabel}>Prioridade</Text>
+              <View style={styles.chipsWrap}>
+                {PRIORIDADE_OPCOES.map((pr) => {
+                  const ativo = prioForm === pr;
+                  const cor = PrioridadeColors[pr];
+                  return (
+                    <TouchableOpacity
+                      key={pr}
+                      onPress={() => setPrioForm(pr)}
+                      style={[
+                        styles.statusChip,
+                        {
+                          borderColor: cor.text,
+                          backgroundColor: ativo ? cor.bg : "transparent",
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.statusChipTexto, { color: cor.text }]}>
+                        {cor.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              <View style={styles.formAcoes}>
+                <TouchableOpacity
+                  style={[styles.botaoAcao, styles.botaoSalvar]}
+                  onPress={salvar}
+                >
+                  <Text style={styles.botaoAcaoTexto}>Adicionar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.botaoAcao, styles.botaoCancelar]}
+                  onPress={() => setMostrarForm(false)}
+                >
+                  <Text style={styles.botaoCancelarTexto}>Cancelar</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+        </View>
+      )}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -975,6 +1482,8 @@ const styles = StyleSheet.create({
     color: ClinicalColors.text,
     paddingRight: 12,
   },
+  acoesIcones: { flexDirection: "row", alignItems: "center", gap: 16 },
+  iconeBtn: { padding: 8 },
   identificacao: {
     backgroundColor: ClinicalColors.surface,
     borderColor: ClinicalColors.border,
@@ -1041,24 +1550,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: BorderWidth.hairline,
   },
-  botaoEditar: {
-    backgroundColor: "transparent",
-    borderColor: ClinicalColors.primary,
-  },
-  botaoEditarTexto: {
-    color: ClinicalColors.primary,
-    fontSize: 15,
-    fontWeight: "600",
-  },
-  botaoExcluir: {
-    backgroundColor: StatusColors.pendente.bg,
-    borderColor: StatusColors.pendente.text,
-  },
-  botaoExcluirTexto: {
-    color: StatusColors.pendente.text,
-    fontSize: 15,
-    fontWeight: "600",
-  },
   botaoSalvar: {
     backgroundColor: ClinicalColors.buttonPrimary,
     borderColor: ClinicalColors.buttonPrimary,
@@ -1068,7 +1559,7 @@ const styles = StyleSheet.create({
     borderColor: ClinicalColors.border,
   },
   botaoAcaoTexto: {
-    color: ClinicalColors.text,
+    color: ClinicalColors.textOnPrimary,
     fontSize: 15,
     fontWeight: "600",
   },
@@ -1084,17 +1575,22 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 16,
   },
-  botaoFotoTexto: { color: ClinicalColors.text, fontSize: 16, fontWeight: "600" },
+  botaoFotoTexto: {
+    color: ClinicalColors.textOnPrimary,
+    fontSize: 16,
+    fontWeight: "600",
+  },
   botaoPassarCaso: {
-    backgroundColor: ClinicalColors.buttonPrimary,
+    backgroundColor: ClinicalColors.accent,
     borderRadius: Radius.card,
-    paddingVertical: 16,
+    paddingVertical: 18,
     alignItems: "center",
+    marginTop: 4,
     marginBottom: 24,
   },
   botaoPassarCasoTexto: {
-    color: ClinicalColors.text,
-    fontSize: 16,
+    color: ClinicalColors.textOnPrimary,
+    fontSize: 17,
     fontWeight: "700",
   },
   capturaRow: { flexDirection: "row", gap: 12, marginBottom: 16 },
@@ -1144,11 +1640,11 @@ const styles = StyleSheet.create({
   secaoHeaderTitulo: {
     flex: 1,
     fontSize: 15,
-    fontWeight: "600",
+    fontWeight: "500",
     color: ClinicalColors.text,
     paddingRight: 12,
   },
-  secaoChevron: { color: ClinicalColors.textMuted, fontSize: 12 },
+  secaoChevron: { color: ClinicalColors.chevron, fontSize: 12 },
   secaoBody: {
     paddingHorizontal: 16,
     paddingBottom: 16,
@@ -1177,7 +1673,7 @@ const styles = StyleSheet.create({
   },
   botaoSalvarAnotacaoDesativado: { opacity: 0.5 },
   botaoSalvarAnotacaoTexto: {
-    color: ClinicalColors.text,
+    color: ClinicalColors.textOnPrimary,
     fontSize: 14,
     fontWeight: "600",
   },
@@ -1264,6 +1760,7 @@ const styles = StyleSheet.create({
   },
   toggleChipAtivo: { backgroundColor: ClinicalColors.buttonPrimary },
   toggleChipTexto: { color: ClinicalColors.text, fontSize: 14 },
+  toggleChipTextoAtivo: { color: ClinicalColors.textOnPrimary },
   evoInput: {
     backgroundColor: ClinicalColors.background,
     borderColor: ClinicalColors.border,
@@ -1277,4 +1774,124 @@ const styles = StyleSheet.create({
     textAlignVertical: "top",
   },
   evoObsDispositivo: { marginTop: 10 },
+
+  // Diagnóstico principal / status clínico (header)
+  diagnosticoBox: { marginBottom: 16 },
+  diagnosticoPrincipal: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: ClinicalColors.text,
+  },
+  diagnosticoVazio: {
+    fontSize: 15,
+    color: ClinicalColors.textMuted,
+    fontStyle: "italic",
+  },
+  motivoInternacao: {
+    fontSize: 14,
+    color: ClinicalColors.textMuted,
+    lineHeight: 20,
+    marginTop: 4,
+  },
+  statusClinicoLabel: { marginTop: 12 },
+  statusClinicoRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  statusClinicoChip: {
+    borderWidth: 1,
+    borderRadius: Radius.badge,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  statusClinicoChipTexto: { fontSize: 13, fontWeight: "600" },
+
+  // Cabeçalho de seção com botão "+"
+  secaoHeaderToque: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  botaoMais: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: ClinicalColors.buttonPrimary,
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 12,
+  },
+  botaoMaisTexto: {
+    color: ClinicalColors.textOnPrimary,
+    fontSize: 20,
+    fontWeight: "600",
+    lineHeight: 22,
+  },
+  vazioTexto: { color: ClinicalColors.textMuted, fontSize: 14 },
+
+  // Problemas ativos
+  problemaCard: {
+    borderLeftWidth: 4,
+    borderRadius: Radius.badge,
+    padding: 12,
+    marginBottom: 10,
+    gap: 6,
+  },
+  problemaTopo: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+  problemaTitulo: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: "700",
+    color: ClinicalColors.text,
+    paddingRight: 8,
+  },
+  problemaMeta: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  miniChip: {
+    fontSize: 11,
+    fontWeight: "600",
+    borderWidth: 1,
+    borderRadius: Radius.badge,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    overflow: "hidden",
+  },
+  problemaObs: {
+    fontSize: 13,
+    color: ClinicalColors.text,
+    lineHeight: 18,
+  },
+  problemaConduta: {
+    fontSize: 13,
+    color: ClinicalColors.textMuted,
+    lineHeight: 18,
+    fontStyle: "italic",
+  },
+
+  // Formulário inline (problemas/pendências)
+  formInline: { marginTop: 12, gap: 10 },
+  formAcoes: { flexDirection: "row", gap: 12, marginTop: 4 },
+
+  // Pendências
+  pendenciaLinha: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 10,
+    borderBottomWidth: BorderWidth.hairline,
+    borderBottomColor: ClinicalColors.border,
+  },
+  checkbox: { fontSize: 20, color: ClinicalColors.primary },
+  pendenciaTexto: {
+    flex: 1,
+    fontSize: 14,
+    color: ClinicalColors.text,
+    lineHeight: 20,
+  },
+  pendenciaFeita: {
+    textDecorationLine: "line-through",
+    color: ClinicalColors.textMuted,
+  },
+  prioridadePonto: { width: 8, height: 8, borderRadius: 4 },
 });

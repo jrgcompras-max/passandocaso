@@ -7,11 +7,15 @@ import {
   type ReactNode,
 } from "react";
 
+import { type StatusType } from "@/constants/clinicalTheme";
+import { gerarPacientesExemplo } from "@/constants/pacientesExemplo";
 import {
   type CabecalhoProntuario,
   type DadosClinicos,
   type EvolucaoBeiraLeito,
   type Paciente,
+  type Pendencia,
+  type Problema,
   type SecaoClinica,
   type SecaoId,
 } from "@/types/paciente";
@@ -47,6 +51,10 @@ type PacientesContextValue = {
     campos: Partial<SecaoClinica>,
   ) => void;
   atualizarPaciente: (id: string, campos: PacienteEditavel) => void;
+  /** Substitui a lista de problemas ativos do paciente. */
+  atualizarProblemas: (id: string, problemas: Problema[]) => void;
+  /** Substitui a lista de pendências do paciente. */
+  atualizarPendencias: (id: string, pendencias: Pendencia[]) => void;
   /** Salva (substitui) a evolução beira-leito de uma data específica. */
   atualizarEvolucao: (
     id: string,
@@ -67,22 +75,56 @@ export type PacienteEditavel = Partial<
     | "dataEntrada"
     | "numeroProntuario"
     | "status"
+    | "diagnosticoPrincipal"
+    | "motivoInternacao"
+    | "statusClinico"
   >
 >;
 
+const STATUS_VALIDOS: StatusType[] = [
+  "naoVisitado",
+  "visitado",
+  "revisar",
+  "pendente",
+  "altaProvavel",
+  "altaRealizada",
+];
+
+/** Status do esquema antigo (4 estados) → novos status (6 estados). */
+const STATUS_LEGADO: Record<string, StatusType> = {
+  discutido: "revisar",
+  evoluido: "altaRealizada",
+};
+
+/** Converte um status armazenado para o vocabulário atual (fallback: não visitado). */
+function migrarStatus(s: unknown): StatusType {
+  if (typeof s === "string") {
+    if (STATUS_LEGADO[s]) return STATUS_LEGADO[s];
+    if ((STATUS_VALIDOS as string[]).includes(s)) return s as StatusType;
+  }
+  return "naoVisitado";
+}
+
 /**
- * Migra registros antigos para o formato atual. O principal: o campo único
- * `leitoSetor` foi separado em `setor` (extraído pela IA) e `leito` (manual).
+ * Migra registros antigos para o formato atual:
+ * - `leitoSetor` único foi separado em `setor` (IA) e `leito` (manual);
+ * - status do esquema de 4 estados é remapeado para os 6 novos.
  */
 function migrarPacientes(bruto: unknown): Paciente[] {
   if (!Array.isArray(bruto)) return [];
   return bruto.map((p) => {
     const antigo = p as Paciente & { leitoSetor?: string };
+    const status = migrarStatus(antigo.status);
     if (antigo.setor === undefined && antigo.leitoSetor !== undefined) {
       const { leitoSetor, ...resto } = antigo;
-      return { ...resto, leito: "", setor: leitoSetor ?? "" };
+      return { ...resto, status, leito: "", setor: leitoSetor ?? "" };
     }
-    return { ...antigo, leito: antigo.leito ?? "", setor: antigo.setor ?? "" };
+    return {
+      ...antigo,
+      status,
+      leito: antigo.leito ?? "",
+      setor: antigo.setor ?? "",
+    };
   });
 }
 
@@ -98,9 +140,9 @@ export function PacientesProvider({ children }: { children: ReactNode }) {
     (async () => {
       try {
         const bruto = await AsyncStorage.getItem(STORAGE_KEY);
-        if (ativo && bruto) {
-          setPacientes(migrarPacientes(JSON.parse(bruto)));
-        }
+        const lista = bruto ? migrarPacientes(JSON.parse(bruto)) : [];
+        // Primeira execução (nada salvo): popula com os pacientes de exemplo.
+        if (ativo) setPacientes(lista.length ? lista : gerarPacientesExemplo());
       } catch (e) {
         console.log("Erro ao carregar pacientes:", e);
       } finally {
@@ -142,7 +184,7 @@ export function PacientesProvider({ children }: { children: ReactNode }) {
                 // Setor vem da IA; leito é manual, então preservamos o existente.
                 setor: cab.setor || p.setor,
                 dataEntrada: cab.dataEntrada || p.dataEntrada,
-                status: "pendente",
+                status: "naoVisitado",
                 diasAcompanhamento: p.diasAcompanhamento.includes(hoje)
                   ? p.diasAcompanhamento
                   : [...p.diasAcompanhamento, hoje],
@@ -161,7 +203,7 @@ export function PacientesProvider({ children }: { children: ReactNode }) {
       setor: cab.setor,
       dataEntrada: cab.dataEntrada,
       numeroProntuario: cab.numeroProntuario,
-      status: "pendente",
+      status: "naoVisitado",
       diasAcompanhamento: [hoje],
       dadosClinicos: null,
     };
@@ -198,6 +240,18 @@ export function PacientesProvider({ children }: { children: ReactNode }) {
     );
   };
 
+  const atualizarProblemas = (id: string, problemas: Problema[]) => {
+    setPacientes((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, problemas } : p)),
+    );
+  };
+
+  const atualizarPendencias = (id: string, pendencias: Pendencia[]) => {
+    setPacientes((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, pendencias } : p)),
+    );
+  };
+
   const atualizarEvolucao = (
     id: string,
     data: string,
@@ -226,6 +280,8 @@ export function PacientesProvider({ children }: { children: ReactNode }) {
         atualizarDadosClinicos,
         atualizarSecao,
         atualizarPaciente,
+        atualizarProblemas,
+        atualizarPendencias,
         atualizarEvolucao,
         removerPaciente,
       }}
