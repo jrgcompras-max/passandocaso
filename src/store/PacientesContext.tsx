@@ -78,6 +78,10 @@ export type PacienteEditavel = Partial<
     | "diagnosticoPrincipal"
     | "motivoInternacao"
     | "statusClinico"
+    | "resumoRapido"
+    | "checklistAlta"
+    | "resultadosLab"
+    | "sinaisVitais"
   >
 >;
 

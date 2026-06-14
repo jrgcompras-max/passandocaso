@@ -78,6 +78,34 @@ export type Pendencia = {
   feito: boolean;
 };
 
+/** Resultado laboratorial pontual (exame + data + valor), para evolução temporal. */
+export type ResultadoLab = {
+  id: string;
+  /** Nome do exame (ex.: "PCR", "Creatinina"). */
+  exame: string;
+  /** Data do resultado (YYYY-MM-DD). */
+  data: string;
+  /** Valor (texto livre; a tendência usa a parte numérica). */
+  valor: string;
+};
+
+/** Modo de oxigenoterapia em uso. */
+export type O2Modo = "ar" | "cateter" | "mascara" | "vm";
+
+/** Sinais vitais estruturados de um dia (registro por data). */
+export type SinaisVitaisDia = {
+  temp: string;
+  paSist: string;
+  paDiast: string;
+  fc: string;
+  fr: string;
+  sato2: string;
+  glicemia: string;
+  diurese: string;
+  o2: O2Modo | null;
+  intercorrencias: string;
+};
+
 /**
  * Evolução beira-leito de UM dia — formulário estruturado preenchido no leito,
  * 100% manual (sem foto). Guardada por data (cada dia tem a sua).
@@ -120,6 +148,14 @@ export type Paciente = CabecalhoProntuario & {
   problemas?: Problema[];
   /** Checklist de pendências. */
   pendencias?: Pendencia[];
+  /** Resumo rápido/executivo do paciente (texto livre, editável). */
+  resumoRapido?: string;
+  /** Checklist de alta (itemId → marcado). */
+  checklistAlta?: Record<string, boolean>;
+  /** Resultados laboratoriais por data, para acompanhar a evolução temporal. */
+  resultadosLab?: ResultadoLab[];
+  /** Sinais vitais estruturados por data (YYYY-MM-DD). */
+  sinaisVitais?: Record<string, SinaisVitaisDia>;
   /** Datas (YYYY-MM-DD) em que o paciente foi fotografado/acompanhado. */
   diasAcompanhamento: string[];
   /** Dados clínicos da visita (formato legado); null até a primeira extração. */

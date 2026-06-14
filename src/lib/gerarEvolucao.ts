@@ -16,6 +16,8 @@ import {
 } from "@/types/paciente";
 
 import { diaDeInternacao } from "./datas";
+import { agruparPorExame, TENDENCIA_INFO } from "./lab";
+import { fraseSinaisVitais } from "./sinaisVitais";
 
 /** Converte o conteúdo extraído (JSON de blocos ou texto) em linhas legíveis. */
 function extraidoParaLinhas(extraido: string): string[] {
@@ -90,6 +92,37 @@ function blocoEvolucao(evo: EvolucaoBeiraLeito | undefined): string[] {
 }
 
 /**
+ * Linhas estruturadas (Fase 2) que entram nas seções correspondentes do texto:
+ * sinais vitais viram a frase clínica automática; exames laboratoriais viram a
+ * evolução temporal por exame com tendência.
+ */
+function extrasEstruturados(
+  secao: SecaoId,
+  paciente: Paciente,
+  hoje: string,
+): string[] {
+  if (secao === "sinaisVitaisIntercorrencias") {
+    const sv = paciente.sinaisVitais?.[hoje];
+    const linhas: string[] = [];
+    const frase = fraseSinaisVitais(sv);
+    if (frase) linhas.push(frase);
+    if (sv?.intercorrencias?.trim())
+      linhas.push(`Intercorrências: ${sv.intercorrencias.trim()}`);
+    return linhas;
+  }
+  if (secao === "examesLaboratoriais") {
+    return agruparPorExame(paciente.resultadosLab ?? []).map((s) => {
+      const seq = s.pontos
+        .map((p) => `${p.valor} (${dataBR(p.data).slice(0, 5)})`)
+        .join(" → ");
+      const tend = s.tendencia ? ` ${TENDENCIA_INFO[s.tendencia].icone}` : "";
+      return `${s.exame}: ${seq}${tend}`;
+    });
+  }
+  return [];
+}
+
+/**
  * Monta deterministicamente o texto de passagem de caso a partir de tudo que a
  * médica já validou. Não interpreta nem adiciona conteúdo clínico — apenas
  * organiza e formata. Seções/campos vazios são omitidos.
@@ -117,15 +150,16 @@ export function montarTextoEvolucao(paciente: Paciente, hoje: string): string {
   if (dia != null) ident.push(`Dia ${dia} de internação`);
   partes.push(ident.join("\n"));
 
-  // Seções (extração validada + anotações)
+  // Seções (extração validada + anotações + dados estruturados da Fase 2)
   for (const secao of SECOES) {
     const dadosSecao = paciente.secoes?.[secao.id as SecaoId];
     const linhas = extraidoParaLinhas(dadosSecao?.extraido ?? "");
     const anotacoes = anotacoesParaTextos(dadosSecao?.anotacoes);
-    if (!linhas.length && !anotacoes.length) continue;
+    const extras = extrasEstruturados(secao.id as SecaoId, paciente, hoje);
+    if (!linhas.length && !anotacoes.length && !extras.length) continue;
 
     const bloco = [secao.titulo.toUpperCase()];
-    bloco.push(...linhas);
+    bloco.push(...linhas, ...extras);
     if (anotacoes.length) {
       bloco.push(`Anotações: ${anotacoes.join("; ")}`);
     }

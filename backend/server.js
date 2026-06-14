@@ -140,6 +140,49 @@ app.post("/api/formatar", async (req, res) => {
   }
 });
 
+/**
+ * Gera um RESUMO EXECUTIVO curto do paciente a partir dos dados já preenchidos
+ * (diagnóstico, problemas, exames, sinais vitais, evolução). Diferente de
+ * /api/formatar, aqui o modelo PODE sintetizar/condensar — mas sem inventar.
+ *
+ * Body: { dados: string }  ->  { resumo: string }
+ */
+const INSTRUCAO_RESUMO =
+  "Você recebe os dados clínicos de um paciente internado, já preenchidos por um médico. " +
+  "Produza um RESUMO EXECUTIVO de 3 a 4 frases curtas, telegráfico e objetivo, no estilo de passagem de plantão. " +
+  "Inclua: dia de internação, diagnóstico, evolução recente (febre, exames em queda/elevação, suporte de O2) e a perspectiva (ex.: alta provável). " +
+  "REGRAS: use apenas o que está nos dados; não invente valores, condutas nem diagnósticos; seja conciso. " +
+  "Responda SOMENTE com o texto do resumo, sem títulos, comentários nem marcações de código.";
+
+app.post("/api/resumo", async (req, res) => {
+  const { dados } = req.body || {};
+  if (typeof dados !== "string" || !dados.trim()) {
+    return res.status(400).json({ erro: "Campo obrigatório: dados." });
+  }
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return res.status(500).json({ erro: "ANTHROPIC_API_KEY não configurada no servidor." });
+  }
+
+  try {
+    const msg = await getAnthropic().messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 600,
+      messages: [
+        {
+          role: "user",
+          content: [{ type: "text", text: `${INSTRUCAO_RESUMO}\n\n---\n${dados}` }],
+        },
+      ],
+    });
+    const bloco = msg.content.find((c) => c.type === "text");
+    const resumo = bloco ? bloco.text.trim() : "";
+    res.json({ resumo });
+  } catch (e) {
+    console.error("Erro em /api/resumo:", e);
+    res.status(502).json({ erro: e.message || "Falha ao gerar resumo." });
+  }
+});
+
 // --- Evoluções (armazenamento em memória; trocar por banco depois) ---
 // Chave: `${medicoId}|${data}` -> [{ pacienteId, nome, texto, salvoEm }]
 const evolucoes = new Map();

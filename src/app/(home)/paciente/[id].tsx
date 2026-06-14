@@ -3,8 +3,11 @@ import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
+    ActivityIndicator,
     Alert,
     FlatList,
+    Modal,
+    ScrollView,
     StyleSheet,
     Text,
     TextInput,
@@ -33,20 +36,33 @@ import {
   OPC_ORIENTACAO,
   type Opcao,
 } from "@/constants/evolucao";
+import { CHECKLIST_ALTA } from "@/constants/checklistAlta";
 import { SECOES } from "@/constants/secoes";
 import { diaDeInternacao, formatarDataBR, hojeISO } from "@/lib/datas";
 import { extrairDadosImagem } from "@/lib/extrairDadosImagem";
 import { formatarNome } from "@/lib/formatarNome";
+import { gerarResumoIA } from "@/lib/gerarResumoIA";
 import { converterParaJpegBase64 } from "@/lib/imagem";
+import { agruparPorExame, TENDENCIA_INFO } from "@/lib/lab";
+import { montarDadosParaResumo } from "@/lib/resumoPaciente";
+import {
+  fraseSinaisVitais,
+  O2_OPCOES,
+  SV_VAZIO,
+  svVazio,
+} from "@/lib/sinaisVitais";
 import { usePacientes } from "@/store/PacientesContext";
 import {
   type Anotacao,
   type DadosClinicos,
   type EvolucaoBeiraLeito,
+  type Paciente as PacienteModel,
   type Pendencia,
   type Problema,
   type ProblemaStatus,
+  type ResultadoLab,
   type SecaoId,
+  type SinaisVitaisDia,
 } from "@/types/paciente";
 
 const STATUS_OPCOES = Object.keys(StatusColors) as StatusType[];
@@ -157,6 +173,10 @@ export default function Paciente() {
   const [diagnosticoForm, setDiagnosticoForm] = useState("");
   const [motivoForm, setMotivoForm] = useState("");
 
+  // Modo Round (apresentação) e geração de resumo por IA.
+  const [modoRound, setModoRound] = useState(false);
+  const [gerandoResumo, setGerandoResumo] = useState(false);
+
   // Leito editável inline na área de identificação (preenchimento manual).
   const [leitoInline, setLeitoInline] = useState("");
   useEffect(() => {
@@ -200,6 +220,20 @@ export default function Paciente() {
     });
   };
 
+  const gerarResumo = async () => {
+    if (!paciente) return;
+    setGerandoResumo(true);
+    try {
+      const dados = montarDadosParaResumo(paciente, hojeISO());
+      const resumo = await gerarResumoIA(dados);
+      atualizarPaciente(id, { resumoRapido: resumo });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      Alert.alert("Não foi possível gerar o resumo", msg);
+    }
+    setGerandoResumo(false);
+  };
+
   const salvarLeitoInline = () => {
     if (leitoInline.trim() !== (paciente?.leito ?? "")) {
       atualizarPaciente(id, { leito: leitoInline.trim() });
@@ -228,9 +262,19 @@ export default function Paciente() {
 
   const cabecalho = (
     <>
-      <TouchableOpacity style={styles.botaoVoltar} onPress={() => router.back()}>
-        <Text style={styles.botaoVoltarTexto}>← Voltar</Text>
-      </TouchableOpacity>
+      <View style={styles.topoBar}>
+        <TouchableOpacity onPress={() => router.back()}>
+          <Text style={styles.botaoVoltarTexto}>← Voltar</Text>
+        </TouchableOpacity>
+        {!!paciente && !editando && (
+          <TouchableOpacity
+            style={styles.botaoRound}
+            onPress={() => setModoRound(true)}
+          >
+            <Text style={styles.botaoRoundTexto}>🎯 Modo Round</Text>
+          </TouchableOpacity>
+        )}
+      </View>
 
       {!paciente ? (
         <Text style={styles.aviso}>
@@ -374,39 +418,6 @@ export default function Paciente() {
                     {paciente.motivoInternacao}
                   </Text>
                 )}
-                <Text style={[styles.campoLabel, styles.statusClinicoLabel]}>
-                  Status clínico
-                </Text>
-                <View style={styles.statusClinicoRow}>
-                  {STATUS_CLINICO_OPCOES.map((sc) => {
-                    const ativo = paciente.statusClinico === sc;
-                    const cor = StatusClinicoColors[sc];
-                    return (
-                      <TouchableOpacity
-                        key={sc}
-                        onPress={() => definirStatusClinico(sc)}
-                        style={[
-                          styles.statusClinicoChip,
-                          {
-                            borderColor: cor.text,
-                            backgroundColor: ativo ? cor.bg : "transparent",
-                          },
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.statusClinicoChipTexto,
-                            {
-                              color: ativo ? cor.text : ClinicalColors.textMuted,
-                            },
-                          ]}
-                        >
-                          {cor.label}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
               </View>
 
               <View style={styles.identificacao}>
@@ -449,6 +460,47 @@ export default function Paciente() {
                 )}
               </View>
 
+              <View style={styles.statusClinicoBox}>
+                <Text style={styles.campoLabel}>Status clínico</Text>
+                <View style={styles.statusClinicoRow}>
+                  {STATUS_CLINICO_OPCOES.map((sc) => {
+                    const ativo = paciente.statusClinico === sc;
+                    const cor = StatusClinicoColors[sc];
+                    return (
+                      <TouchableOpacity
+                        key={sc}
+                        onPress={() => definirStatusClinico(sc)}
+                        style={[
+                          styles.statusClinicoChip,
+                          {
+                            borderColor: cor.text,
+                            backgroundColor: ativo ? cor.bg : "transparent",
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.statusClinicoChipTexto,
+                            {
+                              color: ativo ? cor.text : ClinicalColors.textMuted,
+                            },
+                          ]}
+                        >
+                          {cor.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              <ResumoRapidoSecao
+                resumo={paciente.resumoRapido ?? ""}
+                gerando={gerandoResumo}
+                onChange={(t) => atualizarPaciente(id, { resumoRapido: t })}
+                onGerar={gerarResumo}
+              />
+
               <ProblemasSecao
                 problemas={paciente.problemas ?? []}
                 onChange={(lista) => atualizarProblemas(id, lista)}
@@ -467,8 +519,14 @@ export default function Paciente() {
   // As seções só aparecem no modo de visualização de um paciente existente.
   const mostrarSecoes = !!paciente && !editando;
   const hoje = hojeISO();
+  // Checklist de alta só aparece quando o status é de alta (provável/realizada).
+  const mostrarChecklistAlta =
+    !!paciente &&
+    (paciente.status === "altaProvavel" ||
+      paciente.status === "altaRealizada");
 
   return (
+    <>
     <FlatList
       style={styles.container}
       contentContainerStyle={styles.containerConteudo}
@@ -490,6 +548,25 @@ export default function Paciente() {
             atualizarSecao(id, item.id, { anotacoes: lista })
           }
           onExtraido={(t) => atualizarSecao(id, item.id, { extraido: t })}
+          extra={
+            item.id === "examesLaboratoriais" ? (
+              <LabEvolucao
+                resultados={paciente?.resultadosLab ?? []}
+                onChange={(lista) =>
+                  atualizarPaciente(id, { resultadosLab: lista })
+                }
+              />
+            ) : item.id === "sinaisVitaisIntercorrencias" ? (
+              <SinaisVitaisSecao
+                sv={paciente?.sinaisVitais?.[hoje] ?? SV_VAZIO}
+                onChange={(v) =>
+                  atualizarPaciente(id, {
+                    sinaisVitais: { ...paciente?.sinaisVitais, [hoje]: v },
+                  })
+                }
+              />
+            ) : null
+          }
         />
       )}
       ListFooterComponent={
@@ -500,6 +577,12 @@ export default function Paciente() {
               evolucao={paciente?.evolucoes?.[hoje] ?? EVOLUCAO_VAZIA}
               onSalvar={(evo) => atualizarEvolucao(id, hoje, evo)}
             />
+            {mostrarChecklistAlta && (
+              <ChecklistAltaSecao
+                checklist={paciente?.checklistAlta ?? {}}
+                onChange={(c) => atualizarPaciente(id, { checklistAlta: c })}
+              />
+            )}
             <TouchableOpacity
               style={styles.botaoPassarCaso}
               onPress={() =>
@@ -512,6 +595,16 @@ export default function Paciente() {
         ) : null
       }
     />
+    {paciente && (
+      <ModoRound
+        visivel={modoRound}
+        paciente={paciente}
+        dia={diaInternacao}
+        hoje={hoje}
+        onSair={() => setModoRound(false)}
+      />
+    )}
+    </>
   );
 }
 
@@ -637,6 +730,7 @@ function SecaoExpansivel({
   anotacoes,
   extraido,
   medicacao,
+  extra,
   onSalvarAnotacoes,
   onExtraido,
 }: {
@@ -645,6 +739,8 @@ function SecaoExpansivel({
   anotacoes: Anotacao[];
   extraido: string;
   medicacao?: boolean;
+  /** Conteúdo estruturado extra renderizado no fim do corpo da seção. */
+  extra?: React.ReactNode;
   onSalvarAnotacoes: (lista: Anotacao[]) => void;
   onExtraido: (texto: string) => void;
 }) {
@@ -832,6 +928,8 @@ function SecaoExpansivel({
             Informações do sistema
           </Text>
           <ConteudoExtraido texto={extraido} medicacao={medicacao} />
+
+          {extra}
         </View>
       )}
     </View>
@@ -1456,6 +1554,489 @@ function PendenciasSecao({
   );
 }
 
+/** Campos numéricos dos sinais vitais (todos guardados como string). */
+type CampoNum =
+  | "temp"
+  | "paSist"
+  | "paDiast"
+  | "fc"
+  | "fr"
+  | "sato2"
+  | "glicemia"
+  | "diurese";
+
+/**
+ * Resumo Rápido: card destacado com texto editável e botão de gerar por IA.
+ * O texto persiste ao perder o foco; "Gerar resumo" substitui pelo resultado.
+ */
+function ResumoRapidoSecao({
+  resumo,
+  gerando,
+  onChange,
+  onGerar,
+}: {
+  resumo: string;
+  gerando: boolean;
+  onChange: (t: string) => void;
+  onGerar: () => void;
+}) {
+  const [texto, setTexto] = useState(resumo);
+  useEffect(() => setTexto(resumo), [resumo]);
+
+  return (
+    <View style={styles.resumoCard}>
+      <View style={styles.resumoTopo}>
+        <Text style={styles.resumoTitulo}>RESUMO RÁPIDO</Text>
+        <TouchableOpacity
+          style={styles.resumoGerarBtn}
+          onPress={onGerar}
+          disabled={gerando}
+        >
+          {gerando ? (
+            <ActivityIndicator size="small" color={ClinicalColors.primary} />
+          ) : (
+            <Text style={styles.resumoGerarTexto}>✨ Gerar resumo</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+      <TextInput
+        style={styles.resumoInput}
+        value={texto}
+        onChangeText={setTexto}
+        onBlur={() => {
+          if (texto !== resumo) onChange(texto);
+        }}
+        placeholder="Ex: D8 internação. Afebril há 48h. PCR em queda. Alta provável em 24h."
+        placeholderTextColor={ClinicalColors.textMuted}
+        multiline
+      />
+    </View>
+  );
+}
+
+/**
+ * Evolução laboratorial por data: formulário para inserir exame/data/valor e
+ * exibição por exame com a série temporal e a tendência (↓ queda / ↑ alta / →).
+ */
+function LabEvolucao({
+  resultados,
+  onChange,
+}: {
+  resultados: ResultadoLab[];
+  onChange: (l: ResultadoLab[]) => void;
+}) {
+  const [mostrarForm, setMostrarForm] = useState(false);
+  const [exame, setExame] = useState("");
+  const [data, setData] = useState(hojeISO());
+  const [valor, setValor] = useState("");
+
+  const adicionar = () => {
+    if (!exame.trim() || !valor.trim()) return;
+    onChange([
+      ...resultados,
+      {
+        id: novoId(),
+        exame: exame.trim(),
+        data: data.trim() || hojeISO(),
+        valor: valor.trim(),
+      },
+    ]);
+    setExame("");
+    setValor("");
+    setData(hojeISO());
+    setMostrarForm(false);
+  };
+
+  const removerExame = (nome: string) =>
+    onChange(resultados.filter((r) => r.exame.trim() !== nome));
+
+  const series = agruparPorExame(resultados);
+
+  return (
+    <View style={styles.labBox}>
+      <TouchableOpacity
+        style={styles.labAddBtn}
+        onPress={() => setMostrarForm((v) => !v)}
+      >
+        <Text style={styles.labAddTexto}>📅 Adicionar resultado por data</Text>
+      </TouchableOpacity>
+
+      {mostrarForm && (
+        <View style={styles.formInline}>
+          <TextInput
+            style={styles.campoInput}
+            value={exame}
+            onChangeText={setExame}
+            placeholder="Exame (ex.: PCR)"
+            placeholderTextColor={ClinicalColors.textMuted}
+          />
+          <TextInput
+            style={styles.campoInput}
+            value={data}
+            onChangeText={setData}
+            placeholder="Data (YYYY-MM-DD)"
+            placeholderTextColor={ClinicalColors.textMuted}
+          />
+          <TextInput
+            style={styles.campoInput}
+            value={valor}
+            onChangeText={setValor}
+            placeholder="Valor (ex.: 42)"
+            placeholderTextColor={ClinicalColors.textMuted}
+          />
+          <View style={styles.formAcoes}>
+            <TouchableOpacity
+              style={[styles.botaoAcao, styles.botaoSalvar]}
+              onPress={adicionar}
+            >
+              <Text style={styles.botaoAcaoTexto}>Adicionar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.botaoAcao, styles.botaoCancelar]}
+              onPress={() => setMostrarForm(false)}
+            >
+              <Text style={styles.botaoCancelarTexto}>Cancelar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {series.length === 0 ? (
+        <Text style={styles.vazioTexto}>Nenhum resultado por data ainda.</Text>
+      ) : (
+        series.map((s) => {
+          const info = s.tendencia ? TENDENCIA_INFO[s.tendencia] : null;
+          return (
+            <View key={s.exame} style={styles.labLinha}>
+              <View style={styles.labLinhaTopo}>
+                <Text style={styles.labExame}>{s.exame}</Text>
+                <View style={styles.labLinhaDir}>
+                  {info && (
+                    <Text style={[styles.labTend, { color: info.cor }]}>
+                      {info.icone} {info.rotulo}
+                    </Text>
+                  )}
+                  <TouchableOpacity
+                    onPress={() => removerExame(s.exame)}
+                    hitSlop={8}
+                  >
+                    <Text style={styles.anotacaoIcone}>🗑️</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+              <Text style={styles.labSerie}>
+                {s.pontos
+                  .map((p) => `${p.valor} (${formatarDataBR(p.data).slice(0, 5)})`)
+                  .join("  →  ")}
+              </Text>
+            </View>
+          );
+        })
+      )}
+    </View>
+  );
+}
+
+/**
+ * Sinais vitais estruturados de um dia. Campos numéricos + O2 em uso + frase
+ * clínica gerada automaticamente (usada também no "Passar o Caso"). Persiste ao
+ * perder o foco / ao alternar o O2.
+ */
+function SinaisVitaisSecao({
+  sv,
+  onChange,
+}: {
+  sv: SinaisVitaisDia;
+  onChange: (v: SinaisVitaisDia) => void;
+}) {
+  const [local, setLocal] = useState(sv);
+  useEffect(() => setLocal(sv), [sv]);
+
+  const setNum = (campo: CampoNum) => (t: string) =>
+    setLocal((s) => ({ ...s, [campo]: t }));
+  const persistir = () => onChange(local);
+
+  const camposNum: { k: CampoNum; label: string; ph: string }[] = [
+    { k: "temp", label: "Temp (°C)", ph: "36,5" },
+    { k: "fc", label: "FC (bpm)", ph: "78" },
+    { k: "fr", label: "FR (irpm)", ph: "16" },
+    { k: "sato2", label: "SatO2 (%)", ph: "96" },
+    { k: "glicemia", label: "Glicemia (mg/dL)", ph: "—" },
+    { k: "diurese", label: "Diurese (mL/24h)", ph: "—" },
+  ];
+
+  const frase = fraseSinaisVitais(local);
+
+  return (
+    <View style={styles.svBox}>
+      <Text style={[styles.campoLabel, styles.campoLabelEspacado]}>
+        Sinais vitais (estruturado)
+      </Text>
+      <View style={styles.svGrid}>
+        <View style={styles.svCampo}>
+          <Text style={styles.campoLabel}>PA sistólica</Text>
+          <TextInput
+            style={styles.campoInput}
+            value={local.paSist}
+            onChangeText={setNum("paSist")}
+            onBlur={persistir}
+            keyboardType="numeric"
+            placeholder="120"
+            placeholderTextColor={ClinicalColors.textMuted}
+          />
+        </View>
+        <View style={styles.svCampo}>
+          <Text style={styles.campoLabel}>PA diastólica</Text>
+          <TextInput
+            style={styles.campoInput}
+            value={local.paDiast}
+            onChangeText={setNum("paDiast")}
+            onBlur={persistir}
+            keyboardType="numeric"
+            placeholder="80"
+            placeholderTextColor={ClinicalColors.textMuted}
+          />
+        </View>
+        {camposNum.map((c) => (
+          <View key={c.k} style={styles.svCampo}>
+            <Text style={styles.campoLabel}>{c.label}</Text>
+            <TextInput
+              style={styles.campoInput}
+              value={local[c.k]}
+              onChangeText={setNum(c.k)}
+              onBlur={persistir}
+              keyboardType="numeric"
+              placeholder={c.ph}
+              placeholderTextColor={ClinicalColors.textMuted}
+            />
+          </View>
+        ))}
+      </View>
+
+      <Text style={[styles.campoLabel, styles.campoLabelEspacado]}>
+        O2 em uso
+      </Text>
+      <View style={styles.chipsWrap}>
+        {O2_OPCOES.map((o) => {
+          const ativo = local.o2 === o.valor;
+          return (
+            <TouchableOpacity
+              key={o.valor}
+              onPress={() => {
+                const novo: SinaisVitaisDia = {
+                  ...local,
+                  o2: ativo ? null : o.valor,
+                };
+                setLocal(novo);
+                onChange(novo);
+              }}
+              style={[styles.toggleChip, ativo && styles.toggleChipAtivo]}
+            >
+              <Text
+                style={[
+                  styles.toggleChipTexto,
+                  ativo && styles.toggleChipTextoAtivo,
+                ]}
+              >
+                {o.rotulo}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      <Text style={[styles.campoLabel, styles.campoLabelEspacado]}>
+        Intercorrências
+      </Text>
+      <TextInput
+        style={styles.anotacoesInput}
+        value={local.intercorrencias}
+        onChangeText={(t) => setLocal((s) => ({ ...s, intercorrencias: t }))}
+        onBlur={persistir}
+        placeholder="Intercorrências nas últimas 24h..."
+        placeholderTextColor={ClinicalColors.textMuted}
+        multiline
+      />
+
+      {!svVazio(local) && !!frase && (
+        <View style={styles.svFraseBox}>
+          <Text style={styles.svFraseLabel}>Frase gerada</Text>
+          <Text style={styles.svFrase}>{frase}</Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
+/**
+ * Checklist de Alta: lista de itens marcáveis. Item marcado fica verde e
+ * riscado. Só é renderizado quando o status do paciente é de alta.
+ */
+function ChecklistAltaSecao({
+  checklist,
+  onChange,
+}: {
+  checklist: Record<string, boolean>;
+  onChange: (c: Record<string, boolean>) => void;
+}) {
+  const [aberto, setAberto] = useState(true);
+  const feitos = CHECKLIST_ALTA.filter((i) => checklist[i.id]).length;
+
+  return (
+    <View style={styles.secao}>
+      <TouchableOpacity
+        style={styles.secaoHeader}
+        onPress={() => setAberto((v) => !v)}
+        activeOpacity={0.7}
+      >
+        <Text style={styles.secaoHeaderTitulo}>
+          Checklist de Alta ({feitos}/{CHECKLIST_ALTA.length})
+        </Text>
+        <Text style={styles.secaoChevron}>{aberto ? "▲" : "▼"}</Text>
+      </TouchableOpacity>
+      {aberto && (
+        <View style={styles.secaoBody}>
+          {CHECKLIST_ALTA.map((item) => {
+            const feito = !!checklist[item.id];
+            return (
+              <TouchableOpacity
+                key={item.id}
+                style={styles.checkItem}
+                onPress={() => onChange({ ...checklist, [item.id]: !feito })}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.checkbox, feito && styles.checkboxFeito]}>
+                  {feito ? "☑" : "☐"}
+                </Text>
+                <Text
+                  style={[styles.checkItemTexto, feito && styles.checkItemFeito]}
+                >
+                  {item.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
+    </View>
+  );
+}
+
+/** Um bloco rotulado dentro do Modo Round (fontes maiores). */
+function RoundBloco({
+  titulo,
+  children,
+}: {
+  titulo: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <View style={styles.roundBloco}>
+      <Text style={styles.roundSecaoTitulo}>{titulo}</Text>
+      {children}
+    </View>
+  );
+}
+
+/**
+ * Modo Round: tela fullscreen, visual limpo e fontes maiores, para apresentar o
+ * caso segurando o celular. Mostra o essencial em ordem de apresentação.
+ */
+function ModoRound({
+  visivel,
+  paciente,
+  dia,
+  hoje,
+  onSair,
+}: {
+  visivel: boolean;
+  paciente: PacienteModel;
+  dia: number | null;
+  hoje: string;
+  onSair: () => void;
+}) {
+  const problemas = (paciente.problemas ?? []).filter(
+    (p) => p.status !== "resolvido",
+  );
+  const evo = paciente.evolucoes?.[hoje];
+  const frase = fraseSinaisVitais(paciente.sinaisVitais?.[hoje]);
+  const series = agruparPorExame(paciente.resultadosLab ?? []);
+  const statusClinicoLabel = paciente.statusClinico
+    ? StatusClinicoColors[paciente.statusClinico].label
+    : null;
+  const linhaTopo = [
+    paciente.idade != null ? `${paciente.idade} anos` : null,
+    dia != null ? `D${dia} de internação` : null,
+  ]
+    .filter(Boolean)
+    .join("  ·  ");
+
+  return (
+    <Modal visible={visivel} animationType="slide" onRequestClose={onSair}>
+      <View style={styles.roundContainer}>
+        <TouchableOpacity style={styles.roundSair} onPress={onSair}>
+          <Text style={styles.roundSairTexto}>← Sair do Modo Round</Text>
+        </TouchableOpacity>
+        <ScrollView contentContainerStyle={styles.roundConteudo}>
+          <Text style={styles.roundNome}>
+            {paciente.nomeCompleto || "Sem nome"}
+          </Text>
+          {!!linhaTopo && <Text style={styles.roundLinhaTopo}>{linhaTopo}</Text>}
+
+          {!!paciente.diagnosticoPrincipal && (
+            <RoundBloco titulo="Diagnóstico principal">
+              <Text style={styles.roundTexto}>
+                {paciente.diagnosticoPrincipal}
+              </Text>
+            </RoundBloco>
+          )}
+          {!!statusClinicoLabel && (
+            <RoundBloco titulo="Status clínico">
+              <Text style={styles.roundTexto}>{statusClinicoLabel}</Text>
+            </RoundBloco>
+          )}
+          {problemas.length > 0 && (
+            <RoundBloco titulo="Problemas ativos">
+              {problemas.map((p) => (
+                <Text key={p.id} style={styles.roundItem}>
+                  • {p.titulo}
+                  {p.conduta?.trim() ? ` — ${p.conduta.trim()}` : ""}
+                </Text>
+              ))}
+            </RoundBloco>
+          )}
+          {(!!frase || !!evo?.estadoGeral?.trim()) && (
+            <RoundBloco titulo="Últimas 24h">
+              {!!evo?.estadoGeral?.trim() && (
+                <Text style={styles.roundTexto}>{evo.estadoGeral.trim()}</Text>
+              )}
+              {!!frase && <Text style={styles.roundTexto}>{frase}</Text>}
+            </RoundBloco>
+          )}
+          {series.length > 0 && (
+            <RoundBloco titulo="Exames relevantes">
+              {series.map((s) => {
+                const info = s.tendencia ? TENDENCIA_INFO[s.tendencia] : null;
+                return (
+                  <Text key={s.exame} style={styles.roundItem}>
+                    • {s.exame}: {s.pontos.map((p) => p.valor).join(" → ")}
+                    {info ? ` ${info.icone}` : ""}
+                  </Text>
+                );
+              })}
+            </RoundBloco>
+          )}
+          {!!evo?.condutaDoDia?.trim() && (
+            <RoundBloco titulo="Conduta do dia">
+              <Text style={styles.roundTexto}>{evo.condutaDoDia.trim()}</Text>
+            </RoundBloco>
+          )}
+        </ScrollView>
+      </View>
+    </Modal>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -1466,7 +2047,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 120,
   },
-  botaoVoltar: { marginBottom: 16 },
   botaoVoltarTexto: { color: ClinicalColors.primary, fontSize: 16 },
   aviso: { color: ClinicalColors.textMuted, fontSize: 15, marginTop: 24 },
   cabecalho: {
@@ -1793,7 +2373,6 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginTop: 4,
   },
-  statusClinicoLabel: { marginTop: 12 },
   statusClinicoRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   statusClinicoChip: {
     borderWidth: 1,
@@ -1894,4 +2473,192 @@ const styles = StyleSheet.create({
     color: ClinicalColors.textMuted,
   },
   prioridadePonto: { width: 8, height: 8, borderRadius: 4 },
+
+  // Barra do topo (Voltar + Modo Round)
+  topoBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 16,
+  },
+  botaoRound: {
+    backgroundColor: ClinicalColors.accent,
+    borderRadius: Radius.badge,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  botaoRoundTexto: {
+    color: ClinicalColors.textOnPrimary,
+    fontSize: 14,
+    fontWeight: "700",
+  },
+
+  // Status clínico (seção própria)
+  statusClinicoBox: { marginBottom: 16 },
+
+  // Resumo Rápido
+  resumoCard: {
+    backgroundColor: "#F0F9FF",
+    borderColor: "#BAE6FD",
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+  },
+  resumoTopo: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  resumoTitulo: {
+    fontSize: 11,
+    color: ClinicalColors.textMuted,
+    fontWeight: "600",
+    textTransform: "uppercase",
+  },
+  resumoGerarBtn: {
+    backgroundColor: ClinicalColors.surface,
+    borderColor: ClinicalColors.primary,
+    borderWidth: BorderWidth.hairline,
+    borderRadius: Radius.badge,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    minWidth: 96,
+    alignItems: "center",
+  },
+  resumoGerarTexto: {
+    color: ClinicalColors.primary,
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  resumoInput: {
+    backgroundColor: ClinicalColors.surface,
+    borderColor: "#BAE6FD",
+    borderWidth: BorderWidth.hairline,
+    borderRadius: Radius.badge,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: ClinicalColors.text,
+    fontSize: 15,
+    lineHeight: 22,
+    minHeight: 96,
+    textAlignVertical: "top",
+  },
+
+  // Evolução laboratorial
+  labBox: { marginTop: 16, gap: 10 },
+  labAddBtn: {
+    backgroundColor: ClinicalColors.background,
+    borderColor: ClinicalColors.primary,
+    borderWidth: BorderWidth.hairline,
+    borderRadius: Radius.badge,
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+  labAddTexto: {
+    color: ClinicalColors.primary,
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  labLinha: {
+    backgroundColor: ClinicalColors.background,
+    borderRadius: Radius.badge,
+    padding: 10,
+    gap: 4,
+  },
+  labLinhaTopo: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  labLinhaDir: { flexDirection: "row", alignItems: "center", gap: 10 },
+  labExame: { fontSize: 14, fontWeight: "700", color: ClinicalColors.text },
+  labTend: { fontSize: 13, fontWeight: "600" },
+  labSerie: { fontSize: 14, color: ClinicalColors.text, lineHeight: 20 },
+
+  // Sinais vitais estruturados
+  svBox: { marginTop: 8 },
+  svGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  svCampo: { width: "47%", marginBottom: 4 },
+  svFraseBox: {
+    backgroundColor: "#F0F9FF",
+    borderColor: "#BAE6FD",
+    borderWidth: BorderWidth.hairline,
+    borderRadius: Radius.badge,
+    padding: 12,
+    marginTop: 12,
+  },
+  svFraseLabel: {
+    fontSize: 11,
+    color: ClinicalColors.textMuted,
+    fontWeight: "600",
+    textTransform: "uppercase",
+    marginBottom: 4,
+  },
+  svFrase: { fontSize: 14, color: ClinicalColors.text, lineHeight: 20 },
+
+  // Checklist de alta
+  checkItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 10,
+    borderBottomWidth: BorderWidth.hairline,
+    borderBottomColor: ClinicalColors.border,
+  },
+  checkboxFeito: { color: "#166534" },
+  checkItemTexto: {
+    flex: 1,
+    fontSize: 14,
+    color: ClinicalColors.text,
+    lineHeight: 20,
+  },
+  checkItemFeito: {
+    color: "#166534",
+    textDecorationLine: "line-through",
+  },
+
+  // Modo Round
+  roundContainer: { flex: 1, backgroundColor: ClinicalColors.surface },
+  roundSair: {
+    paddingTop: 60,
+    paddingHorizontal: 20,
+    paddingBottom: 8,
+  },
+  roundSairTexto: {
+    color: ClinicalColors.primary,
+    fontSize: 17,
+    fontWeight: "600",
+  },
+  roundConteudo: { paddingHorizontal: 24, paddingBottom: 48, paddingTop: 8 },
+  roundNome: {
+    fontSize: 28,
+    fontWeight: "bold",
+    color: ClinicalColors.text,
+  },
+  roundLinhaTopo: {
+    fontSize: 18,
+    color: ClinicalColors.textMuted,
+    marginTop: 6,
+    marginBottom: 8,
+  },
+  roundBloco: { marginTop: 20 },
+  roundSecaoTitulo: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: ClinicalColors.primary,
+    marginBottom: 8,
+  },
+  roundTexto: {
+    fontSize: 16,
+    color: ClinicalColors.text,
+    lineHeight: 24,
+    marginBottom: 4,
+  },
+  roundItem: {
+    fontSize: 16,
+    color: ClinicalColors.text,
+    lineHeight: 26,
+  },
 });
