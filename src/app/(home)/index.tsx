@@ -328,7 +328,7 @@ export default function Index() {
                     : ""}
                 </Text>
                 {!!item.diagnosticoPrincipal && (
-                  <Text style={styles.diagnostico} numberOfLines={1}>
+                  <Text style={styles.diagnostico} numberOfLines={2}>
                     {item.diagnosticoPrincipal}
                   </Text>
                 )}
