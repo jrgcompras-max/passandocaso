@@ -184,6 +184,7 @@ export function PacientesProvider({ children }: { children: ReactNode }) {
 
   // Sincroniza com o backend (best-effort, debounced para coalescer edições
   // rápidas). Em offline simplesmente não envia — o cache local segue válido.
+  // Roda também na primeira carga (carregado → true), empurrando o estado atual.
   useEffect(() => {
     if (!carregado) return;
     const t = setTimeout(() => {
