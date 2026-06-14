@@ -11,7 +11,16 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json({ limit: "15mb" }));
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+// Inicialização preguiçosa: o construtor do SDK lança erro se não houver apiKey.
+// Criar sob demanda evita derrubar o servidor no boot quando a chave não está
+// configurada (o /health continua respondendo e as rotas retornam erro tratado).
+let _anthropic = null;
+function getAnthropic() {
+  if (!_anthropic) {
+    _anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  }
+  return _anthropic;
+}
 
 /**
  * Isola o objeto JSON dentro da resposta do modelo, que às vezes vem embrulhado
@@ -52,7 +61,7 @@ app.post("/api/extract", async (req, res) => {
   }
 
   try {
-    const msg = await anthropic.messages.create({
+    const msg = await getAnthropic().messages.create({
       model: "claude-sonnet-4-6",
       max_tokens: 1000,
       messages: [
@@ -111,7 +120,7 @@ app.post("/api/formatar", async (req, res) => {
   }
 
   try {
-    const msg = await anthropic.messages.create({
+    const msg = await getAnthropic().messages.create({
       model: "claude-sonnet-4-6",
       max_tokens: 2000,
       messages: [
@@ -168,6 +177,6 @@ app.get("/api/evolucao/:medicoId/:data", (req, res) => {
   res.json({ medicoId, data, evolucoes: lista });
 });
 
-app.listen(PORT, () => {
-  console.log(`Passando o Caso — backend ouvindo na porta ${PORT}`);
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Passando o Caso — backend ouvindo em 0.0.0.0:${PORT}`);
 });
