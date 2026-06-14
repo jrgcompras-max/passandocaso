@@ -6,9 +6,9 @@
     <title>Passando o Caso — Companion</title>
     <style>
       :root {
-        --azul: #1a6b8a; /* azul clínico */
+        --azul: #1a6b8a;
         --azul-escuro: #155772;
-        --verde: #0e7a5a; /* verde esmeralda */
+        --verde: #0e7a5a;
         --verde-escuro: #0b6249;
         --texto: #0f2d52;
         --muted: #64748b;
@@ -35,9 +35,8 @@
       header h1 { font-size: 18px; margin: 0; font-weight: 700; }
       header .quem { font-size: 13px; opacity: 0.95; }
       header .quem a { color: #fff; }
-      .container { max-width: 820px; margin: 0 auto; padding: 24px 16px 64px; }
+      .container { max-width: 880px; margin: 0 auto; padding: 24px 16px 64px; }
 
-      /* Login */
       .login {
         max-width: 380px;
         margin: 64px auto;
@@ -60,103 +59,60 @@
         background: #fff;
       }
       input:focus { outline: 2px solid var(--azul); border-color: var(--azul); }
-      button {
-        cursor: pointer;
-        border: none;
-        font-weight: 600;
-        border-radius: 8px;
-      }
-      .btn-primario {
-        width: 100%;
-        margin-top: 20px;
-        background: var(--azul);
-        color: #fff;
-        padding: 12px;
-        font-size: 15px;
-      }
+      button { cursor: pointer; border: none; font-weight: 600; border-radius: 8px; }
+      .btn-primario { width: 100%; margin-top: 20px; background: var(--azul); color: #fff; padding: 12px; font-size: 15px; }
       .btn-primario:hover { background: var(--azul-escuro); }
 
-      /* Barra de filtros */
-      .filtros {
-        display: flex;
-        gap: 12px;
-        align-items: flex-end;
-        flex-wrap: wrap;
-        margin-bottom: 20px;
-      }
+      .filtros { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 20px; }
       .filtros .campo { flex: 1; min-width: 160px; }
       .filtros label { margin-top: 0; }
-      .btn-sec {
-        background: #fff;
-        border: 1px solid var(--azul);
-        color: var(--azul);
-        padding: 10px 16px;
-        font-size: 14px;
-      }
+      .btn-sec { background: #fff; border: 1px solid var(--azul); color: var(--azul); padding: 10px 16px; font-size: 14px; }
       .btn-sec:hover { background: #eef5f8; }
 
-      /* Cards de evolução */
       .card {
         background: var(--card);
         border: 1px solid var(--borda);
         border-radius: 12px;
-        padding: 18px;
-        margin-bottom: 16px;
+        margin-bottom: 14px;
         box-shadow: 0 2px 8px rgba(15, 45, 82, 0.04);
+        overflow: hidden;
       }
-      .card-topo {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        margin-bottom: 12px;
-      }
-      .card h3 { margin: 0; font-size: 16px; color: var(--texto); }
-      .btn-copiar {
-        background: var(--verde);
-        color: #fff;
-        padding: 8px 14px;
-        font-size: 13px;
-        white-space: nowrap;
-      }
+      .card-cab { padding: 16px 18px; cursor: pointer; display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; }
+      .card-cab:hover { background: #fafcfe; }
+      .card-info h3 { margin: 0 0 2px; font-size: 16px; }
+      .card-meta { font-size: 13px; color: var(--muted); }
+      .card-diag { font-size: 14px; color: var(--texto); font-weight: 500; margin-top: 4px; }
+      .pill { font-size: 12px; font-weight: 600; border-radius: 8px; padding: 3px 9px; white-space: nowrap; }
+      .dia { font-size: 12px; font-weight: 700; color: var(--azul); background: var(--fundo); border-radius: 8px; padding: 2px 8px; margin-top: 6px; display: inline-block; }
+      .card-dir { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+
+      .detalhe { border-top: 1px solid var(--borda); padding: 16px 18px; display: none; }
+      .detalhe.aberto { display: block; }
+      .bloco { margin-bottom: 16px; }
+      .bloco h4 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted); }
+      .bloco p, .bloco li { font-size: 14px; color: var(--texto); margin: 2px 0; }
+      .bloco ul { margin: 0; padding-left: 18px; }
+      .frase { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 10px 12px; font-size: 14px; }
+      .btn-copiar { background: var(--verde); color: #fff; padding: 8px 14px; font-size: 13px; white-space: nowrap; }
       .btn-copiar:hover { background: var(--verde-escuro); }
       .btn-copiar.ok { background: var(--verde-escuro); }
-      pre {
-        margin: 0;
-        white-space: pre-wrap;
-        word-wrap: break-word;
-        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-        font-size: 13px;
-        color: var(--texto);
-        background: var(--fundo);
-        border-radius: 8px;
-        padding: 12px;
-        max-height: 360px;
-        overflow: auto;
-      }
-      .vazio, .erro {
-        text-align: center;
-        color: var(--muted);
-        padding: 48px 16px;
-        font-size: 15px;
-      }
+      pre { margin: 8px 0 0; white-space: pre-wrap; word-wrap: break-word; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; background: var(--fundo); border-radius: 8px; padding: 12px; max-height: 320px; overflow: auto; }
+      .vazio, .erro { text-align: center; color: var(--muted); padding: 48px 16px; font-size: 15px; }
       .erro { color: #991b1b; }
       .hidden { display: none; }
     </style>
   </head>
   <body>
-    <!-- Tela de login -->
     <div id="tela-login">
       <div class="login">
         <h2>Passando o Caso</h2>
-        <p>Companion web — entre com seu ID de médico para ver as evoluções do dia.</p>
+        <p>Companion web — entre com seu ID de médico para ver os pacientes.</p>
         <label for="medicoId">ID do médico</label>
         <input id="medicoId" type="text" placeholder="ex.: medico-001" autocomplete="username" />
         <button class="btn-primario" onclick="entrar()">Entrar</button>
       </div>
     </div>
 
-    <!-- App -->
     <div id="tela-app" class="hidden">
       <header>
         <h1>📋 Passando o Caso</h1>
@@ -165,7 +121,7 @@
       <div class="container">
         <div class="filtros">
           <div class="campo">
-            <label for="data">Data</label>
+            <label for="data">Evolução do dia</label>
             <input id="data" type="date" />
           </div>
           <button class="btn-sec" onclick="carregar()">Atualizar</button>
@@ -175,10 +131,35 @@
     </div>
 
     <script>
-      // URL da API. Ajuste aqui para apontar para o backend em produção.
+      // URL da API (temporariamente o Railway até o SSL do domínio custom resolver).
       const API_URL = "https://passandocaso-production.up.railway.app";
 
       let medicoId = "";
+      let pacientes = [];
+      let evolucoesDia = {}; // pacienteId -> texto
+
+      const STATUS = {
+        naoVisitado: { label: "Não visitado", bg: "#FEE2E2", fg: "#991B1B" },
+        visitado: { label: "Visitado", bg: "#FEF9C3", fg: "#854D0E" },
+        revisar: { label: "Revisar", bg: "#FFEDD5", fg: "#9A3412" },
+        pendente: { label: "Pendente", bg: "#EDE9FE", fg: "#6B21A8" },
+        altaProvavel: { label: "Alta provável", bg: "#DCFCE7", fg: "#166534" },
+        altaRealizada: { label: "Alta realizada", bg: "#F1F5F9", fg: "#475569" },
+      };
+      const STATUS_CLINICO = {
+        melhora: "Melhora clínica",
+        estavel: "Estável",
+        piora: "Em piora",
+        critico: "Crítico",
+      };
+      const SECOES = [
+        ["comorbidadesMedicacoes", "Comorbidades e MUC"],
+        ["historia", "HDA — História da Doença Atual"],
+        ["examesLaboratoriais", "Exames Laboratoriais"],
+        ["prescricaoHospitalar", "Prescrição Hospitalar"],
+        ["imagem", "Imagem"],
+        ["sinaisVitaisIntercorrencias", "Sinais Vitais e Intercorrências"],
+      ];
 
       function hojeISO() {
         const d = new Date();
@@ -187,12 +168,70 @@
         return `${d.getFullYear()}-${mes}-${dia}`;
       }
 
+      function escapeHtml(s) {
+        return (s || "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
+      }
+
+      function diaInternacao(dataEntrada) {
+        if (!dataEntrada) return null;
+        let m = String(dataEntrada).match(/(\d{4})-(\d{2})-(\d{2})/);
+        let d;
+        if (m) d = new Date(+m[1], +m[2] - 1, +m[3], 12);
+        else {
+          m = String(dataEntrada).match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+          if (!m) return null;
+          const ano = m[3].length === 2 ? 2000 + +m[3] : +m[3];
+          d = new Date(ano, +m[2] - 1, +m[1], 12);
+        }
+        if (isNaN(d.getTime())) return null;
+        const hoje = new Date();
+        const h = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(), 12);
+        return Math.max(1, Math.round((h - d) / 86400000) + 1);
+      }
+
+      function blocosTexto(extraido) {
+        if (!extraido) return [];
+        const t = String(extraido).trim();
+        if (!t.startsWith("[")) return t ? [t] : [];
+        try {
+          const blocos = JSON.parse(t);
+          return blocos
+            .map((b) => {
+              const itens = (b.itens || []).filter(Boolean);
+              if (!itens.length) return "";
+              return (b.titulo ? b.titulo + ": " : "") + itens.join("; ");
+            })
+            .filter(Boolean);
+        } catch {
+          return [t];
+        }
+      }
+
+      function fraseSinaisVitais(sv) {
+        if (!sv) return "";
+        const p = [];
+        if (sv.temp) {
+          const t = parseFloat(String(sv.temp).replace(",", "."));
+          const q = isNaN(t) ? null : t < 37.8 ? "afebril" : "febril";
+          p.push(q ? `${q} (Tax ${sv.temp}°C)` : `Tax ${sv.temp}°C`);
+        }
+        const h = [];
+        if (sv.paSist && sv.paDiast) h.push(`PA ${sv.paSist}/${sv.paDiast}`);
+        if (sv.fc) h.push(`FC ${sv.fc}`);
+        if (h.length) p.push(`(${h.join(", ")})`);
+        if (sv.fr) p.push(`FR ${sv.fr} irpm`);
+        const o2map = { ar: "em ar ambiente", cateter: "em cateter de O2", mascara: "em máscara de O2", vm: "em ventilação mecânica" };
+        const o2 = [];
+        if (sv.o2) o2.push(o2map[sv.o2] || "");
+        if (sv.sato2) o2.push(`SatO2 ${sv.sato2}%`);
+        if (o2.length) p.push(o2.filter(Boolean).join(" com "));
+        if (!p.length) return "";
+        return "Paciente " + p.join(", ") + ".";
+      }
+
       function entrar() {
         const valor = document.getElementById("medicoId").value.trim();
-        if (!valor) {
-          alert("Informe o ID do médico.");
-          return;
-        }
+        if (!valor) return alert("Informe o ID do médico.");
         medicoId = valor;
         document.getElementById("quem").textContent = medicoId;
         document.getElementById("tela-login").classList.add("hidden");
@@ -207,67 +246,154 @@
         document.getElementById("tela-login").classList.remove("hidden");
       }
 
-      function escapeHtml(s) {
-        return (s || "").replace(
-          /[&<>]/g,
-          (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c],
-        );
-      }
-
       async function carregar() {
         const data = document.getElementById("data").value || hojeISO();
         const lista = document.getElementById("lista");
         lista.innerHTML = '<div class="vazio">Carregando...</div>';
         try {
-          const resp = await fetch(
-            `${API_URL}/api/evolucao/${encodeURIComponent(medicoId)}/${data}`,
-          );
-          if (!resp.ok) throw new Error("HTTP " + resp.status);
-          const json = await resp.json();
-          renderizar(json.evolucoes || []);
+          const [rp, re] = await Promise.all([
+            fetch(`${API_URL}/api/pacientes/${encodeURIComponent(medicoId)}`),
+            fetch(`${API_URL}/api/evolucao/${encodeURIComponent(medicoId)}/${data}`),
+          ]);
+          if (!rp.ok) throw new Error("HTTP " + rp.status);
+          pacientes = (await rp.json()).pacientes || [];
+          evolucoesDia = {};
+          if (re.ok) {
+            for (const e of (await re.json()).evolucoes || []) {
+              evolucoesDia[e.pacienteId] = e.texto;
+            }
+          }
+          renderizar();
         } catch (e) {
           lista.innerHTML =
             '<div class="erro">Não foi possível conectar à API (' +
-            escapeHtml(API_URL) +
-            ").<br>Verifique a configuração do backend.</div>";
+            escapeHtml(API_URL) + ").</div>";
         }
       }
 
-      function renderizar(evolucoes) {
+      function renderizar() {
         const lista = document.getElementById("lista");
-        if (!evolucoes.length) {
-          lista.innerHTML =
-            '<div class="vazio">Nenhuma evolução para esta data.</div>';
+        if (!pacientes.length) {
+          lista.innerHTML = '<div class="vazio">Nenhum paciente para este médico.</div>';
           return;
         }
-        window.__evolucoes = evolucoes;
-        lista.innerHTML = evolucoes
-          .map(
-            (e, i) => `
+        lista.innerHTML = pacientes.map((p, i) => cardHtml(p, i)).join("");
+      }
+
+      function cardHtml(p, i) {
+        const st = STATUS[p.status] || { label: p.status || "—", bg: "#F1F5F9", fg: "#475569" };
+        const dia = diaInternacao(p.dataEntrada);
+        const pend = (p.pendencias || []).filter((x) => !x.feito).length;
+        return `
           <div class="card">
-            <div class="card-topo">
-              <h3>${escapeHtml(e.nome || "Paciente")}</h3>
-              <button class="btn-copiar" id="copiar-${i}" onclick="copiar(${i})">📋 Copiar evolução</button>
+            <div class="card-cab" onclick="toggle(${i})">
+              <div class="card-info">
+                <h3>${escapeHtml(p.nomeCompleto || "Sem nome")}</h3>
+                <div class="card-meta">${[
+                  p.idade != null ? p.idade + " anos" : null,
+                  p.leito ? "Leito " + escapeHtml(p.leito) : null,
+                  escapeHtml(p.setor || ""),
+                ].filter(Boolean).join(" · ")}</div>
+                ${p.diagnosticoPrincipal ? `<div class="card-diag">${escapeHtml(p.diagnosticoPrincipal)}</div>` : ""}
+                ${dia ? `<span class="dia">D${dia}</span>` : ""}
+                ${pend ? `<span class="dia" style="color:#b45309;background:#fef3c7">${pend} pendência${pend > 1 ? "s" : ""}</span>` : ""}
+              </div>
+              <div class="card-dir">
+                <span class="pill" style="background:${st.bg};color:${st.fg}">${st.label}</span>
+              </div>
             </div>
-            <pre id="texto-${i}">${escapeHtml(e.texto)}</pre>
-          </div>`,
-          )
-          .join("");
+            <div class="detalhe" id="det-${i}">${detalheHtml(p, i)}</div>
+          </div>`;
+      }
+
+      function detalheHtml(p, i) {
+        let h = "";
+        if (p.statusClinico)
+          h += bloco("Status clínico", `<p>${STATUS_CLINICO[p.statusClinico] || p.statusClinico}</p>`);
+        if (p.motivoInternacao)
+          h += bloco("Motivo da internação", `<p>${escapeHtml(p.motivoInternacao)}</p>`);
+        if (p.resumoRapido)
+          h += bloco("Resumo rápido", `<div class="frase">${escapeHtml(p.resumoRapido)}</div>`);
+
+        const probs = p.problemas || [];
+        if (probs.length)
+          h += bloco("Problemas ativos", "<ul>" + probs.map((x) =>
+            `<li><b>${escapeHtml(x.titulo)}</b> (${x.status}, ${x.prioridade})${x.conduta ? " — " + escapeHtml(x.conduta) : ""}</li>`).join("") + "</ul>");
+
+        const pend = p.pendencias || [];
+        if (pend.length)
+          h += bloco("Pendências", "<ul>" + pend.map((x) =>
+            `<li>${x.feito ? "☑" : "☐"} ${escapeHtml(x.descricao)} (${x.prioridade})</li>`).join("") + "</ul>");
+
+        // Exames laboratoriais por data (evolução temporal)
+        const labs = agruparLab(p.resultadosLab || []);
+        if (labs.length)
+          h += bloco("Evolução laboratorial", "<ul>" + labs.map((s) =>
+            `<li><b>${escapeHtml(s.exame)}</b>: ${s.pontos.map((pt) => escapeHtml(pt.valor)).join(" → ")}</li>`).join("") + "</ul>");
+
+        // Sinais vitais (frase do registro mais recente)
+        const sv = ultimoSV(p.sinaisVitais);
+        const frase = fraseSinaisVitais(sv);
+        if (frase) h += bloco("Sinais vitais", `<div class="frase">${escapeHtml(frase)}</div>`);
+
+        // Seções extraídas
+        for (const [sid, titulo] of SECOES) {
+          const sec = (p.secoes || {})[sid];
+          const linhas = blocosTexto(sec && sec.extraido);
+          if (linhas.length)
+            h += bloco(titulo, "<ul>" + linhas.map((l) => `<li>${escapeHtml(l)}</li>`).join("") + "</ul>");
+        }
+
+        // Evolução do dia + copiar
+        const evo = evolucoesDia[p.id];
+        if (evo) {
+          h += `<div class="bloco"><h4>Evolução do dia</h4>
+            <button class="btn-copiar" id="cp-${i}" onclick="copiar(${i})">📋 Copiar evolução</button>
+            <pre id="evo-${i}">${escapeHtml(evo)}</pre></div>`;
+        }
+        return h || '<p class="card-meta">Sem dados adicionais.</p>';
+      }
+
+      function bloco(titulo, conteudo) {
+        return `<div class="bloco"><h4>${escapeHtml(titulo)}</h4>${conteudo}</div>`;
+      }
+
+      function agruparLab(resultados) {
+        const mapa = {};
+        for (const r of resultados) {
+          const k = (r.exame || "").trim();
+          if (!k) continue;
+          (mapa[k] = mapa[k] || []).push(r);
+        }
+        return Object.keys(mapa).sort().map((exame) => ({
+          exame,
+          pontos: mapa[exame].sort((a, b) => String(a.data).localeCompare(String(b.data))),
+        }));
+      }
+
+      function ultimoSV(sinaisVitais) {
+        if (!sinaisVitais) return null;
+        const datas = Object.keys(sinaisVitais).sort();
+        return datas.length ? sinaisVitais[datas[datas.length - 1]] : null;
+      }
+
+      function toggle(i) {
+        document.getElementById("det-" + i).classList.toggle("aberto");
       }
 
       async function copiar(i) {
-        const texto = (window.__evolucoes[i] || {}).texto || "";
+        const texto = evolucoesDia[pacientes[i].id] || "";
         try {
           await navigator.clipboard.writeText(texto);
         } catch {
           const range = document.createRange();
-          range.selectNodeContents(document.getElementById("texto-" + i));
+          range.selectNodeContents(document.getElementById("evo-" + i));
           const sel = window.getSelection();
           sel.removeAllRanges();
           sel.addRange(range);
           document.execCommand("copy");
         }
-        const btn = document.getElementById("copiar-" + i);
+        const btn = document.getElementById("cp-" + i);
         btn.textContent = "✓ Copiado!";
         btn.classList.add("ok");
         setTimeout(() => {

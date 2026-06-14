@@ -3,6 +3,7 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const Anthropic = require("@anthropic-ai/sdk");
+const db = require("./db");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -192,43 +193,153 @@ app.post("/api/resumo", async (req, res) => {
   }
 });
 
-// --- Evoluções (armazenamento em memória; trocar por banco depois) ---
-// Chave: `${medicoId}|${data}` -> [{ pacienteId, nome, texto, salvoEm }]
-const evolucoes = new Map();
+// --- Pacientes (sincronização app ⇄ banco) ---
+
+/** Lista todos os pacientes de um médico (mais recentes primeiro). */
+app.get("/api/pacientes/:medicoId", async (req, res) => {
+  const { medicoId } = req.params;
+  try {
+    const r = await db.query(
+      "SELECT dados FROM pacientes WHERE medico_id = $1 ORDER BY updated_at DESC",
+      [medicoId],
+    );
+    res.json({ medicoId, pacientes: r.rows.map((row) => row.dados) });
+  } catch (e) {
+    console.error("Erro em GET /api/pacientes:", e);
+    res.status(500).json({ erro: e.message || "Falha ao listar pacientes." });
+  }
+});
+
+/** Busca um paciente específico do médico. */
+app.get("/api/pacientes/:medicoId/:pacienteId", async (req, res) => {
+  const { medicoId, pacienteId } = req.params;
+  try {
+    const r = await db.query(
+      "SELECT dados FROM pacientes WHERE medico_id = $1 AND id = $2",
+      [medicoId, pacienteId],
+    );
+    if (!r.rows.length) {
+      return res.status(404).json({ erro: "Paciente não encontrado." });
+    }
+    res.json(r.rows[0].dados);
+  } catch (e) {
+    console.error("Erro em GET /api/pacientes/:id:", e);
+    res.status(500).json({ erro: e.message || "Falha ao buscar paciente." });
+  }
+});
+
+/**
+ * Recebe um array de pacientes do app e faz upsert no banco (offline-first: o
+ * app continua usando o AsyncStorage como cache e empurra o estado para cá).
+ * Body: { medicoId, pacientes: Paciente[] }
+ */
+app.post("/api/pacientes/sync", async (req, res) => {
+  const { medicoId, pacientes } = req.body || {};
+  if (!medicoId || !Array.isArray(pacientes)) {
+    return res
+      .status(400)
+      .json({ erro: "Campos obrigatórios: medicoId, pacientes (array)." });
+  }
+  try {
+    for (const p of pacientes) {
+      if (!p || !p.id) continue;
+      const dataCriacao =
+        (Array.isArray(p.diasAcompanhamento) && p.diasAcompanhamento[0]) ||
+        new Date().toISOString().slice(0, 10);
+      await db.query(
+        `INSERT INTO pacientes (id, medico_id, data_criacao, dados, updated_at)
+         VALUES ($1, $2, $3, $4, NOW())
+         ON CONFLICT (id) DO UPDATE
+           SET medico_id = EXCLUDED.medico_id,
+               dados = EXCLUDED.dados,
+               updated_at = NOW()`,
+        [p.id, medicoId, dataCriacao, p],
+      );
+    }
+    res.json({ status: "ok", total: pacientes.length });
+  } catch (e) {
+    console.error("Erro em POST /api/pacientes/sync:", e);
+    res.status(500).json({ erro: e.message || "Falha ao sincronizar." });
+  }
+});
+
+/** Remove um paciente do médico. */
+app.delete("/api/pacientes/:medicoId/:pacienteId", async (req, res) => {
+  const { medicoId, pacienteId } = req.params;
+  try {
+    await db.query("DELETE FROM pacientes WHERE medico_id = $1 AND id = $2", [
+      medicoId,
+      pacienteId,
+    ]);
+    res.json({ status: "ok" });
+  } catch (e) {
+    console.error("Erro em DELETE /api/pacientes:", e);
+    res.status(500).json({ erro: e.message || "Falha ao remover paciente." });
+  }
+});
+
+// --- Evoluções (PostgreSQL) ---
 
 /**
  * Salva (ou substitui) a evolução de um paciente para um médico/data.
  * Body: { medicoId, data (YYYY-MM-DD), pacienteId, nome, texto }
  */
-app.post("/api/evolucao/salvar", (req, res) => {
+app.post("/api/evolucao/salvar", async (req, res) => {
   const { medicoId, data, pacienteId, nome, texto } = req.body || {};
   if (!medicoId || !data || !pacienteId) {
     return res
       .status(400)
       .json({ erro: "Campos obrigatórios: medicoId, data, pacienteId." });
   }
-
-  const chave = `${medicoId}|${data}`;
-  const lista = evolucoes.get(chave) || [];
-  const semAntigo = lista.filter((e) => e.pacienteId !== pacienteId);
-  semAntigo.push({
-    pacienteId,
-    nome: nome || "",
-    texto: texto || "",
-    salvoEm: new Date().toISOString(),
-  });
-  evolucoes.set(chave, semAntigo);
-
-  res.json({ status: "ok", total: semAntigo.length });
+  try {
+    // "Substitui" a evolução do dia: remove a anterior do mesmo paciente/data.
+    await db.query(
+      "DELETE FROM evolucoes WHERE medico_id = $1 AND data = $2 AND paciente_id = $3",
+      [medicoId, data, pacienteId],
+    );
+    await db.query(
+      `INSERT INTO evolucoes (paciente_id, medico_id, data, texto)
+       VALUES ($1, $2, $3, $4)`,
+      [pacienteId, medicoId, data, texto || ""],
+    );
+    res.json({ status: "ok" });
+  } catch (e) {
+    console.error("Erro em POST /api/evolucao/salvar:", e);
+    res.status(500).json({ erro: e.message || "Falha ao salvar evolução." });
+  }
 });
 
-/** Retorna as evoluções de um médico em uma data. */
-app.get("/api/evolucao/:medicoId/:data", (req, res) => {
+/** Retorna as evoluções de um médico em uma data (com o nome do paciente). */
+app.get("/api/evolucao/:medicoId/:data", async (req, res) => {
   const { medicoId, data } = req.params;
-  const lista = evolucoes.get(`${medicoId}|${data}`) || [];
-  res.json({ medicoId, data, evolucoes: lista });
+  try {
+    const r = await db.query(
+      `SELECT e.paciente_id, e.texto, e.created_at, p.dados->>'nomeCompleto' AS nome
+         FROM evolucoes e
+         LEFT JOIN pacientes p ON p.id = e.paciente_id
+        WHERE e.medico_id = $1 AND e.data = $2
+        ORDER BY e.created_at DESC`,
+      [medicoId, data],
+    );
+    const evolucoes = r.rows.map((row) => ({
+      pacienteId: row.paciente_id,
+      nome: row.nome || "",
+      texto: row.texto,
+      salvoEm: row.created_at,
+    }));
+    res.json({ medicoId, data, evolucoes });
+  } catch (e) {
+    console.error("Erro em GET /api/evolucao:", e);
+    res.status(500).json({ erro: e.message || "Falha ao listar evoluções." });
+  }
 });
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Passando o Caso — backend ouvindo em 0.0.0.0:${PORT}`);
-});
+// Sobe o servidor depois de garantir o schema do banco. Se o initDB falhar
+// (ex.: DATABASE_URL ausente), ainda sobe — as rotas de IA seguem funcionando.
+db.initDB()
+  .catch((e) => console.error("Falha ao inicializar o banco:", e))
+  .finally(() => {
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Passando o Caso — backend ouvindo em 0.0.0.0:${PORT}`);
+    });
+  });

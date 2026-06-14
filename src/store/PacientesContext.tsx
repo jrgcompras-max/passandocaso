@@ -10,6 +10,12 @@ import {
 import { type StatusType } from "@/constants/clinicalTheme";
 import { gerarPacientesExemplo } from "@/constants/pacientesExemplo";
 import {
+  buscarPacientes,
+  enviarPacientes,
+  mesclarPacientes,
+  removerPacienteRemoto,
+} from "@/lib/sincronizarPacientes";
+import {
   type CabecalhoProntuario,
   type DadosClinicos,
   type EvolucaoBeiraLeito,
@@ -144,9 +150,18 @@ export function PacientesProvider({ children }: { children: ReactNode }) {
     (async () => {
       try {
         const bruto = await AsyncStorage.getItem(STORAGE_KEY);
-        const lista = bruto ? migrarPacientes(JSON.parse(bruto)) : [];
+        let lista = bruto ? migrarPacientes(JSON.parse(bruto)) : [];
         // Primeira execução (nada salvo): popula com os pacientes de exemplo.
-        if (ativo) setPacientes(lista.length ? lista : gerarPacientesExemplo());
+        if (!lista.length) lista = gerarPacientesExemplo();
+        // Mescla com o backend (best-effort): pacientes só-remotos entram; o
+        // local tem prioridade nos conflitos.
+        try {
+          const remoto = migrarPacientes(await buscarPacientes());
+          lista = mesclarPacientes(lista, remoto);
+        } catch {
+          // sem rede / backend indisponível: segue só com o cache local
+        }
+        if (ativo) setPacientes(lista);
       } catch (e) {
         console.log("Erro ao carregar pacientes:", e);
       } finally {
@@ -165,6 +180,18 @@ export function PacientesProvider({ children }: { children: ReactNode }) {
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(pacientes)).catch((e) =>
       console.log("Erro ao salvar pacientes:", e),
     );
+  }, [pacientes, carregado]);
+
+  // Sincroniza com o backend (best-effort, debounced para coalescer edições
+  // rápidas). Em offline simplesmente não envia — o cache local segue válido.
+  useEffect(() => {
+    if (!carregado) return;
+    const t = setTimeout(() => {
+      enviarPacientes(pacientes).catch((e) =>
+        console.log("Falha ao sincronizar pacientes:", e),
+      );
+    }, 1500);
+    return () => clearTimeout(t);
   }, [pacientes, carregado]);
 
   const getPaciente = (id: string) => pacientes.find((p) => p.id === id);
@@ -272,6 +299,10 @@ export function PacientesProvider({ children }: { children: ReactNode }) {
 
   const removerPaciente = (id: string) => {
     setPacientes((prev) => prev.filter((p) => p.id !== id));
+    // Remove também no backend (best-effort) — o sync por upsert não apaga.
+    removerPacienteRemoto(id).catch((e) =>
+      console.log("Falha ao remover paciente no backend:", e),
+    );
   };
 
   return (
