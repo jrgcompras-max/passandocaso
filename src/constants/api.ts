@@ -4,7 +4,7 @@
  * produção). Toda chamada à Anthropic passa pelo backend — o app não tem chave.
  */
 export const API_URL =
-  process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
+  process.env.EXPO_PUBLIC_API_URL ?? "https://api.passandocaso.com.br";
 
 /**
  * Identificador do médico. Fixo e temporário até existir autenticação real.
