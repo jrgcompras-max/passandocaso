@@ -1,46 +1,46 @@
 import { Image } from 'expo-image';
 import { useState } from 'react';
-import { Dimensions, StyleSheet, View } from 'react-native';
+import { Dimensions, StyleSheet, Text, View } from 'react-native';
 import Animated, { Easing, Keyframe } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
 const INITIAL_SCALE_FACTOR = Dimensions.get('screen').height / 90;
 const DURATION = 600;
 
+// Splash de marca: fundo #0F2D52, ícone centralizado, nome e tagline.
+// Mantém visível ~1s e então faz fade-out, desmontando ao terminar.
+const SPLASH_DURATION = 1600;
+
 export function AnimatedSplashOverlay() {
   const [visible, setVisible] = useState(true);
 
   if (!visible) return null;
 
-  const splashKeyframe = new Keyframe({
-    0: {
-      transform: [{ scale: INITIAL_SCALE_FACTOR }],
-      opacity: 1,
-    },
-    20: {
-      opacity: 1,
-    },
-    70: {
-      opacity: 0,
-      easing: Easing.elastic(0.7),
-    },
-    100: {
-      opacity: 0,
-      transform: [{ scale: 1 }],
-      easing: Easing.elastic(0.7),
-    },
+  const fadeOut = new Keyframe({
+    0: { opacity: 1 },
+    60: { opacity: 1 },
+    100: { opacity: 0, easing: Easing.out(Easing.ease) },
   });
 
   return (
     <Animated.View
-      entering={splashKeyframe.duration(DURATION).withCallback((finished) => {
+      pointerEvents="none"
+      entering={fadeOut.duration(SPLASH_DURATION).withCallback((finished) => {
         'worklet';
         if (finished) {
           scheduleOnRN(setVisible, false);
         }
       })}
-      style={styles.backgroundSolidColor}
-    />
+      style={styles.splash}
+    >
+      <Image
+        source={require('@/assets/images/icon.png')}
+        style={styles.splashIcon}
+        contentFit="contain"
+      />
+      <Text style={styles.splashNome}>Passando Caso</Text>
+      <Text style={styles.splashTagline}>ORGANIZAR • COMPREENDER • DECIDIR</Text>
+    </Animated.View>
   );
 }
 
@@ -124,9 +124,30 @@ const styles = StyleSheet.create({
     height: 128,
     position: 'absolute',
   },
-  backgroundSolidColor: {
+  splash: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: '#208AEF',
+    backgroundColor: '#0F2D52',
+    alignItems: 'center',
+    justifyContent: 'center',
     zIndex: 1000,
+  },
+  splashIcon: {
+    width: 120,
+    height: 120,
+    borderRadius: 28,
+    marginBottom: 24,
+  },
+  splashNome: {
+    color: '#FFFFFF',
+    fontSize: 28,
+    fontWeight: '700',
+  },
+  splashTagline: {
+    color: '#0E7A5A',
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 2,
+    marginTop: 8,
   },
 });
