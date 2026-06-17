@@ -16,16 +16,18 @@ export function AnimatedSplashOverlay() {
 
   if (!visible) return null;
 
-  const fadeOut = new Keyframe({
-    0: { opacity: 1 },
-    60: { opacity: 1 },
+  // Fade-in suave ao entrar, segura a marca, e fade-out ao revelar o app.
+  const splashAnim = new Keyframe({
+    0: { opacity: 0 },
+    18: { opacity: 1, easing: Easing.out(Easing.ease) },
+    70: { opacity: 1 },
     100: { opacity: 0, easing: Easing.out(Easing.ease) },
   });
 
   return (
     <Animated.View
       pointerEvents="none"
-      entering={fadeOut.duration(SPLASH_DURATION).withCallback((finished) => {
+      entering={splashAnim.duration(SPLASH_DURATION).withCallback((finished) => {
         'worklet';
         if (finished) {
           scheduleOnRN(setVisible, false);
