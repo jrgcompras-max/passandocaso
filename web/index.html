@@ -134,6 +134,9 @@
       .blocoex b { color: var(--primary); font-size: 13px; }
       .blocoex ul { margin: 2px 0 0; padding-left: 18px; }
       .blocoex li { font-size: 14px; }
+      .med { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: var(--bg); border-radius: 8px; padding: 8px 10px; margin-bottom: 6px; }
+      .med-txt { font-size: 14px; color: var(--texto); }
+      .med-classe { color: #fff; font-size: 11px; font-weight: 700; border-radius: 8px; padding: 2px 8px; white-space: nowrap; }
 
       .anot { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-top: 8px; display: flex; justify-content: space-between; gap: 8px; }
       .anot .hora { font-size: 11px; color: var(--muted); }
@@ -362,62 +365,80 @@
       }
       function svVazio(sv) { return !sv || !(sv.temp || sv.paSist || sv.paDiast || sv.fc || sv.fr || sv.sato2 || sv.glicemia || sv.diurese || sv.o2 || sv.intercorrencias); }
 
-      // Replica montarTextoEvolucao do app (versão crua; o /api/formatar padroniza).
-      function gerarTextoEvolucao(p, data) {
-        const partes = [];
-        const ident = [`PASSAGEM DE CASO — ${p.nomeCompleto || "Sem nome"}`];
-        const l2 = [p.numeroProntuario && `Prontuário ${p.numeroProntuario}`, p.idade != null && `${p.idade} anos`].filter(Boolean).join(" · ");
-        if (l2) ident.push(l2);
-        const l3 = [p.leito && `Leito ${p.leito}`, p.setor].filter(Boolean).join(" · ");
-        if (l3) ident.push(l3);
-        const dia = diaInternacao(p.dataEntrada);
-        if (dia != null) ident.push(`Dia ${dia} de internação`);
-        partes.push(ident.join("\n"));
-
-        for (const s of SECOES_FOTO) {
-          const sec = (p.secoes || {})[s.id];
-          const linhas = parseBlocos(sec && sec.extraido).map((b) => b.itens.length ? (b.titulo ? `${b.titulo}: ${b.itens.join("; ")}` : b.itens.join("; ")) : "").filter(Boolean);
-          const anots = ((sec && sec.anotacoes) || []).map((a) => (a.texto || "").trim()).filter(Boolean);
-          const extras = extrasEstruturados(s.id, p, data);
-          if (!linhas.length && !anots.length && !extras.length) continue;
-          const bloco = [s.titulo.toUpperCase(), ...linhas, ...extras];
-          if (anots.length) bloco.push(`Anotações: ${anots.join("; ")}`);
-          partes.push(bloco.join("\n"));
-        }
-
-        const evo = (p.evolucoes || {})[data];
-        const el = blocoEvolucao(evo);
-        if (el.length) partes.push([`EVOLUÇÃO BEIRA-LEITO — ${formatarDataBR(data)}`, ...el].join("\n"));
-        return partes.join("\n\n");
-      }
-      function extrasEstruturados(sid, p, data) {
-        if (sid === "sinaisVitaisIntercorrencias") {
-          const sv = (p.sinaisVitais || {})[data]; const out = [];
-          const f = fraseSinaisVitais(sv); if (f) out.push(f);
-          if (sv && (sv.intercorrencias || "").trim()) out.push(`Intercorrências: ${sv.intercorrencias.trim()}`);
-          return out;
-        }
-        if (sid === "examesLaboratoriais") {
-          return agruparLab(p.resultadosLab || []).map((s) => {
-            const seq = s.pontos.map((pt) => `${pt.valor} (${formatarDataBR(pt.data).slice(0, 5)})`).join(" → ");
-            return `${s.exame}: ${seq}${s.tendencia ? " " + s.tendencia.icone : ""}`;
-          });
-        }
-        return [];
-      }
       function rotulo(grupo, valor) { const o = (OPC[grupo] || []).find((x) => x[0] === valor); return o ? o[1] : valor; }
-      function blocoEvolucao(e) {
-        if (!e) return [];
+      // Conteúdo extraído (foto) + anotações de uma seção.
+      function secaoLinhas(p, id) {
+        const sec = (p.secoes || {})[id];
+        const linhas = parseBlocos(sec && sec.extraido)
+          .map((b) => (b.itens.length ? (b.titulo ? `${b.titulo}: ${b.itens.join("; ")}` : b.itens.join("; ")) : ""))
+          .filter(Boolean);
+        const anots = ((sec && sec.anotacoes) || []).map((a) => (a.texto || "").trim()).filter(Boolean);
+        if (anots.length) linhas.push(`Anotações: ${anots.join("; ")}`);
+        return linhas;
+      }
+      // Antibióticos: medicamentos classificados como antibiótico pela IA.
+      function antibioticoterapiaLinhas(p) {
+        return (p.medicamentos || [])
+          .filter((m) => /antibi|\batb\b/i.test(m.classe || ""))
+          .map((m) => (m.texto || "").trim())
+          .filter(Boolean);
+      }
+      function exameFisicoLinhas(p, data) {
         const l = [];
-        if ((e.estadoGeral || "").trim()) l.push(`Estado geral: ${e.estadoGeral.trim()}`);
-        if (e.nivelConsciencia) l.push(`Nível de consciência: ${rotulo("consciencia", e.nivelConsciencia)}`);
-        if (e.orientacao) l.push(`Orientação: ${rotulo("orientacao", e.orientacao)}`);
-        const el = [e.alimentacao && `Alimentação: ${rotulo("alimentacao", e.alimentacao)}`, e.diurese && `Diurese: ${rotulo("diurese", e.diurese)}`, e.evacuacao && `Evacuação: ${rotulo("evacuacao", e.evacuacao)}`].filter(Boolean);
-        if (el.length) l.push(el.join(" | "));
-        if ((e.dispositivos || []).length) l.push(`Dispositivos: ${e.dispositivos.map((d) => { const o = (e.dispositivosObs || {})[d]; return o && o.trim() ? `${d} (${o.trim()})` : d; }).join("; ")}`);
-        if ((e.exameFisico || "").trim()) l.push(`Exame físico: ${e.exameFisico.trim()}`);
-        if ((e.condutaDoDia || "").trim()) l.push(`Conduta do dia: ${e.condutaDoDia.trim()}`);
+        const frase = fraseSinaisVitais((p.sinaisVitais || {})[data]);
+        if (frase) l.push(frase);
+        const e = (p.evolucoes || {})[data];
+        if (e) {
+          if (e.nivelConsciencia) l.push(`Nível de consciência: ${rotulo("consciencia", e.nivelConsciencia)}`);
+          if (e.orientacao) l.push(`Orientação: ${rotulo("orientacao", e.orientacao)}`);
+          if ((e.estadoGeral || "").trim()) l.push(`Estado geral: ${e.estadoGeral.trim()}`);
+          if ((e.dispositivos || []).length) {
+            l.push(`Invasões/dispositivos: ${e.dispositivos.map((d) => { const o = (e.dispositivosObs || {})[d]; return o && o.trim() ? `${d} (${o.trim()})` : d; }).join("; ")}`);
+          }
+          if ((e.exameFisico || "").trim()) l.push(`Exame físico: ${e.exameFisico.trim()}`);
+        }
         return l;
+      }
+      function laboratorioLinhas(p) {
+        return agruparLab(p.resultadosLab || []).map((s) => {
+          const seq = s.pontos.map((pt) => `${pt.valor} (${formatarDataBR(pt.data).slice(0, 5)})`).join(" → ");
+          return `${s.exame}: ${seq}${s.tendencia ? " " + s.tendencia.icone : ""}`;
+        });
+      }
+      function problemasLinhas(p) {
+        const lbl = { ativo: "Ativo", resolvendo: "Resolvendo", resolvido: "Resolvido" };
+        return (p.problemas || []).map((x) => {
+          const partes = [x.titulo.trim(), lbl[x.status] || x.status];
+          if ((x.conduta || "").trim()) partes.push(x.conduta.trim());
+          return partes.join(" — ");
+        });
+      }
+      function blocoTexto(titulo, linhas) {
+        const ls = (linhas || []).map((l) => (l || "").trim()).filter(Boolean);
+        return ls.length ? [titulo, ...ls].join("\n") : null;
+      }
+      // Mirror de montarTextoEvolucao do app (estrutura clínica v2).
+      function gerarTextoEvolucao(p, data) {
+        const dia = diaInternacao(p.dataEntrada);
+        const ident = [
+          p.nomeCompleto || "Sem nome",
+          p.idade != null ? `${p.idade} anos` : null,
+          p.leito ? `Leito ${p.leito}` : null,
+          p.setor || null,
+          dia != null ? `Dia ${dia} de internação` : null,
+        ].filter(Boolean).join(" · ");
+        return [
+          blocoTexto("IDENTIFICAÇÃO", [ident]),
+          blocoTexto("MOTIVO DA INTERNAÇÃO", [p.diagnosticoPrincipal]),
+          blocoTexto("ANTIBIOTICOTERAPIA EM USO", antibioticoterapiaLinhas(p)),
+          blocoTexto("COMORBIDADES E MUC", secaoLinhas(p, "comorbidadesMedicacoes")),
+          blocoTexto("HDA — HISTÓRIA DA DOENÇA ATUAL", secaoLinhas(p, "historia")),
+          blocoTexto("EXAME FÍSICO", exameFisicoLinhas(p, data)),
+          blocoTexto("EXAMES LABORATORIAIS", laboratorioLinhas(p)),
+          blocoTexto("EXAMES DE IMAGEM", secaoLinhas(p, "imagem")),
+          blocoTexto("PROBLEMAS ATIVOS", problemasLinhas(p)),
+          blocoTexto("CONDUTA", [(p.evolucoes || {})[data] && (p.evolucoes[data].condutaDoDia || "")]),
+        ].filter(Boolean).join("\n\n");
       }
 
       // ======== API ========
@@ -644,20 +665,55 @@
       function delPend(id) { mut((p) => { p.pendencias = (p.pendencias || []).filter((x) => x.id !== id); }); renderSidebar(); renderDetalhe(); }
 
       // ---- Seção foto (blocos + anotações) ----
+      const CLASSE_COR = { atb: "#991B1B", "antibiótico": "#991B1B", antibiotico: "#991B1B", "antifúngico": "#9A3412", antifungico: "#9A3412", anticoagulante: "#1E40AF", corticoide: "#854D0E", "corticóide": "#854D0E" };
+      function corDaClasse(classe) { return CLASSE_COR[(classe || "").toLowerCase().trim()] || "#475569"; }
+
       function secFoto(p, s) {
+        if (s.id === "comorbidadesMedicacoes") {
+          return acc("sec_" + s.id, s.titulo, null, conteudoComorbidades(p) + entradaAnot(p, s), null);
+        }
+        if (s.id === "prescricaoHospitalar") {
+          return acc("sec_" + s.id, s.titulo, null, conteudoPrescricao(p) + entradaAnot(p, s), null);
+        }
         const sec = (p.secoes || {})[s.id] || { anotacoes: [], extraido: "" };
         return acc("sec_" + s.id, s.titulo, null, conteudoFoto(p, s, sec), null);
+      }
+      // Campo de nova anotação + lista de anotações com 🗑️ (compartilhado).
+      function entradaAnot(p, s) {
+        const sec = (p.secoes || {})[s.id] || { anotacoes: [] };
+        let h = `<div style="margin-top:12px"><span class="label">Anotações</span>`;
+        h += (sec.anotacoes || []).map((a) => `<div class="anot"><div><div class="hora">${esc(a.horario || "")}</div><div class="at">${esc(a.texto)}</div></div><span onclick="delAnot('${s.id}','${a.id}')" style="cursor:pointer">🗑️</span></div>`).join("");
+        h += `<div class="field" style="margin-top:8px"><textarea id="anot-${s.id}" placeholder="Nova anotação..."></textarea></div>
+          <button class="btn-ghost" onclick="addAnot('${s.id}')">Salvar anotação</button></div>`;
+        return h;
       }
       function conteudoFoto(p, s, sec) {
         const blocos = parseBlocos(sec.extraido);
         let h = blocos.length && blocos.some((b) => b.itens.length)
           ? blocos.map((b) => `<div class="blocoex">${b.titulo ? `<b>${esc(b.titulo)}</b>` : ""}<ul>${b.itens.map((i) => `<li>${esc(i)}</li>`).join("")}</ul></div>`).join("")
           : '<div class="vazio">Sem dados extraídos.</div>';
-        h += `<div style="margin-top:12px"><span class="label">Anotações</span>`;
-        h += ((sec.anotacoes || []).map((a) => `<div class="anot"><div><div class="hora">${esc(a.horario || "")}</div><div class="at">${esc(a.texto)}</div></div><span onclick="delAnot('${s.id}','${a.id}')" style="cursor:pointer">🗑️</span></div>`).join(""));
-        h += `<div class="field" style="margin-top:8px"><textarea id="anot-${s.id}" placeholder="Nova anotação..."></textarea></div>
-          <button class="btn-ghost" onclick="addAnot('${s.id}')">Salvar anotação</button></div>`;
-        return h;
+        return h + entradaAnot(p, s);
+      }
+      // Comorbidades e MUC unificado: foto + anotações em bullets, agrupados.
+      function conteudoComorbidades(p) {
+        const sec = (p.secoes || {}).comorbidadesMedicacoes || { anotacoes: [], extraido: "" };
+        const comorb = [], muc = [];
+        for (const b of parseBlocos(sec.extraido)) {
+          (/medica|muc/i.test(b.titulo || "") ? muc : comorb).push(...b.itens);
+        }
+        for (const a of sec.anotacoes || []) {
+          (a.categoria === "medicacao" ? muc : comorb).push(a.texto);
+        }
+        const grupo = (titulo, itens) => itens.length
+          ? `<div class="blocoex"><b>${titulo}</b><ul>${itens.map((i) => `<li>${esc(i)}</li>`).join("")}</ul></div>` : "";
+        const corpo = grupo("Comorbidades", comorb) + grupo("Medicações de uso contínuo", muc);
+        return corpo || '<div class="vazio">Sem dados.</div>';
+      }
+      // Prescrição: medicamentos com badge de classe (definida pela IA).
+      function conteudoPrescricao(p) {
+        const meds = p.medicamentos || [];
+        if (!meds.length) return '<div class="vazio">Sem medicamentos.</div>';
+        return meds.map((m) => `<div class="med"><span class="med-txt">${esc(m.texto)}</span>${m.classe ? `<span class="med-classe" style="background:${corDaClasse(m.classe)}">${esc(m.classe)}</span>` : ""}</div>`).join("");
       }
       function addAnot(sid) {
         const ta = document.getElementById("anot-" + sid); const t = ta.value.trim(); if (!t) return;
