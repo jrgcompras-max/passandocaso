@@ -33,6 +33,19 @@ async function initDB() {
       created_at TIMESTAMP DEFAULT NOW()
     );
   `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS hospitais (
+      id TEXT PRIMARY KEY,
+      medico_id TEXT NOT NULL,
+      nome TEXT NOT NULL,
+      cidade TEXT,
+      updated_at TIMESTAMP DEFAULT NOW()
+    );
+  `);
+  // Multi-hospital: associa cada paciente a um hospital (idempotente).
+  await pool.query(
+    "ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS hospital_id TEXT;",
+  );
   console.log("PostgreSQL — tabelas verificadas/criadas.");
 }
 

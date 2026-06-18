@@ -4,6 +4,13 @@ import {
   type StatusType,
 } from "@/constants/clinicalTheme";
 
+/** Hospital onde o médico acompanha pacientes (cada um tem sua própria lista). */
+export type Hospital = {
+  id: string;
+  nome: string;
+  cidade: string;
+};
+
 /** Dados extraídos do cabeçalho do prontuário (sistema Tasy). */
 export type CabecalhoProntuario = {
   nomeCompleto: string;
@@ -168,6 +175,8 @@ export type Paciente = CabecalhoProntuario & {
   /** Identidade estável entre dias (= numeroProntuario, ou fallback gerado). */
   id: string;
   status: StatusType;
+  /** Hospital ao qual o paciente pertence (default "geral" para registros antigos). */
+  hospitalId?: string;
   /** Diagnóstico principal (texto livre, editável). */
   diagnosticoPrincipal?: string;
   /** Motivo da internação (texto livre, editável). */

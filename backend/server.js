@@ -253,13 +253,14 @@ app.post("/api/pacientes/sync", async (req, res) => {
         (Array.isArray(p.diasAcompanhamento) && p.diasAcompanhamento[0]) ||
         new Date().toISOString().slice(0, 10);
       await db.query(
-        `INSERT INTO pacientes (id, medico_id, data_criacao, dados, updated_at)
-         VALUES ($1, $2, $3, $4, NOW())
+        `INSERT INTO pacientes (id, medico_id, hospital_id, data_criacao, dados, updated_at)
+         VALUES ($1, $2, $3, $4, $5, NOW())
          ON CONFLICT (id) DO UPDATE
            SET medico_id = EXCLUDED.medico_id,
+               hospital_id = EXCLUDED.hospital_id,
                dados = EXCLUDED.dados,
                updated_at = NOW()`,
-        [p.id, medicoId, dataCriacao, p],
+        [p.id, medicoId, p.hospitalId || "geral", dataCriacao, p],
       );
     }
     res.json({ status: "ok", total: pacientes.length });
@@ -281,6 +282,64 @@ app.delete("/api/pacientes/:medicoId/:pacienteId", async (req, res) => {
   } catch (e) {
     console.error("Erro em DELETE /api/pacientes:", e);
     res.status(500).json({ erro: e.message || "Falha ao remover paciente." });
+  }
+});
+
+// --- Hospitais (multi-tenancy por médico) ---
+
+/** Lista os hospitais do médico. */
+app.get("/api/hospitais/:medicoId", async (req, res) => {
+  const { medicoId } = req.params;
+  try {
+    const r = await db.query(
+      "SELECT id, nome, cidade FROM hospitais WHERE medico_id = $1 ORDER BY nome",
+      [medicoId],
+    );
+    res.json({ medicoId, hospitais: r.rows });
+  } catch (e) {
+    console.error("Erro em GET /api/hospitais:", e);
+    res.status(500).json({ erro: e.message || "Falha ao listar hospitais." });
+  }
+});
+
+/** Upsert da lista de hospitais do médico. Body: { medicoId, hospitais: [] } */
+app.post("/api/hospitais/sync", async (req, res) => {
+  const { medicoId, hospitais } = req.body || {};
+  if (!medicoId || !Array.isArray(hospitais)) {
+    return res
+      .status(400)
+      .json({ erro: "Campos obrigatórios: medicoId, hospitais (array)." });
+  }
+  try {
+    for (const h of hospitais) {
+      if (!h || !h.id || !h.nome) continue;
+      await db.query(
+        `INSERT INTO hospitais (id, medico_id, nome, cidade, updated_at)
+         VALUES ($1, $2, $3, $4, NOW())
+         ON CONFLICT (id) DO UPDATE
+           SET nome = EXCLUDED.nome, cidade = EXCLUDED.cidade, updated_at = NOW()`,
+        [h.id, medicoId, h.nome, h.cidade || ""],
+      );
+    }
+    res.json({ status: "ok", total: hospitais.length });
+  } catch (e) {
+    console.error("Erro em POST /api/hospitais/sync:", e);
+    res.status(500).json({ erro: e.message || "Falha ao sincronizar hospitais." });
+  }
+});
+
+/** Remove um hospital do médico. */
+app.delete("/api/hospitais/:medicoId/:hospitalId", async (req, res) => {
+  const { medicoId, hospitalId } = req.params;
+  try {
+    await db.query("DELETE FROM hospitais WHERE medico_id = $1 AND id = $2", [
+      medicoId,
+      hospitalId,
+    ]);
+    res.json({ status: "ok" });
+  } catch (e) {
+    console.error("Erro em DELETE /api/hospitais:", e);
+    res.status(500).json({ erro: e.message || "Falha ao remover hospital." });
   }
 });
 

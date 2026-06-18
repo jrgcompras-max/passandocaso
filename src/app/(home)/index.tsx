@@ -31,8 +31,9 @@ import { diaDeInternacao } from "@/lib/datas";
 import { extrairDadosImagem } from "@/lib/extrairDadosImagem";
 import { formatarNome } from "@/lib/formatarNome";
 import { converterParaJpegBase64 } from "@/lib/imagem";
+import { useHospitais } from "@/store/HospitaisContext";
 import { usePacientes } from "@/store/PacientesContext";
-import { type CabecalhoProntuario } from "@/types/paciente";
+import { type CabecalhoProntuario, type Hospital } from "@/types/paciente";
 
 // Habilita LayoutAnimation no Android (no-op em quem já suporta).
 if (
@@ -133,6 +134,14 @@ export default function Index() {
   const router = useRouter();
   const { pacientes, adicionarPorCabecalho, atualizarPaciente, removerPaciente } =
     usePacientes();
+  const {
+    hospitais,
+    hospitalAtivo,
+    carregado: hospCarregado,
+    selecionar,
+    trocarHospital,
+    adicionarHospital,
+  } = useHospitais();
   const [processando, setProcessando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [modalVisivel, setModalVisivel] = useState(false);
@@ -148,11 +157,16 @@ export default function Index() {
   const grupoDe = (p: (typeof pacientes)[number]) =>
     aguardando[p.id] ?? p.status;
 
+  // Pacientes do hospital selecionado (registros sem hospital = "geral").
+  const pacientesHosp = pacientes.filter(
+    (p) => (p.hospitalId ?? "geral") === hospitalAtivo,
+  );
+
   // Agrupa por status na ordem de prioridade; só inclui grupos não-vazios.
   const secoes = ORDEM_STATUS.map((status) => ({
     status,
     titulo: ROTULO_GRUPO[status],
-    data: pacientes.filter((p) => grupoDe(p) === status),
+    data: pacientesHosp.filter((p) => grupoDe(p) === status),
   })).filter((s) => s.data.length > 0);
 
   const avancarStatus = (id: string, atual: StatusType) => {
@@ -201,7 +215,7 @@ export default function Index() {
         INSTRUCAO_CABECALHO,
       );
       // Leito não é extraído da foto — fica para preenchimento manual.
-      adicionarPorCabecalho({ ...cabecalho, leito: "" });
+      adicionarPorCabecalho({ ...cabecalho, leito: "" }, hospitalAtivo ?? undefined);
     } catch (e) {
       const mensagem = e instanceof Error ? e.message : String(e);
       console.log("Erro ao adicionar paciente:", e);
@@ -263,14 +277,17 @@ export default function Index() {
   const salvarManual = () => {
     const nome = form.nome.trim();
     if (!nome) return;
-    const { id } = adicionarPorCabecalho({
-      nomeCompleto: nome,
-      idade: idadeDeTexto(form.idadeNasc),
-      leito: form.leito.trim(),
-      setor: form.setor.trim(),
-      dataEntrada: form.internacao.trim(),
-      numeroProntuario: form.prontuario.trim(),
-    });
+    const { id } = adicionarPorCabecalho(
+      {
+        nomeCompleto: nome,
+        idade: idadeDeTexto(form.idadeNasc),
+        leito: form.leito.trim(),
+        setor: form.setor.trim(),
+        dataEntrada: form.internacao.trim(),
+        numeroProntuario: form.prontuario.trim(),
+      },
+      hospitalAtivo ?? undefined,
+    );
     const diag = form.diagnostico.trim();
     const mot = form.motivo.trim();
     if (diag || mot) {
@@ -283,10 +300,29 @@ export default function Index() {
     setModalVisivel(false);
   };
 
+  const hospitalNome =
+    hospitais.find((h) => h.id === hospitalAtivo)?.nome ?? "";
+
+  // Antes da Rotina: tela de seleção de hospital.
+  if (hospCarregado && !hospitalAtivo) {
+    return (
+      <SelecaoHospital
+        hospitais={hospitais}
+        onSelecionar={selecionar}
+        onAdicionar={adicionarHospital}
+      />
+    );
+  }
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <View style={styles.headerTextos}>
+          <TouchableOpacity onPress={trocarHospital} style={styles.trocarHosp}>
+            <Text style={styles.trocarHospTexto}>
+              🏥 {hospitalNome || "Hospital"} ⌄
+            </Text>
+          </TouchableOpacity>
           <Text style={styles.titulo}>Rotina do Dia</Text>
           <Text style={styles.subtitulo}>{dataPorExtenso()}</Text>
         </View>
@@ -321,7 +357,7 @@ export default function Index() {
         keyExtractor={(item) => item.id}
         stickySectionHeadersEnabled={false}
         contentContainerStyle={
-          pacientes.length === 0 ? styles.vazioContainer : styles.listaConteudo
+          pacientesHosp.length === 0 ? styles.vazioContainer : styles.listaConteudo
         }
         ListEmptyComponent={
           !processando ? (
@@ -541,6 +577,79 @@ function CampoForm({
 }
 
 /**
+ * Tela de seleção de hospital (antes da Rotina do Dia). Lista os hospitais do
+ * médico e permite adicionar um novo (nome + cidade).
+ */
+function SelecaoHospital({
+  hospitais,
+  onSelecionar,
+  onAdicionar,
+}: {
+  hospitais: Hospital[];
+  onSelecionar: (id: string) => void;
+  onAdicionar: (nome: string, cidade: string) => void;
+}) {
+  const [mostrarForm, setMostrarForm] = useState(false);
+  const [nome, setNome] = useState("");
+  const [cidade, setCidade] = useState("");
+
+  const salvar = () => {
+    if (!nome.trim()) return;
+    onAdicionar(nome, cidade);
+    setNome("");
+    setCidade("");
+    setMostrarForm(false);
+  };
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <View style={styles.headerTextos}>
+          <Text style={styles.titulo}>Hospitais</Text>
+          <Text style={styles.subtitulo}>
+            Selecione um hospital para começar
+          </Text>
+        </View>
+        <TouchableOpacity
+          style={styles.botaoAdd}
+          onPress={() => setMostrarForm((v) => !v)}
+          accessibilityLabel="Adicionar hospital"
+        >
+          <Text style={styles.botaoAddTexto}>+</Text>
+        </TouchableOpacity>
+      </View>
+
+      {mostrarForm && (
+        <View style={styles.hospForm}>
+          <CampoForm label="Nome do hospital *" value={nome} onChange={setNome} />
+          <CampoForm label="Cidade" value={cidade} onChange={setCidade} />
+          <TouchableOpacity
+            style={[styles.salvarBtn, !nome.trim() && styles.salvarBtnDesativado]}
+            onPress={salvar}
+            disabled={!nome.trim()}
+          >
+            <Text style={styles.salvarBtnTexto}>Salvar hospital</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      <ScrollView contentContainerStyle={styles.listaConteudo}>
+        {hospitais.map((h) => (
+          <TouchableOpacity
+            key={h.id}
+            style={styles.hospCard}
+            onPress={() => onSelecionar(h.id)}
+          >
+            <Text style={styles.hospNome}>{h.nome}</Text>
+            {!!h.cidade && <Text style={styles.hospCidade}>{h.cidade}</Text>}
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
+/**
  * Badge de status tocável: avança o status e dá um leve "pop" de escala como
  * feedback. Tem onPress próprio, separado do toque no card.
  */
@@ -734,6 +843,32 @@ const styles = StyleSheet.create({
     borderRadius: Radius.card,
   },
   swipeExcluirTexto: { color: "#FFFFFF", fontSize: 15, fontWeight: "700" },
+
+  // Multi-hospital
+  trocarHosp: { marginBottom: 4, alignSelf: "flex-start" },
+  trocarHospTexto: {
+    color: ClinicalColors.primary,
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  hospForm: {
+    backgroundColor: ClinicalColors.surface,
+    borderColor: ClinicalColors.border,
+    borderWidth: BorderWidth.hairline,
+    borderRadius: Radius.card,
+    padding: 16,
+    marginBottom: 16,
+  },
+  hospCard: {
+    backgroundColor: ClinicalColors.surface,
+    borderColor: ClinicalColors.border,
+    borderWidth: BorderWidth.hairline,
+    borderRadius: Radius.card,
+    padding: 16,
+    marginBottom: 12,
+  },
+  hospNome: { fontSize: 16, fontWeight: "600", color: ClinicalColors.text },
+  hospCidade: { fontSize: 13, color: ClinicalColors.textMuted, marginTop: 2 },
 
   // Modal de adicionar paciente
   modalOverlay: {

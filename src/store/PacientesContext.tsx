@@ -48,7 +48,10 @@ type PacientesContextValue = {
    * paciente com o mesmo número de prontuário, vincula o dia de hoje ao
    * registro existente (acompanhamento entre dias) em vez de duplicar.
    */
-  adicionarPorCabecalho: (cab: CabecalhoProntuario) => AdicionarResultado;
+  adicionarPorCabecalho: (
+    cab: CabecalhoProntuario,
+    hospitalId?: string,
+  ) => AdicionarResultado;
   atualizarDadosClinicos: (id: string, dados: DadosClinicos) => void;
   /** Atualiza (mesclando) os campos de uma seção clínica do paciente. */
   atualizarSecao: (
@@ -126,13 +129,16 @@ function migrarPacientes(bruto: unknown): Paciente[] {
   return bruto.map((p) => {
     const antigo = p as Paciente & { leitoSetor?: string };
     const status = migrarStatus(antigo.status);
+    // Pacientes sem hospital pertencem ao "Geral" (multi-hospital).
+    const hospitalId = antigo.hospitalId ?? "geral";
     if (antigo.setor === undefined && antigo.leitoSetor !== undefined) {
       const { leitoSetor, ...resto } = antigo;
-      return { ...resto, status, leito: "", setor: leitoSetor ?? "" };
+      return { ...resto, status, hospitalId, leito: "", setor: leitoSetor ?? "" };
     }
     return {
       ...antigo,
       status,
+      hospitalId,
       leito: antigo.leito ?? "",
       setor: antigo.setor ?? "",
     };
@@ -152,8 +158,9 @@ export function PacientesProvider({ children }: { children: ReactNode }) {
       try {
         const bruto = await AsyncStorage.getItem(STORAGE_KEY);
         let lista = bruto ? migrarPacientes(JSON.parse(bruto)) : [];
-        // Primeira execução (nada salvo): popula com os pacientes de exemplo.
-        if (!lista.length) lista = gerarPacientesExemplo();
+        // Primeira execução (nada salvo): popula com os pacientes de exemplo
+        // (migrados para garantir hospitalId = "geral").
+        if (!lista.length) lista = migrarPacientes(gerarPacientesExemplo());
         // Mescla com o backend (best-effort): pacientes só-remotos entram; o
         // local tem prioridade nos conflitos.
         try {
@@ -200,6 +207,7 @@ export function PacientesProvider({ children }: { children: ReactNode }) {
 
   const adicionarPorCabecalho = (
     cab: CabecalhoProntuario,
+    hospitalId?: string,
   ): AdicionarResultado => {
     const hoje = hojeISO();
     const id = cab.numeroProntuario?.trim() || `p-${Date.now()}`;
@@ -237,6 +245,7 @@ export function PacientesProvider({ children }: { children: ReactNode }) {
       dataEntrada: cab.dataEntrada,
       numeroProntuario: cab.numeroProntuario,
       status: "naoVisitado",
+      hospitalId: hospitalId || "geral",
       diasAcompanhamento: [hoje],
       dadosClinicos: null,
     };
