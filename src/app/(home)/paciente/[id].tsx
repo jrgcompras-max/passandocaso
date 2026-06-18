@@ -179,12 +179,6 @@ export default function Paciente() {
   const [modoRound, setModoRound] = useState(false);
   const [gerandoResumo, setGerandoResumo] = useState(false);
 
-  // Leito editável inline na área de identificação (preenchimento manual).
-  const [leitoInline, setLeitoInline] = useState("");
-  useEffect(() => {
-    setLeitoInline(paciente?.leito ?? "");
-  }, [paciente?.leito]);
-
   const iniciarEdicao = () => {
     if (!paciente) return;
     setNomeForm(paciente.nomeCompleto);
@@ -234,12 +228,6 @@ export default function Paciente() {
       Alert.alert("Não foi possível gerar o resumo", msg);
     }
     setGerandoResumo(false);
-  };
-
-  const salvarLeitoInline = () => {
-    if (leitoInline.trim() !== (paciente?.leito ?? "")) {
-      atualizarPaciente(id, { leito: leitoInline.trim() });
-    }
   };
 
   const dados = paciente?.dadosClinicos;
@@ -398,17 +386,12 @@ export default function Paciente() {
               </View>
 
               <View style={styles.identificacao}>
-                <View style={styles.campoIdent}>
-                  <Text style={styles.campoIdentLabel}>Leito ✏️</Text>
-                  <TextInput
-                    style={styles.campoIdentInputEditavel}
-                    value={leitoInline}
-                    onChangeText={setLeitoInline}
-                    onBlur={salvarLeitoInline}
-                    placeholder="Ex: 306-4"
-                    placeholderTextColor={ClinicalColors.textMuted}
-                  />
-                </View>
+                <CampoLeitura
+                  label="Leito"
+                  value={paciente.leito}
+                  onChange={(t) => atualizarPaciente(id, { leito: t.trim() })}
+                  placeholder="Ex: 306-4"
+                />
 
                 <View style={styles.campoIdent}>
                   <Text style={styles.campoIdentLabel}>Setor</Text>
@@ -474,7 +457,6 @@ export default function Paciente() {
               <ResumoRapidoSecao
                 resumo={paciente.resumoRapido ?? ""}
                 gerando={gerandoResumo}
-                onChange={(t) => atualizarPaciente(id, { resumoRapido: t })}
                 onGerar={gerarResumo}
               />
 
@@ -959,6 +941,11 @@ function ToggleLinha({
 }
 
 /** Campo de texto livre (multilinha) com label opcional e salvamento no onBlur. */
+/**
+ * Campo de texto inline em MODO LEITURA por padrão: mostra o valor com um ✏️;
+ * só ao tocar no ✏️ vira editável e abre o teclado. Mantém o contrato
+ * (onChangeText ao vivo + onBlur ao persistir) usado pela Evolução Beira-Leito.
+ */
 function CampoTexto({
   label,
   value,
@@ -972,18 +959,95 @@ function CampoTexto({
   onChangeText: (t: string) => void;
   onBlur: () => void;
 }) {
+  const [editando, setEditando] = useState(false);
   return (
     <View style={styles.campo}>
       {!!label && <Text style={styles.evoLabel}>{label}</Text>}
-      <TextInput
-        style={styles.evoInput}
-        value={value}
-        onChangeText={onChangeText}
-        onBlur={onBlur}
-        placeholder={placeholder ?? "Digite..."}
-        placeholderTextColor={ClinicalColors.textMuted}
-        multiline
-      />
+      {editando ? (
+        <TextInput
+          style={styles.evoInput}
+          value={value}
+          onChangeText={onChangeText}
+          onBlur={() => {
+            setEditando(false);
+            onBlur();
+          }}
+          autoFocus
+          placeholder={placeholder ?? "Digite..."}
+          placeholderTextColor={ClinicalColors.textMuted}
+          multiline
+        />
+      ) : (
+        <TouchableOpacity
+          style={styles.leituraRow}
+          onPress={() => setEditando(true)}
+          activeOpacity={0.6}
+        >
+          <Text style={[styles.leituraTexto, !value && styles.leituraVazio]}>
+            {value || placeholder || "—"}
+          </Text>
+          <Text style={styles.lapisIcone}>✏️</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+
+/**
+ * Campo inline (uma linha ou multiline) em MODO LEITURA por padrão, com ✏️ para
+ * editar. Gerencia o próprio rascunho e persiste via onChange ao perder o foco.
+ */
+function CampoLeitura({
+  label,
+  value,
+  onChange,
+  placeholder,
+  multiline,
+  keyboardType,
+}: {
+  label?: string;
+  value: string;
+  onChange: (t: string) => void;
+  placeholder?: string;
+  multiline?: boolean;
+  keyboardType?: "default" | "numeric";
+}) {
+  const [editando, setEditando] = useState(false);
+  const [texto, setTexto] = useState(value);
+  useEffect(() => {
+    if (!editando) setTexto(value);
+  }, [value, editando]);
+  const salvar = () => {
+    setEditando(false);
+    if (texto !== value) onChange(texto);
+  };
+  return (
+    <View style={styles.campo}>
+      {!!label && <Text style={styles.campoLabel}>{label}</Text>}
+      {editando ? (
+        <TextInput
+          style={multiline ? styles.anotacoesInput : styles.campoInput}
+          value={texto}
+          onChangeText={setTexto}
+          onBlur={salvar}
+          autoFocus
+          multiline={multiline}
+          keyboardType={keyboardType ?? "default"}
+          placeholder={placeholder}
+          placeholderTextColor={ClinicalColors.textMuted}
+        />
+      ) : (
+        <TouchableOpacity
+          style={styles.leituraRow}
+          onPress={() => setEditando(true)}
+          activeOpacity={0.6}
+        >
+          <Text style={[styles.leituraTexto, !value && styles.leituraVazio]}>
+            {value || placeholder || "—"}
+          </Text>
+          <Text style={styles.lapisIcone}>✏️</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -1106,19 +1170,13 @@ function EvolucaoBeiraLeitoSecao({
           </View>
           {evo.dispositivos.map((d) => (
             <View key={d} style={styles.evoObsDispositivo}>
-              <Text style={styles.evoLabel}>{d}</Text>
-              <TextInput
-                style={styles.evoInput}
+              <CampoLeitura
+                label={d}
                 value={evo.dispositivosObs[d] ?? ""}
-                onChangeText={(t) =>
-                  aplicar(
-                    { dispositivosObs: { ...evo.dispositivosObs, [d]: t } },
-                    false,
-                  )
+                onChange={(t) =>
+                  aplicar({ dispositivosObs: { ...evo.dispositivosObs, [d]: t } })
                 }
-                onBlur={() => onSalvar(evo)}
                 placeholder="Observações..."
-                placeholderTextColor={ClinicalColors.textMuted}
                 multiline
               />
             </View>
@@ -1548,23 +1606,18 @@ type CampoNum =
   | "diurese";
 
 /**
- * Resumo Rápido: card destacado com texto editável e botão de gerar por IA.
- * O texto persiste ao perder o foco; "Gerar resumo" substitui pelo resultado.
+ * Resumo Rápido: card destacado, SOMENTE LEITURA (sem ✏️). O conteúdo é gerado
+ * pela IA via "✨ Gerar resumo" — não é digitado manualmente.
  */
 function ResumoRapidoSecao({
   resumo,
   gerando,
-  onChange,
   onGerar,
 }: {
   resumo: string;
   gerando: boolean;
-  onChange: (t: string) => void;
   onGerar: () => void;
 }) {
-  const [texto, setTexto] = useState(resumo);
-  useEffect(() => setTexto(resumo), [resumo]);
-
   return (
     <View style={styles.resumoCard}>
       <View style={styles.resumoTopo}>
@@ -1581,17 +1634,10 @@ function ResumoRapidoSecao({
           )}
         </TouchableOpacity>
       </View>
-      <TextInput
-        style={styles.resumoInput}
-        value={texto}
-        onChangeText={setTexto}
-        onBlur={() => {
-          if (texto !== resumo) onChange(texto);
-        }}
-        placeholder="Ex: D8 internação. Afebril há 48h. PCR em queda. Alta provável em 24h."
-        placeholderTextColor={ClinicalColors.textMuted}
-        multiline
-      />
+      <Text style={[styles.resumoTextoLeitura, !resumo && styles.leituraVazio]}>
+        {resumo ||
+          "Toque em ✨ Gerar resumo para criar um resumo executivo a partir dos dados do paciente."}
+      </Text>
     </View>
   );
 }
@@ -1731,12 +1777,7 @@ function SinaisVitaisSecao({
   sv: SinaisVitaisDia;
   onChange: (v: SinaisVitaisDia) => void;
 }) {
-  const [local, setLocal] = useState(sv);
-  useEffect(() => setLocal(sv), [sv]);
-
-  const setNum = (campo: CampoNum) => (t: string) =>
-    setLocal((s) => ({ ...s, [campo]: t }));
-  const persistir = () => onChange(local);
+  const set = (campo: CampoNum) => (t: string) => onChange({ ...sv, [campo]: t });
 
   const camposNum: { k: CampoNum; label: string; ph: string }[] = [
     { k: "temp", label: "Temp (°C)", ph: "36,5" },
@@ -1747,7 +1788,7 @@ function SinaisVitaisSecao({
     { k: "diurese", label: "Diurese (mL/24h)", ph: "—" },
   ];
 
-  const frase = fraseSinaisVitais(local);
+  const frase = fraseSinaisVitais(sv);
 
   return (
     <View style={styles.svBox}>
@@ -1756,40 +1797,31 @@ function SinaisVitaisSecao({
       </Text>
       <View style={styles.svGrid}>
         <View style={styles.svCampo}>
-          <Text style={styles.campoLabel}>PA sistólica</Text>
-          <TextInput
-            style={styles.campoInput}
-            value={local.paSist}
-            onChangeText={setNum("paSist")}
-            onBlur={persistir}
+          <CampoLeitura
+            label="PA sistólica"
+            value={sv.paSist}
+            onChange={set("paSist")}
             keyboardType="numeric"
             placeholder="120"
-            placeholderTextColor={ClinicalColors.textMuted}
           />
         </View>
         <View style={styles.svCampo}>
-          <Text style={styles.campoLabel}>PA diastólica</Text>
-          <TextInput
-            style={styles.campoInput}
-            value={local.paDiast}
-            onChangeText={setNum("paDiast")}
-            onBlur={persistir}
+          <CampoLeitura
+            label="PA diastólica"
+            value={sv.paDiast}
+            onChange={set("paDiast")}
             keyboardType="numeric"
             placeholder="80"
-            placeholderTextColor={ClinicalColors.textMuted}
           />
         </View>
         {camposNum.map((c) => (
           <View key={c.k} style={styles.svCampo}>
-            <Text style={styles.campoLabel}>{c.label}</Text>
-            <TextInput
-              style={styles.campoInput}
-              value={local[c.k]}
-              onChangeText={setNum(c.k)}
-              onBlur={persistir}
+            <CampoLeitura
+              label={c.label}
+              value={sv[c.k]}
+              onChange={set(c.k)}
               keyboardType="numeric"
               placeholder={c.ph}
-              placeholderTextColor={ClinicalColors.textMuted}
             />
           </View>
         ))}
@@ -1800,18 +1832,11 @@ function SinaisVitaisSecao({
       </Text>
       <View style={styles.chipsWrap}>
         {O2_OPCOES.map((o) => {
-          const ativo = local.o2 === o.valor;
+          const ativo = sv.o2 === o.valor;
           return (
             <TouchableOpacity
               key={o.valor}
-              onPress={() => {
-                const novo: SinaisVitaisDia = {
-                  ...local,
-                  o2: ativo ? null : o.valor,
-                };
-                setLocal(novo);
-                onChange(novo);
-              }}
+              onPress={() => onChange({ ...sv, o2: ativo ? null : o.valor })}
               style={[styles.toggleChip, ativo && styles.toggleChipAtivo]}
             >
               <Text
@@ -1830,17 +1855,14 @@ function SinaisVitaisSecao({
       <Text style={[styles.campoLabel, styles.campoLabelEspacado]}>
         Intercorrências
       </Text>
-      <TextInput
-        style={styles.anotacoesInput}
-        value={local.intercorrencias}
-        onChangeText={(t) => setLocal((s) => ({ ...s, intercorrencias: t }))}
-        onBlur={persistir}
-        placeholder="Intercorrências nas últimas 24h..."
-        placeholderTextColor={ClinicalColors.textMuted}
+      <CampoLeitura
+        value={sv.intercorrencias}
+        onChange={(t) => onChange({ ...sv, intercorrencias: t })}
         multiline
+        placeholder="Intercorrências nas últimas 24h..."
       />
 
-      {!svVazio(local) && !!frase && (
+      {!svVazio(sv) && !!frase && (
         <View style={styles.svFraseBox}>
           <Text style={styles.svFraseLabel}>Frase gerada</Text>
           <Text style={styles.svFrase}>{frase}</Text>
@@ -2775,18 +2797,10 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "600",
   },
-  resumoInput: {
-    backgroundColor: ClinicalColors.surface,
-    borderColor: "#BAE6FD",
-    borderWidth: BorderWidth.hairline,
-    borderRadius: Radius.badge,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+  resumoTextoLeitura: {
     color: ClinicalColors.text,
     fontSize: 15,
     lineHeight: 22,
-    minHeight: 96,
-    textAlignVertical: "top",
   },
 
   // Evolução laboratorial
@@ -2904,6 +2918,24 @@ const styles = StyleSheet.create({
     color: ClinicalColors.text,
     lineHeight: 26,
   },
+
+  // Campo em modo leitura (✏️ para editar)
+  leituraRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+    backgroundColor: ClinicalColors.background,
+    borderColor: ClinicalColors.border,
+    borderWidth: BorderWidth.hairline,
+    borderRadius: Radius.badge,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    minHeight: 40,
+  },
+  leituraTexto: { flex: 1, color: ClinicalColors.text, fontSize: 15, lineHeight: 20 },
+  leituraVazio: { color: ClinicalColors.textMuted },
+  lapisIcone: { fontSize: 15 },
 
   // Prescrição estruturada
   prescBox: { marginTop: 8 },

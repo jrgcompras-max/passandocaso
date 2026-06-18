@@ -99,9 +99,8 @@ export default function Evolucao() {
       <TextInput
         style={styles.editor}
         value={texto}
-        onChangeText={setTexto}
         multiline
-        editable={!gerando}
+        editable={false}
         placeholder="O texto da passagem de caso aparecerá aqui."
         placeholderTextColor={ClinicalColors.textMuted}
         textAlignVertical="top"
@@ -109,7 +108,7 @@ export default function Evolucao() {
 
       <View style={styles.rodapeInfo}>
         <Text style={styles.aviso}>
-          Revise e ajuste o texto antes de copiar. Você decide o conteúdo final.
+          Revise o texto antes de copiar. Gerado a partir dos dados do paciente.
         </Text>
         {salvamento !== "ocioso" && (
           <Text style={styles.salvoStatus}>
