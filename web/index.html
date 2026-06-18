@@ -136,7 +136,8 @@
       .blocoex li { font-size: 14px; }
       .med { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: var(--bg); border-radius: 8px; padding: 8px 10px; margin-bottom: 6px; }
       .med-txt { font-size: 14px; color: var(--texto); }
-      .med-classe { color: #fff; font-size: 11px; font-weight: 700; border-radius: 8px; padding: 2px 8px; white-space: nowrap; }
+      .med-classe { color: #fff; font-size: 11px; font-weight: 700; border-radius: 8px; padding: 2px 8px; white-space: nowrap; cursor: pointer; }
+      .med-classe-input { width: 130px; padding: 4px 8px; border: 1px solid var(--primary); border-radius: 8px; font-size: 12px; }
 
       .anot { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-top: 8px; display: flex; justify-content: space-between; gap: 8px; }
       .anot .hora { font-size: 11px; color: var(--muted); }
@@ -240,6 +241,7 @@
       let pacientes = [];
       let ativoId = null;
       let evolucoesDia = {}; // pacienteId -> texto
+      let medEditId = null; // medicamento com classe em edição inline
       const abertos = new Set(); // chaves de acordeões abertos
       let dataSV = hojeISO();
       let dataEvo = hojeISO();
@@ -710,10 +712,46 @@
         return corpo || '<div class="vazio">Sem dados.</div>';
       }
       // Prescrição: medicamentos com badge de classe (definida pela IA).
+      // Prescrição: texto livre + classe pela IA (badge editável), com CRUD.
       function conteudoPrescricao(p) {
         const meds = p.medicamentos || [];
-        if (!meds.length) return '<div class="vazio">Sem medicamentos.</div>';
-        return meds.map((m) => `<div class="med"><span class="med-txt">${esc(m.texto)}</span>${m.classe ? `<span class="med-classe" style="background:${corDaClasse(m.classe)}">${esc(m.classe)}</span>` : ""}</div>`).join("");
+        let h = meds.length
+          ? meds.map((m) => {
+              if (medEditId === m.id) {
+                return `<div class="med"><span class="med-txt">${esc(m.texto)}</span>
+                  <input id="med-classe-${m.id}" class="med-classe-input" value="${esc(m.classe)}" placeholder="Classe" onblur="salvarMedClasse('${m.id}', this.value)">
+                  <span onclick="delMed('${m.id}')" style="cursor:pointer">🗑️</span></div>`;
+              }
+              const cor = m.classe ? corDaClasse(m.classe) : "var(--muted)";
+              const rotulo = m.classe || "classificando…";
+              return `<div class="med"><span class="med-txt">${esc(m.texto)}</span>
+                <span class="med-classe" style="background:${cor}" onclick="editMedClasse('${m.id}')">${esc(rotulo)}</span>
+                <span onclick="delMed('${m.id}')" style="cursor:pointer">🗑️</span></div>`;
+            }).join("")
+          : '<div class="vazio">Sem medicamentos.</div>';
+        h += `<div class="field" style="margin-top:10px"><input id="med-novo" placeholder="Ex.: Ceftriaxona 1g EV 1x/dia D5/7"></div>
+          <button class="btn-ghost" onclick="addMed()">+ Adicionar medicamento</button>`;
+        return h;
+      }
+      async function classificarMedicamentoIA(texto) {
+        const instrucao = "Você é farmacologista. Para o medicamento informado, responda APENAS com a sua CLASSE FARMACOLÓGICA em 1 a 2 palavras (ex.: Antibiótico, Antifúngico, Anticoagulante, Corticoide, Diurético, Analgésico, Antiemético, Protetor gástrico, Hipoglicemiante). Sempre identifique uma classe específica; NUNCA responda 'Outro' nem frases.";
+        try { const r = await apiPost("/api/formatar", { texto, instrucao }); return (String(r && r.texto || "").trim().split(/[\n.]/)[0].trim()) || null; } catch { return null; }
+      }
+      async function addMed() {
+        const inp = document.getElementById("med-novo"); const t = (inp && inp.value || "").trim(); if (!t) return;
+        const id = "w" + Date.now();
+        mut((p) => { p.medicamentos = p.medicamentos || []; p.medicamentos.push({ id, texto: t, classe: "" }); });
+        renderDetalhe();
+        const classe = await classificarMedicamentoIA(t);
+        if (classe) { mut((p) => { const m = (p.medicamentos || []).find((x) => x.id === id); if (m) m.classe = classe; }); renderDetalhe(); }
+      }
+      function delMed(id) { mut((p) => { p.medicamentos = (p.medicamentos || []).filter((x) => x.id !== id); }); renderDetalhe(); }
+      function editMedClasse(id) { medEditId = id; renderDetalhe(); const el = document.getElementById("med-classe-" + id); if (el) el.focus(); }
+      function salvarMedClasse(id, v) {
+        medEditId = null;
+        const c = (v || "").trim();
+        if (c) mut((p) => { const m = (p.medicamentos || []).find((x) => x.id === id); if (m) m.classe = c; });
+        renderDetalhe();
       }
       function addAnot(sid) {
         const ta = document.getElementById("anot-" + sid); const t = ta.value.trim(); if (!t) return;
