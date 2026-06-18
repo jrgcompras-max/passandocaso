@@ -38,6 +38,7 @@ import {
 } from "@/constants/evolucao";
 import { CHECKLIST_ALTA } from "@/constants/checklistAlta";
 import { SECOES } from "@/constants/secoes";
+import { categorizarAnotacao } from "@/lib/categorizarAnotacao";
 import { diaDeInternacao, formatarDataBR, hojeISO } from "@/lib/datas";
 import { extrairDadosImagem } from "@/lib/extrairDadosImagem";
 import { formatarNome } from "@/lib/formatarNome";
@@ -71,6 +72,21 @@ import {
 const STATUS_OPCOES = Object.keys(StatusColors) as StatusType[];
 const STATUS_CLINICO_OPCOES = Object.keys(StatusClinicoColors) as StatusClinico[];
 const PRIORIDADE_OPCOES = Object.keys(PrioridadeColors) as Prioridade[];
+
+/** Categorias de anotação por seção (chave usada pela IA + rótulo + cor do badge). */
+type CategoriaAnotacao = { chave: string; label: string; cor: string };
+const CATEGORIAS_SECAO: Partial<Record<SecaoId, CategoriaAnotacao[]>> = {
+  comorbidadesMedicacoes: [
+    { chave: "comorbidade", label: "Comorbidade", cor: "#1A6B8A" },
+    { chave: "medicacao", label: "MUC", cor: "#0E7A5A" },
+  ],
+  prescricaoHospitalar: [
+    { chave: "atb", label: "ATB", cor: "#991B1B" },
+    { chave: "antifungico", label: "Antifúngico", cor: "#9A3412" },
+    { chave: "anticoagulante", label: "Anticoagulante", cor: "#6B21A8" },
+    { chave: "outro", label: "Outro", cor: "#64748B" },
+  ],
+};
 
 /** Rótulos dos estados de um problema ativo. */
 const PROBLEMA_STATUS_LABEL: Record<ProblemaStatus, string> = {
@@ -497,6 +513,7 @@ export default function Paciente() {
         <SecaoExpansivel
           titulo={item.titulo}
           instrucao={item.instrucao}
+          secaoId={item.id}
           medicacao={item.medicacao}
           anotacoes={normalizarAnotacoes(paciente?.secoes?.[item.id]?.anotacoes)}
           extraido={
@@ -691,6 +708,7 @@ function ConteudoExtraido({
 function SecaoExpansivel({
   titulo,
   instrucao,
+  secaoId,
   anotacoes,
   extraido,
   medicacao,
@@ -700,6 +718,7 @@ function SecaoExpansivel({
 }: {
   titulo: string;
   instrucao: string;
+  secaoId: SecaoId;
   anotacoes: Anotacao[];
   extraido: string;
   medicacao?: boolean;
@@ -713,6 +732,32 @@ function SecaoExpansivel({
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [extraindo, setExtraindo] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+
+  const categorias = CATEGORIAS_SECAO[secaoId];
+
+  // Classifica a anotação pela IA (best-effort) e grava a categoria.
+  const classificar = async (anotacaoId: string, texto: string, base: Anotacao[]) => {
+    if (!categorias) return;
+    const chave = await categorizarAnotacao(
+      texto,
+      categorias.map((c) => c.chave),
+    );
+    if (chave) {
+      onSalvarAnotacoes(
+        base.map((a) => (a.id === anotacaoId ? { ...a, categoria: chave } : a)),
+      );
+    }
+  };
+
+  // Correção manual: toca no badge para alternar a categoria.
+  const alternarCategoria = (a: Anotacao) => {
+    if (!categorias) return;
+    const i = categorias.findIndex((c) => c.chave === a.categoria);
+    const prox = categorias[(i + 1) % categorias.length].chave;
+    onSalvarAnotacoes(
+      anotacoes.map((x) => (x.id === a.id ? { ...x, categoria: prox } : x)),
+    );
+  };
 
   const salvarAnotacao = () => {
     const texto = rascunho.trim();
@@ -729,7 +774,10 @@ function SecaoExpansivel({
         texto,
         horario: horaAgora(),
       };
-      onSalvarAnotacoes([nova, ...anotacoes]);
+      const lista = [nova, ...anotacoes];
+      onSalvarAnotacoes(lista);
+      // Categorização automática por IA (sem bloquear a UI).
+      classificar(nova.id, texto, lista);
     }
     setRascunho("");
     setEditandoId(null);
@@ -870,6 +918,19 @@ function SecaoExpansivel({
                   <Text style={styles.anotacaoHorario}>{a.horario}</Text>
                 )}
                 <Text style={styles.anotacaoTexto}>{a.texto}</Text>
+                {categorias && (() => {
+                  const cat = categorias.find((c) => c.chave === a.categoria);
+                  return cat ? (
+                    <TouchableOpacity
+                      onPress={() => alternarCategoria(a)}
+                      style={[styles.anotacaoCategoria, { backgroundColor: cat.cor }]}
+                    >
+                      <Text style={styles.anotacaoCategoriaTexto}>{cat.label}</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <Text style={styles.anotacaoClassificando}>classificando…</Text>
+                  );
+                })()}
               </View>
               <View style={styles.anotacaoAcoes}>
                 <TouchableOpacity
@@ -2542,6 +2603,24 @@ const styles = StyleSheet.create({
     color: ClinicalColors.text,
     fontSize: 14,
     lineHeight: 20,
+  },
+  anotacaoCategoria: {
+    alignSelf: "flex-start",
+    borderRadius: Radius.badge,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    marginTop: 6,
+  },
+  anotacaoCategoriaTexto: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  anotacaoClassificando: {
+    color: ClinicalColors.textMuted,
+    fontSize: 11,
+    fontStyle: "italic",
+    marginTop: 6,
   },
   anotacaoAcoes: { flexDirection: "row", gap: 12 },
   anotacaoIcone: { fontSize: 16 },

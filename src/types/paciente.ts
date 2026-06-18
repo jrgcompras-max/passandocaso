@@ -44,6 +44,8 @@ export type Anotacao = {
   texto: string;
   /** Horário da criação no formato HH:MM (local). */
   horario: string;
+  /** Categoria atribuída pela IA (ex.: "comorbidade", "atb"); editável. */
+  categoria?: string;
 };
 
 /** Conteúdo de uma seção: lista de anotações do usuário + texto extraído pela IA. */

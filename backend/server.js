@@ -120,7 +120,7 @@ const INSTRUCAO_FORMATACAO =
   "Responda SOMENTE com o texto final, sem comentários nem marcações de código.";
 
 app.post("/api/formatar", async (req, res) => {
-  const { texto } = req.body || {};
+  const { texto, instrucao } = req.body || {};
   if (typeof texto !== "string" || !texto.trim()) {
     return res.status(400).json({ erro: "Campo obrigatório: texto." });
   }
@@ -129,6 +129,12 @@ app.post("/api/formatar", async (req, res) => {
     return res.json({ texto });
   }
 
+  // Instrução customizada (ex.: classificação) sobrescreve a de formatação.
+  const instrucaoUsada =
+    typeof instrucao === "string" && instrucao.trim()
+      ? instrucao
+      : INSTRUCAO_FORMATACAO;
+
   try {
     const msg = await getAnthropic().messages.create({
       model: "claude-sonnet-4-6",
@@ -136,7 +142,7 @@ app.post("/api/formatar", async (req, res) => {
       messages: [
         {
           role: "user",
-          content: [{ type: "text", text: `${INSTRUCAO_FORMATACAO}\n\n---\n${texto}` }],
+          content: [{ type: "text", text: `${instrucaoUsada}\n\n---\n${texto}` }],
         },
       ],
     });
