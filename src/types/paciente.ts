@@ -78,6 +78,34 @@ export type Pendencia = {
   feito: boolean;
 };
 
+/** Medicamento antimicrobiano estruturado (ATB / antifúngico). */
+export type MedicamentoATB = {
+  id: string;
+  nome: string;
+  dose: string;
+  via: string;
+  frequencia: string;
+  /** Dia de uso, ex.: "D5/7". */
+  diaUso: string;
+};
+
+/** Anticoagulante estruturado. */
+export type Anticoagulante = {
+  id: string;
+  nome: string;
+  dose: string;
+  indicacao: string;
+};
+
+/** Prescrição hospitalar estruturada por categoria. */
+export type Prescricao = {
+  antibioticos: MedicamentoATB[];
+  antifungicos: MedicamentoATB[];
+  anticoagulacao: Anticoagulante[];
+  /** Demais medicamentos (texto livre). */
+  outros: string;
+};
+
 /** Resultado laboratorial pontual (exame + data + valor), para evolução temporal. */
 export type ResultadoLab = {
   id: string;
@@ -152,6 +180,8 @@ export type Paciente = CabecalhoProntuario & {
   resumoRapido?: string;
   /** Checklist de alta (itemId → marcado). */
   checklistAlta?: Record<string, boolean>;
+  /** Prescrição hospitalar estruturada (ATB, antifúngicos, anticoagulação, outros). */
+  prescricao?: Prescricao;
   /** Resultados laboratoriais por data, para acompanhar a evolução temporal. */
   resultadosLab?: ResultadoLab[];
   /** Sinais vitais estruturados por data (YYYY-MM-DD). */

@@ -86,6 +86,7 @@ export type PacienteEditavel = Partial<
     | "statusClinico"
     | "resumoRapido"
     | "checklistAlta"
+    | "prescricao"
     | "resultadosLab"
     | "sinaisVitais"
   >

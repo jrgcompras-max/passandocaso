@@ -54,10 +54,13 @@ import {
 import { usePacientes } from "@/store/PacientesContext";
 import {
   type Anotacao,
+  type Anticoagulante,
   type DadosClinicos,
   type EvolucaoBeiraLeito,
+  type MedicamentoATB,
   type Paciente as PacienteModel,
   type Pendencia,
+  type Prescricao,
   type Problema,
   type ProblemaStatus,
   type ResultadoLab,
@@ -529,6 +532,11 @@ export default function Paciente() {
                 onChange={(lista) =>
                   atualizarPaciente(id, { resultadosLab: lista })
                 }
+              />
+            ) : item.id === "prescricaoHospitalar" ? (
+              <PrescricaoSecao
+                prescricao={paciente?.prescricao}
+                onChange={(p) => atualizarPaciente(id, { prescricao: p })}
               />
             ) : item.id === "sinaisVitaisIntercorrencias" ? (
               <SinaisVitaisSecao
@@ -2011,6 +2019,267 @@ function ModoRound({
   );
 }
 
+const PRESCRICAO_VAZIA: Prescricao = {
+  antibioticos: [],
+  antifungicos: [],
+  anticoagulacao: [],
+  outros: "",
+};
+const MED_VAZIO = { nome: "", dose: "", via: "", frequencia: "", diaUso: "" };
+const ANTICOAG_VAZIO = { nome: "", dose: "", indicacao: "" };
+
+/** Lista de antimicrobianos (ATB/antifúngico) com formulário inline. */
+function MedList({
+  titulo,
+  itens,
+  onChange,
+}: {
+  titulo: string;
+  itens: MedicamentoATB[];
+  onChange: (l: MedicamentoATB[]) => void;
+}) {
+  const [mostrar, setMostrar] = useState(false);
+  const [form, setForm] = useState(MED_VAZIO);
+  const set = (k: keyof typeof MED_VAZIO) => (v: string) =>
+    setForm((f) => ({ ...f, [k]: v }));
+
+  const adicionar = () => {
+    if (!form.nome.trim()) return;
+    onChange([...itens, { ...form, nome: form.nome.trim(), id: novoId() }]);
+    setForm(MED_VAZIO);
+    setMostrar(false);
+  };
+
+  return (
+    <View style={styles.prescCat}>
+      <View style={styles.prescCatTopo}>
+        <Text style={styles.campoLabel}>{titulo}</Text>
+        <TouchableOpacity onPress={() => setMostrar((v) => !v)} hitSlop={8}>
+          <Text style={styles.prescAdd}>+ Adicionar</Text>
+        </TouchableOpacity>
+      </View>
+      {itens.map((m) => (
+        <View key={m.id} style={styles.prescItem}>
+          <Text style={styles.prescItemTexto}>
+            {[m.nome, m.dose, m.via, m.frequencia, m.diaUso]
+              .map((x) => (x || "").trim())
+              .filter(Boolean)
+              .join(" ")}
+          </Text>
+          <TouchableOpacity
+            onPress={() => onChange(itens.filter((x) => x.id !== m.id))}
+            hitSlop={8}
+          >
+            <Text style={styles.anotacaoIcone}>🗑️</Text>
+          </TouchableOpacity>
+        </View>
+      ))}
+      {mostrar && (
+        <View style={styles.formInline}>
+          <TextInput
+            style={styles.campoInput}
+            value={form.nome}
+            onChangeText={set("nome")}
+            placeholder="Nome (ex.: Ceftriaxona)"
+            placeholderTextColor={ClinicalColors.textMuted}
+          />
+          <View style={styles.prescGrid}>
+            <TextInput
+              style={[styles.campoInput, styles.prescMeio]}
+              value={form.dose}
+              onChangeText={set("dose")}
+              placeholder="Dose (1g)"
+              placeholderTextColor={ClinicalColors.textMuted}
+            />
+            <TextInput
+              style={[styles.campoInput, styles.prescMeio]}
+              value={form.via}
+              onChangeText={set("via")}
+              placeholder="Via (EV)"
+              placeholderTextColor={ClinicalColors.textMuted}
+            />
+          </View>
+          <View style={styles.prescGrid}>
+            <TextInput
+              style={[styles.campoInput, styles.prescMeio]}
+              value={form.frequencia}
+              onChangeText={set("frequencia")}
+              placeholder="Freq. (1x/dia)"
+              placeholderTextColor={ClinicalColors.textMuted}
+            />
+            <TextInput
+              style={[styles.campoInput, styles.prescMeio]}
+              value={form.diaUso}
+              onChangeText={set("diaUso")}
+              placeholder="Dia de uso (D5/7)"
+              placeholderTextColor={ClinicalColors.textMuted}
+            />
+          </View>
+          <View style={styles.formAcoes}>
+            <TouchableOpacity
+              style={[styles.botaoAcao, styles.botaoSalvar]}
+              onPress={adicionar}
+            >
+              <Text style={styles.botaoAcaoTexto}>Adicionar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.botaoAcao, styles.botaoCancelar]}
+              onPress={() => {
+                setMostrar(false);
+                setForm(MED_VAZIO);
+              }}
+            >
+              <Text style={styles.botaoCancelarTexto}>Cancelar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+    </View>
+  );
+}
+
+/** Lista de anticoagulantes (nome, dose, indicação) com formulário inline. */
+function AnticoagList({
+  itens,
+  onChange,
+}: {
+  itens: Anticoagulante[];
+  onChange: (l: Anticoagulante[]) => void;
+}) {
+  const [mostrar, setMostrar] = useState(false);
+  const [form, setForm] = useState(ANTICOAG_VAZIO);
+  const set = (k: keyof typeof ANTICOAG_VAZIO) => (v: string) =>
+    setForm((f) => ({ ...f, [k]: v }));
+
+  const adicionar = () => {
+    if (!form.nome.trim()) return;
+    onChange([...itens, { ...form, nome: form.nome.trim(), id: novoId() }]);
+    setForm(ANTICOAG_VAZIO);
+    setMostrar(false);
+  };
+
+  return (
+    <View style={styles.prescCat}>
+      <View style={styles.prescCatTopo}>
+        <Text style={styles.campoLabel}>Anticoagulação</Text>
+        <TouchableOpacity onPress={() => setMostrar((v) => !v)} hitSlop={8}>
+          <Text style={styles.prescAdd}>+ Adicionar</Text>
+        </TouchableOpacity>
+      </View>
+      {itens.map((m) => (
+        <View key={m.id} style={styles.prescItem}>
+          <Text style={styles.prescItemTexto}>
+            {[m.nome, m.dose, m.indicacao]
+              .map((x) => (x || "").trim())
+              .filter(Boolean)
+              .join(" · ")}
+          </Text>
+          <TouchableOpacity
+            onPress={() => onChange(itens.filter((x) => x.id !== m.id))}
+            hitSlop={8}
+          >
+            <Text style={styles.anotacaoIcone}>🗑️</Text>
+          </TouchableOpacity>
+        </View>
+      ))}
+      {mostrar && (
+        <View style={styles.formInline}>
+          <TextInput
+            style={styles.campoInput}
+            value={form.nome}
+            onChangeText={set("nome")}
+            placeholder="Nome (ex.: Enoxaparina)"
+            placeholderTextColor={ClinicalColors.textMuted}
+          />
+          <TextInput
+            style={styles.campoInput}
+            value={form.dose}
+            onChangeText={set("dose")}
+            placeholder="Dose (40mg SC 1x/dia)"
+            placeholderTextColor={ClinicalColors.textMuted}
+          />
+          <TextInput
+            style={styles.campoInput}
+            value={form.indicacao}
+            onChangeText={set("indicacao")}
+            placeholder="Indicação (profilaxia de TVP)"
+            placeholderTextColor={ClinicalColors.textMuted}
+          />
+          <View style={styles.formAcoes}>
+            <TouchableOpacity
+              style={[styles.botaoAcao, styles.botaoSalvar]}
+              onPress={adicionar}
+            >
+              <Text style={styles.botaoAcaoTexto}>Adicionar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.botaoAcao, styles.botaoCancelar]}
+              onPress={() => {
+                setMostrar(false);
+                setForm(ANTICOAG_VAZIO);
+              }}
+            >
+              <Text style={styles.botaoCancelarTexto}>Cancelar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+    </View>
+  );
+}
+
+/**
+ * Prescrição Hospitalar estruturada (renderizada como extra da seção foto).
+ * Os ATBs aqui alimentam a seção ANTIBIOTICOTERAPIA EM USO do "Passar o Caso".
+ */
+function PrescricaoSecao({
+  prescricao,
+  onChange,
+}: {
+  prescricao?: Prescricao;
+  onChange: (p: Prescricao) => void;
+}) {
+  const p: Prescricao = { ...PRESCRICAO_VAZIA, ...prescricao };
+  const [outros, setOutros] = useState(p.outros);
+  useEffect(() => setOutros(p.outros), [p.outros]);
+
+  return (
+    <View style={styles.prescBox}>
+      <Text style={[styles.campoLabel, styles.campoLabelEspacado]}>
+        Prescrição estruturada
+      </Text>
+      <MedList
+        titulo="Antibióticos (ATB)"
+        itens={p.antibioticos}
+        onChange={(l) => onChange({ ...p, antibioticos: l })}
+      />
+      <MedList
+        titulo="Antifúngicos"
+        itens={p.antifungicos}
+        onChange={(l) => onChange({ ...p, antifungicos: l })}
+      />
+      <AnticoagList
+        itens={p.anticoagulacao}
+        onChange={(l) => onChange({ ...p, anticoagulacao: l })}
+      />
+      <View style={styles.prescCat}>
+        <Text style={styles.campoLabel}>Outros medicamentos</Text>
+        <TextInput
+          style={styles.anotacoesInput}
+          value={outros}
+          onChangeText={setOutros}
+          onBlur={() => {
+            if (outros !== p.outros) onChange({ ...p, outros });
+          }}
+          placeholder="Demais medicamentos..."
+          placeholderTextColor={ClinicalColors.textMuted}
+          multiline
+        />
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -2635,4 +2904,29 @@ const styles = StyleSheet.create({
     color: ClinicalColors.text,
     lineHeight: 26,
   },
+
+  // Prescrição estruturada
+  prescBox: { marginTop: 8 },
+  prescCat: { marginTop: 12 },
+  prescCatTopo: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  prescAdd: { color: ClinicalColors.primary, fontSize: 13, fontWeight: "600" },
+  prescItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: ClinicalColors.background,
+    borderRadius: Radius.badge,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 6,
+  },
+  prescItemTexto: { flex: 1, fontSize: 14, color: ClinicalColors.text },
+  prescGrid: { flexDirection: "row", gap: 8 },
+  prescMeio: { flex: 1 },
 });
