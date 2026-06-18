@@ -5,8 +5,7 @@ import { API_URL } from "@/constants/api";
  * modelo de visão da Anthropic e devolve o JSON já extraído. A chave da API
  * fica apenas no servidor — nunca no app.
  *
- * A URL do backend vem de EXPO_PUBLIC_API_URL (ex.: http://192.168.0.10:3000
- * para testar no device, ou a URL pública em produção).
+ * A URL do backend é fixa em produção (ver API_URL em @/constants/api).
  *
  * Lança Error com mensagem legível em caso de falha de rede, HTTP não-ok ou
  * resposta inválida — o chamador trata a UI.
