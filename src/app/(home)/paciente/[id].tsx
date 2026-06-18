@@ -156,7 +156,6 @@ export default function Paciente() {
     atualizarProblemas,
     atualizarPendencias,
     atualizarEvolucao,
-    removerPaciente,
   } = usePacientes();
   const paciente = getPaciente(id);
   const diaInternacao = paciente ? diaDeInternacao(paciente.dataEntrada) : null;
@@ -240,24 +239,6 @@ export default function Paciente() {
     }
   };
 
-  const confirmarExclusao = () => {
-    Alert.alert(
-      "Excluir paciente",
-      `Remover ${paciente?.nomeCompleto || "este paciente"} da rotina? Esta ação não pode ser desfeita.`,
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Excluir",
-          style: "destructive",
-          onPress: () => {
-            removerPaciente(id);
-            router.back();
-          },
-        },
-      ],
-    );
-  };
-
   const dados = paciente?.dadosClinicos;
 
   const cabecalho = (
@@ -309,13 +290,6 @@ export default function Paciente() {
                   accessibilityLabel="Editar paciente"
                 >
                   <Ionicons name="create-outline" size={28} color="#1A6B8A" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.iconeBtn}
-                  onPress={confirmarExclusao}
-                  accessibilityLabel="Excluir paciente"
-                >
-                  <Ionicons name="trash-outline" size={28} color="#991B1B" />
                 </TouchableOpacity>
               </View>
             )}

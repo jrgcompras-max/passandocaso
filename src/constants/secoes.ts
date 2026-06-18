@@ -37,6 +37,13 @@ export const SECOES: SecaoConfig[] = [
       "cada exame com valor e unidade como um item.",
   },
   {
+    id: "imagem",
+    titulo: "Imagem",
+    instrucao:
+      "Extraia os achados de exames de imagem (raio-x, tomografia, ultrassom, etc.) desta tela de prontuário. " +
+      "Use um bloco por exame (ex.: 'Raio-X de tórax', 'TC de crânio'), com cada achado como um item.",
+  },
+  {
     id: "prescricaoHospitalar",
     titulo: "Prescrição Hospitalar",
     medicacao: true,
@@ -44,13 +51,6 @@ export const SECOES: SecaoConfig[] = [
       "Extraia os medicamentos em uso no hospital desta tela de prescrição. " +
       "Agrupe por classe (ex.: 'Antibióticos', 'Antifúngicos', 'Corticoides', 'Analgesia', 'Sintomáticos'), " +
       "cada medicamento com dose, via e posologia como um item.",
-  },
-  {
-    id: "imagem",
-    titulo: "Imagem",
-    instrucao:
-      "Extraia os achados de exames de imagem (raio-x, tomografia, ultrassom, etc.) desta tela de prontuário. " +
-      "Use um bloco por exame (ex.: 'Raio-X de tórax', 'TC de crânio'), com cada achado como um item.",
   },
   {
     id: "sinaisVitaisIntercorrencias",

@@ -20,7 +20,6 @@ export const OPC_ALIMENTACAO: Opcao[] = [
 export const OPC_DIURESE: Opcao[] = [
   { valor: "presente", rotulo: "Presente" },
   { valor: "ausente", rotulo: "Ausente" },
-  { valor: "sondaVesical", rotulo: "Sonda vesical" },
 ];
 export const OPC_EVACUACAO: Opcao[] = [
   { valor: "presente", rotulo: "Presente" },

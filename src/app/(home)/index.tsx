@@ -1,6 +1,7 @@
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import { useRef, useState } from "react";
+import ReanimatedSwipeable from "react-native-gesture-handler/ReanimatedSwipeable";
 import {
   ActivityIndicator,
   Alert,
@@ -130,7 +131,8 @@ const INSTRUCAO_CABECALHO =
 
 export default function Index() {
   const router = useRouter();
-  const { pacientes, adicionarPorCabecalho, atualizarPaciente } = usePacientes();
+  const { pacientes, adicionarPorCabecalho, atualizarPaciente, removerPaciente } =
+    usePacientes();
   const [processando, setProcessando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [modalVisivel, setModalVisivel] = useState(false);
@@ -139,17 +141,54 @@ export default function Index() {
   const setCampo = (campo: keyof typeof FORM_VAZIO) => (valor: string) =>
     setForm((f) => ({ ...f, [campo]: valor }));
 
+  // Reordenação adiada: ao trocar o status, o card mantém a posição no grupo
+  // atual por 1,5s já exibindo o novo badge; depois desliza para o grupo certo.
+  const [aguardando, setAguardando] = useState<Record<string, StatusType>>({});
+  const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const grupoDe = (p: (typeof pacientes)[number]) =>
+    aguardando[p.id] ?? p.status;
+
   // Agrupa por status na ordem de prioridade; só inclui grupos não-vazios.
   const secoes = ORDEM_STATUS.map((status) => ({
     status,
     titulo: ROTULO_GRUPO[status],
-    data: pacientes.filter((p) => p.status === status),
+    data: pacientes.filter((p) => grupoDe(p) === status),
   })).filter((s) => s.data.length > 0);
 
-  // Anima a reordenação ao mudar o status (o paciente "viaja" para o grupo novo).
   const avancarStatus = (id: string, atual: StatusType) => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    // Atualiza o status na hora (o badge já muda), mas ancora o card no grupo
+    // atual para não pular; após 1,5s remove a âncora com animação de deslize.
+    setAguardando((a) => ({ ...a, [id]: a[id] ?? atual }));
     atualizarPaciente(id, { status: proximoStatus(atual) });
+    clearTimeout(timers.current[id]);
+    timers.current[id] = setTimeout(() => {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setAguardando((a) => {
+        const copia = { ...a };
+        delete copia[id];
+        return copia;
+      });
+    }, 1500);
+  };
+
+  const confirmarExcluir = (id: string, nome: string) => {
+    Alert.alert(
+      "Excluir paciente",
+      `Remover ${nome || "este paciente"} da rotina? Esta ação não pode ser desfeita.`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Excluir",
+          style: "destructive",
+          onPress: () => {
+            LayoutAnimation.configureNext(
+              LayoutAnimation.Presets.easeInEaseOut,
+            );
+            removerPaciente(id);
+          },
+        },
+      ],
+    );
   };
 
   const processarImagem = async (uri: string) => {
@@ -304,49 +343,63 @@ export default function Index() {
           const pendenciasAbertas =
             item.pendencias?.filter((p) => !p.feito).length ?? 0;
           return (
-            <TouchableOpacity
-              style={styles.card}
-              onPress={() =>
-                router.push({ pathname: "/paciente/[id]", params: { id: item.id } })
-              }
+            <ReanimatedSwipeable
+              friction={2}
+              rightThreshold={40}
+              overshootRight={false}
+              renderRightActions={() => (
+                <TouchableOpacity
+                  style={styles.swipeExcluir}
+                  onPress={() => confirmarExcluir(item.id, item.nomeCompleto)}
+                >
+                  <Text style={styles.swipeExcluirTexto}>Excluir</Text>
+                </TouchableOpacity>
+              )}
             >
-              <View style={styles.cardLeft}>
-                {(!!item.leito || !!item.setor) && (
-                  <Text style={styles.leito}>
-                    {[item.leito && `Leito ${item.leito}`, item.setor]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </Text>
-                )}
-                <Text style={styles.nome}>
-                  {formatarNome(item.nomeCompleto) || "Sem nome"}
-                </Text>
-                <Text style={styles.idade}>
-                  {item.idade != null ? `${item.idade} anos` : "Idade —"}
-                  {item.numeroProntuario
-                    ? ` · Prontuário ${item.numeroProntuario}`
-                    : ""}
-                </Text>
-                {!!item.diagnosticoPrincipal && (
-                  <Text style={styles.diagnostico} numberOfLines={2}>
-                    {item.diagnosticoPrincipal}
-                  </Text>
-                )}
-                <View style={styles.metaRow}>
-                  {dia != null && <Text style={styles.diaBadge}>D{dia}</Text>}
-                  {pendenciasAbertas > 0 && (
-                    <Text style={styles.pendenciasIndicador}>
-                      {pendenciasAbertas}{" "}
-                      {pendenciasAbertas === 1 ? "pendência" : "pendências"}
+              <TouchableOpacity
+                style={styles.card}
+                onPress={() =>
+                  router.push({ pathname: "/paciente/[id]", params: { id: item.id } })
+                }
+              >
+                <View style={styles.cardLeft}>
+                  {(!!item.leito || !!item.setor) && (
+                    <Text style={styles.leito}>
+                      {[item.leito && `Leito ${item.leito}`, item.setor]
+                        .filter(Boolean)
+                        .join(" · ")}
                     </Text>
                   )}
+                  <Text style={styles.nome}>
+                    {formatarNome(item.nomeCompleto) || "Sem nome"}
+                  </Text>
+                  <Text style={styles.idade}>
+                    {item.idade != null ? `${item.idade} anos` : "Idade —"}
+                    {item.numeroProntuario
+                      ? ` · Prontuário ${item.numeroProntuario}`
+                      : ""}
+                  </Text>
+                  {!!item.diagnosticoPrincipal && (
+                    <Text style={styles.diagnostico} numberOfLines={2}>
+                      {item.diagnosticoPrincipal}
+                    </Text>
+                  )}
+                  <View style={styles.metaRow}>
+                    {dia != null && <Text style={styles.diaBadge}>D{dia}</Text>}
+                    {pendenciasAbertas > 0 && (
+                      <Text style={styles.pendenciasIndicador}>
+                        {pendenciasAbertas}{" "}
+                        {pendenciasAbertas === 1 ? "pendência" : "pendências"}
+                      </Text>
+                    )}
+                  </View>
                 </View>
-              </View>
-              <BadgeStatus
-                status={item.status}
-                onAvancar={() => avancarStatus(item.id, item.status)}
-              />
-            </TouchableOpacity>
+                <BadgeStatus
+                  status={item.status}
+                  onAvancar={() => avancarStatus(item.id, item.status)}
+                />
+              </TouchableOpacity>
+            </ReanimatedSwipeable>
           );
         }}
       />
@@ -672,6 +725,15 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   badgeTexto: { fontSize: 12, fontWeight: "600" },
+  swipeExcluir: {
+    backgroundColor: "#991B1B",
+    justifyContent: "center",
+    alignItems: "center",
+    width: 96,
+    marginBottom: 12,
+    borderRadius: Radius.card,
+  },
+  swipeExcluirTexto: { color: "#FFFFFF", fontSize: 15, fontWeight: "700" },
 
   // Modal de adicionar paciente
   modalOverlay: {
