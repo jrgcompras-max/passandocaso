@@ -216,21 +216,20 @@ app.get("/api/pacientes/:medicoId", async (req, res) => {
   }
 });
 
-/** Busca um paciente específico do médico. */
-app.get("/api/pacientes/:medicoId/:pacienteId", async (req, res) => {
-  const { medicoId, pacienteId } = req.params;
+/** Lista os pacientes de um médico em um hospital específico. */
+app.get("/api/pacientes/:medicoId/:hospitalId", async (req, res) => {
+  const { medicoId, hospitalId } = req.params;
   try {
     const r = await db.query(
-      "SELECT dados FROM pacientes WHERE medico_id = $1 AND id = $2",
-      [medicoId, pacienteId],
+      `SELECT dados FROM pacientes
+        WHERE medico_id = $1 AND COALESCE(hospital_id, 'geral') = $2
+        ORDER BY updated_at DESC`,
+      [medicoId, hospitalId],
     );
-    if (!r.rows.length) {
-      return res.status(404).json({ erro: "Paciente não encontrado." });
-    }
-    res.json(r.rows[0].dados);
+    res.json({ medicoId, hospitalId, pacientes: r.rows.map((row) => row.dados) });
   } catch (e) {
-    console.error("Erro em GET /api/pacientes/:id:", e);
-    res.status(500).json({ erro: e.message || "Falha ao buscar paciente." });
+    console.error("Erro em GET /api/pacientes/:medicoId/:hospitalId:", e);
+    res.status(500).json({ erro: e.message || "Falha ao listar pacientes." });
   }
 });
 
@@ -270,20 +269,25 @@ app.post("/api/pacientes/sync", async (req, res) => {
   }
 });
 
-/** Remove um paciente do médico. */
-app.delete("/api/pacientes/:medicoId/:pacienteId", async (req, res) => {
-  const { medicoId, pacienteId } = req.params;
-  try {
-    await db.query("DELETE FROM pacientes WHERE medico_id = $1 AND id = $2", [
-      medicoId,
-      pacienteId,
-    ]);
-    res.json({ status: "ok" });
-  } catch (e) {
-    console.error("Erro em DELETE /api/pacientes:", e);
-    res.status(500).json({ erro: e.message || "Falha ao remover paciente." });
-  }
-});
+/** Remove um paciente de um hospital do médico. */
+app.delete(
+  "/api/pacientes/:medicoId/:hospitalId/:pacienteId",
+  async (req, res) => {
+    const { medicoId, hospitalId, pacienteId } = req.params;
+    try {
+      await db.query(
+        `DELETE FROM pacientes
+          WHERE medico_id = $1 AND id = $2
+            AND COALESCE(hospital_id, 'geral') = $3`,
+        [medicoId, pacienteId, hospitalId],
+      );
+      res.json({ status: "ok" });
+    } catch (e) {
+      console.error("Erro em DELETE /api/pacientes:", e);
+      res.status(500).json({ erro: e.message || "Falha ao remover paciente." });
+    }
+  },
+);
 
 // --- Hospitais (multi-tenancy por médico) ---
 

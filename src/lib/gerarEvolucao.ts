@@ -68,15 +68,11 @@ function secaoLinhas(paciente: Paciente, id: SecaoId): string[] {
   return linhas;
 }
 
-/** Antibióticos da prescrição estruturada → "Nome dose via freq diaUso". */
+/** Medicamentos classificados como antibiótico pela IA → texto da prescrição. */
 function antibioticoterapiaLinhas(paciente: Paciente): string[] {
-  return (paciente.prescricao?.antibioticos ?? [])
-    .map((a) =>
-      [a.nome, a.dose, a.via, a.frequencia, a.diaUso]
-        .map((x) => (x || "").trim())
-        .filter(Boolean)
-        .join(" "),
-    )
+  return (paciente.medicamentos ?? [])
+    .filter((m) => /antibi|\batb\b/i.test(m.classe || ""))
+    .map((m) => (m.texto || "").trim())
     .filter(Boolean);
 }
 
@@ -149,7 +145,8 @@ export function montarTextoEvolucao(paciente: Paciente, hoje: string): string {
 
   const blocos = [
     bloco("IDENTIFICAÇÃO", [identificacao]),
-    bloco("MOTIVO DA INTERNAÇÃO", [paciente.motivoInternacao]),
+    // Apenas o diagnóstico principal, limpo e objetivo (não o motivo/sintomas).
+    bloco("MOTIVO DA INTERNAÇÃO", [paciente.diagnosticoPrincipal]),
     bloco("ANTIBIOTICOTERAPIA EM USO", antibioticoterapiaLinhas(paciente)),
     bloco("COMORBIDADES E MUC", secaoLinhas(paciente, "comorbidadesMedicacoes")),
     bloco("HDA — HISTÓRIA DA DOENÇA ATUAL", secaoLinhas(paciente, "historia")),

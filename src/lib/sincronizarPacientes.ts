@@ -26,10 +26,13 @@ export async function enviarPacientes(pacientes: Paciente[]): Promise<void> {
   });
 }
 
-/** Remove um paciente no backend. */
-export async function removerPacienteRemoto(pacienteId: string): Promise<void> {
+/** Remove um paciente (escopado por hospital) no backend. */
+export async function removerPacienteRemoto(
+  pacienteId: string,
+  hospitalId: string,
+): Promise<void> {
   await fetch(
-    `${API_URL}/api/pacientes/${encodeURIComponent(MEDICO_ID)}/${encodeURIComponent(pacienteId)}`,
+    `${API_URL}/api/pacientes/${encodeURIComponent(MEDICO_ID)}/${encodeURIComponent(hospitalId)}/${encodeURIComponent(pacienteId)}`,
     { method: "DELETE" },
   );
 }

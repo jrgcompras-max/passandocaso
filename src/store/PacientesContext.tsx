@@ -89,7 +89,7 @@ export type PacienteEditavel = Partial<
     | "statusClinico"
     | "resumoRapido"
     | "checklistAlta"
-    | "prescricao"
+    | "medicamentos"
     | "resultadosLab"
     | "sinaisVitais"
   >
@@ -309,9 +309,10 @@ export function PacientesProvider({ children }: { children: ReactNode }) {
   };
 
   const removerPaciente = (id: string) => {
+    const hospitalId = pacientes.find((p) => p.id === id)?.hospitalId || "geral";
     setPacientes((prev) => prev.filter((p) => p.id !== id));
     // Remove também no backend (best-effort) — o sync por upsert não apaga.
-    removerPacienteRemoto(id).catch((e) =>
+    removerPacienteRemoto(id, hospitalId).catch((e) =>
       console.log("Falha ao remover paciente no backend:", e),
     );
   };

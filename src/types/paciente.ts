@@ -87,32 +87,17 @@ export type Pendencia = {
   feito: boolean;
 };
 
-/** Medicamento antimicrobiano estruturado (ATB / antifúngico). */
-export type MedicamentoATB = {
+/**
+ * Medicamento da prescrição hospitalar (texto livre digitado pela médica). A
+ * `classe` farmacológica é atribuída automaticamente pela IA (ex.: "Antibiótico",
+ * "Antifúngico", "Anticoagulante", "Corticoide", "Diurético", ...) e é editável.
+ */
+export type Medicamento = {
   id: string;
-  nome: string;
-  dose: string;
-  via: string;
-  frequencia: string;
-  /** Dia de uso, ex.: "D5/7". */
-  diaUso: string;
-};
-
-/** Anticoagulante estruturado. */
-export type Anticoagulante = {
-  id: string;
-  nome: string;
-  dose: string;
-  indicacao: string;
-};
-
-/** Prescrição hospitalar estruturada por categoria. */
-export type Prescricao = {
-  antibioticos: MedicamentoATB[];
-  antifungicos: MedicamentoATB[];
-  anticoagulacao: Anticoagulante[];
-  /** Demais medicamentos (texto livre). */
-  outros: string;
+  /** Texto livre, ex.: "Ceftriaxona 1g EV 1x/dia D5/7". */
+  texto: string;
+  /** Classe farmacológica classificada pela IA. */
+  classe: string;
 };
 
 /** Resultado laboratorial pontual (exame + data + valor), para evolução temporal. */
@@ -191,8 +176,8 @@ export type Paciente = CabecalhoProntuario & {
   resumoRapido?: string;
   /** Checklist de alta (itemId → marcado). */
   checklistAlta?: Record<string, boolean>;
-  /** Prescrição hospitalar estruturada (ATB, antifúngicos, anticoagulação, outros). */
-  prescricao?: Prescricao;
+  /** Prescrição hospitalar: medicamentos em texto livre classificados pela IA. */
+  medicamentos?: Medicamento[];
   /** Resultados laboratoriais por data, para acompanhar a evolução temporal. */
   resultadosLab?: ResultadoLab[];
   /** Sinais vitais estruturados por data (YYYY-MM-DD). */

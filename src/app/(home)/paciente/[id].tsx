@@ -6,6 +6,7 @@ import {
     ActivityIndicator,
     Alert,
     FlatList,
+    LayoutAnimation,
     Modal,
     ScrollView,
     StyleSheet,
@@ -39,6 +40,7 @@ import {
 import { CHECKLIST_ALTA } from "@/constants/checklistAlta";
 import { SECOES } from "@/constants/secoes";
 import { categorizarAnotacao } from "@/lib/categorizarAnotacao";
+import { classificarMedicamento } from "@/lib/classificarMedicamento";
 import { diaDeInternacao, formatarDataBR, hojeISO } from "@/lib/datas";
 import { extrairDadosImagem } from "@/lib/extrairDadosImagem";
 import { formatarNome } from "@/lib/formatarNome";
@@ -55,13 +57,11 @@ import {
 import { usePacientes } from "@/store/PacientesContext";
 import {
   type Anotacao,
-  type Anticoagulante,
   type DadosClinicos,
   type EvolucaoBeiraLeito,
-  type MedicamentoATB,
+  type Medicamento,
   type Paciente as PacienteModel,
   type Pendencia,
-  type Prescricao,
   type Problema,
   type ProblemaStatus,
   type ResultadoLab,
@@ -534,8 +534,8 @@ export default function Paciente() {
               />
             ) : item.id === "prescricaoHospitalar" ? (
               <PrescricaoSecao
-                prescricao={paciente?.prescricao}
-                onChange={(p) => atualizarPaciente(id, { prescricao: p })}
+                medicamentos={paciente?.medicamentos ?? []}
+                onChange={(l) => atualizarPaciente(id, { medicamentos: l })}
               />
             ) : item.id === "sinaisVitaisIntercorrencias" ? (
               <SinaisVitaisSecao
@@ -696,6 +696,73 @@ function ConteudoExtraido({
           )}
         </View>
       ))}
+    </View>
+  );
+}
+
+/**
+ * Visão unificada de "Comorbidades e MUC": junta o que veio da foto (extraído)
+ * com as anotações digitadas, no MESMO formato (bullets), agrupadas em
+ * Comorbidades e Medicações de uso contínuo. Anotações têm 🗑️ para remover.
+ */
+function ComorbidadesUnificado({
+  extraido,
+  anotacoes,
+  onExcluir,
+}: {
+  extraido: string;
+  anotacoes: Anotacao[];
+  onExcluir: (a: Anotacao) => void;
+}) {
+  const blocos =
+    parseBlocos(extraido) ??
+    (extraido.trim() ? [{ titulo: "", itens: dividirItens(extraido) }] : []);
+  const comorbExtra: string[] = [];
+  const mucExtra: string[] = [];
+  for (const b of blocos) {
+    const alvo = /medica|muc/i.test(b.titulo ?? "") ? mucExtra : comorbExtra;
+    alvo.push(...b.itens);
+  }
+  const comorbAnot = anotacoes.filter((a) => a.categoria !== "medicacao");
+  const mucAnot = anotacoes.filter((a) => a.categoria === "medicacao");
+
+  const grupo = (titulo: string, extras: string[], anots: Anotacao[]) => {
+    if (!extras.length && !anots.length) return null;
+    return (
+      <View style={styles.uniGrupo}>
+        <Text style={styles.blocoTitulo}>{titulo}</Text>
+        {extras.map((t, i) => (
+          <View key={`e${i}`} style={styles.itemRow}>
+            <Text style={styles.itemBullet}>•</Text>
+            <Text style={styles.itemTexto}>{t}</Text>
+          </View>
+        ))}
+        {anots.map((a) => (
+          <View key={a.id} style={styles.itemRow}>
+            <Text style={styles.itemBullet}>•</Text>
+            <Text style={styles.itemTexto}>{a.texto}</Text>
+            <TouchableOpacity onPress={() => onExcluir(a)} hitSlop={8}>
+              <Text style={styles.anotacaoIcone}>🗑️</Text>
+            </TouchableOpacity>
+          </View>
+        ))}
+      </View>
+    );
+  };
+
+  if (
+    !comorbExtra.length &&
+    !mucExtra.length &&
+    !comorbAnot.length &&
+    !mucAnot.length
+  ) {
+    return <Text style={styles.secaoConteudo}>—</Text>;
+  }
+
+  return (
+    <View style={styles.conteudoBlocos}>
+      {grupo("Comorbidades", comorbExtra, comorbAnot)}
+      {grupo("Medicações de uso contínuo", mucExtra, mucAnot)}
     </View>
   );
 }
@@ -911,48 +978,63 @@ function SecaoExpansivel({
             </Text>
           </TouchableOpacity>
 
-          {anotacoesVisiveis.map((a) => (
-            <View key={a.id} style={styles.anotacaoCard}>
-              <View style={styles.anotacaoConteudo}>
-                {!!a.horario && (
-                  <Text style={styles.anotacaoHorario}>{a.horario}</Text>
-                )}
-                <Text style={styles.anotacaoTexto}>{a.texto}</Text>
-                {categorias && (() => {
-                  const cat = categorias.find((c) => c.chave === a.categoria);
-                  return cat ? (
-                    <TouchableOpacity
-                      onPress={() => alternarCategoria(a)}
-                      style={[styles.anotacaoCategoria, { backgroundColor: cat.cor }]}
-                    >
-                      <Text style={styles.anotacaoCategoriaTexto}>{cat.label}</Text>
+          {secaoId === "comorbidadesMedicacoes" ? (
+            // Unificado: foto + anotações no mesmo formato (bullets), agrupados.
+            <ComorbidadesUnificado
+              extraido={extraido}
+              anotacoes={anotacoes}
+              onExcluir={excluirAnotacao}
+            />
+          ) : (
+            <>
+              {anotacoesVisiveis.map((a) => (
+                <View key={a.id} style={styles.anotacaoCard}>
+                  <View style={styles.anotacaoConteudo}>
+                    {!!a.horario && (
+                      <Text style={styles.anotacaoHorario}>{a.horario}</Text>
+                    )}
+                    <Text style={styles.anotacaoTexto}>{a.texto}</Text>
+                    {categorias &&
+                      (() => {
+                        const cat = categorias.find(
+                          (c) => c.chave === a.categoria,
+                        );
+                        return cat ? (
+                          <TouchableOpacity
+                            onPress={() => alternarCategoria(a)}
+                            style={[
+                              styles.anotacaoCategoria,
+                              { backgroundColor: cat.cor },
+                            ]}
+                          >
+                            <Text style={styles.anotacaoCategoriaTexto}>
+                              {cat.label}
+                            </Text>
+                          </TouchableOpacity>
+                        ) : (
+                          <Text style={styles.anotacaoClassificando}>
+                            classificando…
+                          </Text>
+                        );
+                      })()}
+                  </View>
+                  <View style={styles.anotacaoAcoes}>
+                    <TouchableOpacity onPress={() => editarAnotacao(a)} hitSlop={8}>
+                      <Text style={styles.anotacaoIcone}>✏️</Text>
                     </TouchableOpacity>
-                  ) : (
-                    <Text style={styles.anotacaoClassificando}>classificando…</Text>
-                  );
-                })()}
-              </View>
-              <View style={styles.anotacaoAcoes}>
-                <TouchableOpacity
-                  onPress={() => editarAnotacao(a)}
-                  hitSlop={8}
-                >
-                  <Text style={styles.anotacaoIcone}>✏️</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => excluirAnotacao(a)}
-                  hitSlop={8}
-                >
-                  <Text style={styles.anotacaoIcone}>🗑️</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          ))}
+                    <TouchableOpacity onPress={() => excluirAnotacao(a)} hitSlop={8}>
+                      <Text style={styles.anotacaoIcone}>🗑️</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
 
-          <Text style={[styles.campoLabel, styles.campoLabelEspacado]}>
-            Informações do sistema
-          </Text>
-          <ConteudoExtraido texto={extraido} medicacao={medicacao} />
+              <Text style={[styles.campoLabel, styles.campoLabelEspacado]}>
+                Informações do sistema
+              </Text>
+              <ConteudoExtraido texto={extraido} medicacao={medicacao} />
+            </>
+          )}
 
           {extra}
         </View>
@@ -1667,8 +1749,9 @@ type CampoNum =
   | "diurese";
 
 /**
- * Resumo Rápido: card destacado, SOMENTE LEITURA (sem ✏️). O conteúdo é gerado
- * pela IA via "✨ Gerar resumo" — não é digitado manualmente.
+ * Resumo Rápido: SOMENTE LEITURA (sem ✏️), minimizado por padrão. "✨ Gerar"
+ * cria o resumo pela IA e expande com animação; "▲ Minimizar" recolhe. O texto
+ * fica salvo — ao expandir de novo aparece sem regenerar.
  */
 function ResumoRapidoSecao({
   resumo,
@@ -1679,26 +1762,50 @@ function ResumoRapidoSecao({
   gerando: boolean;
   onGerar: () => void;
 }) {
+  const [aberto, setAberto] = useState(false);
+  const temResumo = !!resumo;
+
+  const alternar = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setAberto((v) => !v);
+  };
+
   return (
     <View style={styles.resumoCard}>
       <View style={styles.resumoTopo}>
         <Text style={styles.resumoTitulo}>RESUMO RÁPIDO</Text>
-        <TouchableOpacity
-          style={styles.resumoGerarBtn}
-          onPress={onGerar}
-          disabled={gerando}
-        >
-          {gerando ? (
-            <ActivityIndicator size="small" color={ClinicalColors.primary} />
-          ) : (
-            <Text style={styles.resumoGerarTexto}>✨ Gerar resumo</Text>
+        <View style={styles.resumoAcoes}>
+          {temResumo && (
+            <TouchableOpacity onPress={alternar}>
+              <Text style={styles.resumoToggle}>
+                {aberto ? "▲ Minimizar" : "▼ Ver"}
+              </Text>
+            </TouchableOpacity>
           )}
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.resumoGerarBtn}
+            onPress={() => {
+              LayoutAnimation.configureNext(
+                LayoutAnimation.Presets.easeInEaseOut,
+              );
+              setAberto(true);
+              onGerar();
+            }}
+            disabled={gerando}
+          >
+            {gerando ? (
+              <ActivityIndicator size="small" color={ClinicalColors.primary} />
+            ) : (
+              <Text style={styles.resumoGerarTexto}>✨ Gerar</Text>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
-      <Text style={[styles.resumoTextoLeitura, !resumo && styles.leituraVazio]}>
-        {resumo ||
-          "Toque em ✨ Gerar resumo para criar um resumo executivo a partir dos dados do paciente."}
-      </Text>
+      {aberto && (
+        <Text style={[styles.resumoTextoLeitura, !resumo && styles.leituraVazio]}>
+          {resumo || "Gerando resumo…"}
+        </Text>
+      )}
     </View>
   );
 }
@@ -2102,263 +2209,117 @@ function ModoRound({
   );
 }
 
-const PRESCRICAO_VAZIA: Prescricao = {
-  antibioticos: [],
-  antifungicos: [],
-  anticoagulacao: [],
-  outros: "",
+/** Cores de destaque por classe farmacológica (default para classes diversas). */
+const CLASSE_COR: Record<string, string> = {
+  atb: "#991B1B",
+  antibiotico: "#991B1B",
+  "antibiótico": "#991B1B",
+  antifungico: "#9A3412",
+  "antifúngico": "#9A3412",
+  anticoagulante: "#1E40AF",
+  corticoide: "#854D0E",
+  "corticóide": "#854D0E",
 };
-const MED_VAZIO = { nome: "", dose: "", via: "", frequencia: "", diaUso: "" };
-const ANTICOAG_VAZIO = { nome: "", dose: "", indicacao: "" };
-
-/** Lista de antimicrobianos (ATB/antifúngico) com formulário inline. */
-function MedList({
-  titulo,
-  itens,
-  onChange,
-}: {
-  titulo: string;
-  itens: MedicamentoATB[];
-  onChange: (l: MedicamentoATB[]) => void;
-}) {
-  const [mostrar, setMostrar] = useState(false);
-  const [form, setForm] = useState(MED_VAZIO);
-  const set = (k: keyof typeof MED_VAZIO) => (v: string) =>
-    setForm((f) => ({ ...f, [k]: v }));
-
-  const adicionar = () => {
-    if (!form.nome.trim()) return;
-    onChange([...itens, { ...form, nome: form.nome.trim(), id: novoId() }]);
-    setForm(MED_VAZIO);
-    setMostrar(false);
-  };
-
-  return (
-    <View style={styles.prescCat}>
-      <View style={styles.prescCatTopo}>
-        <Text style={styles.campoLabel}>{titulo}</Text>
-        <TouchableOpacity onPress={() => setMostrar((v) => !v)} hitSlop={8}>
-          <Text style={styles.prescAdd}>+ Adicionar</Text>
-        </TouchableOpacity>
-      </View>
-      {itens.map((m) => (
-        <View key={m.id} style={styles.prescItem}>
-          <Text style={styles.prescItemTexto}>
-            {[m.nome, m.dose, m.via, m.frequencia, m.diaUso]
-              .map((x) => (x || "").trim())
-              .filter(Boolean)
-              .join(" ")}
-          </Text>
-          <TouchableOpacity
-            onPress={() => onChange(itens.filter((x) => x.id !== m.id))}
-            hitSlop={8}
-          >
-            <Text style={styles.anotacaoIcone}>🗑️</Text>
-          </TouchableOpacity>
-        </View>
-      ))}
-      {mostrar && (
-        <View style={styles.formInline}>
-          <TextInput
-            style={styles.campoInput}
-            value={form.nome}
-            onChangeText={set("nome")}
-            placeholder="Nome (ex.: Ceftriaxona)"
-            placeholderTextColor={ClinicalColors.textMuted}
-          />
-          <View style={styles.prescGrid}>
-            <TextInput
-              style={[styles.campoInput, styles.prescMeio]}
-              value={form.dose}
-              onChangeText={set("dose")}
-              placeholder="Dose (1g)"
-              placeholderTextColor={ClinicalColors.textMuted}
-            />
-            <TextInput
-              style={[styles.campoInput, styles.prescMeio]}
-              value={form.via}
-              onChangeText={set("via")}
-              placeholder="Via (EV)"
-              placeholderTextColor={ClinicalColors.textMuted}
-            />
-          </View>
-          <View style={styles.prescGrid}>
-            <TextInput
-              style={[styles.campoInput, styles.prescMeio]}
-              value={form.frequencia}
-              onChangeText={set("frequencia")}
-              placeholder="Freq. (1x/dia)"
-              placeholderTextColor={ClinicalColors.textMuted}
-            />
-            <TextInput
-              style={[styles.campoInput, styles.prescMeio]}
-              value={form.diaUso}
-              onChangeText={set("diaUso")}
-              placeholder="Dia de uso (D5/7)"
-              placeholderTextColor={ClinicalColors.textMuted}
-            />
-          </View>
-          <View style={styles.formAcoes}>
-            <TouchableOpacity
-              style={[styles.botaoAcao, styles.botaoSalvar]}
-              onPress={adicionar}
-            >
-              <Text style={styles.botaoAcaoTexto}>Adicionar</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.botaoAcao, styles.botaoCancelar]}
-              onPress={() => {
-                setMostrar(false);
-                setForm(MED_VAZIO);
-              }}
-            >
-              <Text style={styles.botaoCancelarTexto}>Cancelar</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
-    </View>
-  );
-}
-
-/** Lista de anticoagulantes (nome, dose, indicação) com formulário inline. */
-function AnticoagList({
-  itens,
-  onChange,
-}: {
-  itens: Anticoagulante[];
-  onChange: (l: Anticoagulante[]) => void;
-}) {
-  const [mostrar, setMostrar] = useState(false);
-  const [form, setForm] = useState(ANTICOAG_VAZIO);
-  const set = (k: keyof typeof ANTICOAG_VAZIO) => (v: string) =>
-    setForm((f) => ({ ...f, [k]: v }));
-
-  const adicionar = () => {
-    if (!form.nome.trim()) return;
-    onChange([...itens, { ...form, nome: form.nome.trim(), id: novoId() }]);
-    setForm(ANTICOAG_VAZIO);
-    setMostrar(false);
-  };
-
-  return (
-    <View style={styles.prescCat}>
-      <View style={styles.prescCatTopo}>
-        <Text style={styles.campoLabel}>Anticoagulação</Text>
-        <TouchableOpacity onPress={() => setMostrar((v) => !v)} hitSlop={8}>
-          <Text style={styles.prescAdd}>+ Adicionar</Text>
-        </TouchableOpacity>
-      </View>
-      {itens.map((m) => (
-        <View key={m.id} style={styles.prescItem}>
-          <Text style={styles.prescItemTexto}>
-            {[m.nome, m.dose, m.indicacao]
-              .map((x) => (x || "").trim())
-              .filter(Boolean)
-              .join(" · ")}
-          </Text>
-          <TouchableOpacity
-            onPress={() => onChange(itens.filter((x) => x.id !== m.id))}
-            hitSlop={8}
-          >
-            <Text style={styles.anotacaoIcone}>🗑️</Text>
-          </TouchableOpacity>
-        </View>
-      ))}
-      {mostrar && (
-        <View style={styles.formInline}>
-          <TextInput
-            style={styles.campoInput}
-            value={form.nome}
-            onChangeText={set("nome")}
-            placeholder="Nome (ex.: Enoxaparina)"
-            placeholderTextColor={ClinicalColors.textMuted}
-          />
-          <TextInput
-            style={styles.campoInput}
-            value={form.dose}
-            onChangeText={set("dose")}
-            placeholder="Dose (40mg SC 1x/dia)"
-            placeholderTextColor={ClinicalColors.textMuted}
-          />
-          <TextInput
-            style={styles.campoInput}
-            value={form.indicacao}
-            onChangeText={set("indicacao")}
-            placeholder="Indicação (profilaxia de TVP)"
-            placeholderTextColor={ClinicalColors.textMuted}
-          />
-          <View style={styles.formAcoes}>
-            <TouchableOpacity
-              style={[styles.botaoAcao, styles.botaoSalvar]}
-              onPress={adicionar}
-            >
-              <Text style={styles.botaoAcaoTexto}>Adicionar</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.botaoAcao, styles.botaoCancelar]}
-              onPress={() => {
-                setMostrar(false);
-                setForm(ANTICOAG_VAZIO);
-              }}
-            >
-              <Text style={styles.botaoCancelarTexto}>Cancelar</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
-    </View>
-  );
+function corDaClasse(classe: string): string {
+  return CLASSE_COR[(classe || "").toLowerCase().trim()] ?? "#475569";
 }
 
 /**
- * Prescrição Hospitalar estruturada (renderizada como extra da seção foto).
- * Os ATBs aqui alimentam a seção ANTIBIOTICOTERAPIA EM USO do "Passar o Caso".
+ * Prescrição Hospitalar: a médica digita o medicamento em texto livre e a IA
+ * classifica a classe farmacológica (badge colorido, editável tocando nele).
+ * Os classificados como antibiótico alimentam a ANTIBIOTICOTERAPIA do caso.
  */
 function PrescricaoSecao({
-  prescricao,
+  medicamentos,
   onChange,
 }: {
-  prescricao?: Prescricao;
-  onChange: (p: Prescricao) => void;
+  medicamentos: Medicamento[];
+  onChange: (l: Medicamento[]) => void;
 }) {
-  const p: Prescricao = { ...PRESCRICAO_VAZIA, ...prescricao };
-  const [outros, setOutros] = useState(p.outros);
-  useEffect(() => setOutros(p.outros), [p.outros]);
+  const [texto, setTexto] = useState("");
+  const [editClasseId, setEditClasseId] = useState<string | null>(null);
+  const [classeDraft, setClasseDraft] = useState("");
+
+  const adicionar = async () => {
+    const t = texto.trim();
+    if (!t) return;
+    const novo: Medicamento = { id: novoId(), texto: t, classe: "" };
+    const lista = [...medicamentos, novo];
+    onChange(lista);
+    setTexto("");
+    const classe = await classificarMedicamento(t);
+    if (classe) {
+      onChange(lista.map((m) => (m.id === novo.id ? { ...m, classe } : m)));
+    }
+  };
+
+  const salvarClasse = (id: string) => {
+    const c = classeDraft.trim();
+    setEditClasseId(null);
+    if (c) {
+      onChange(medicamentos.map((m) => (m.id === id ? { ...m, classe: c } : m)));
+    }
+  };
 
   return (
     <View style={styles.prescBox}>
       <Text style={[styles.campoLabel, styles.campoLabelEspacado]}>
-        Prescrição estruturada
+        Medicamentos (classe definida pela IA)
       </Text>
-      <MedList
-        titulo="Antibióticos (ATB)"
-        itens={p.antibioticos}
-        onChange={(l) => onChange({ ...p, antibioticos: l })}
+      {medicamentos.map((m) => (
+        <View key={m.id} style={styles.medRow}>
+          <View style={styles.medInfo}>
+            <Text style={styles.medTexto}>{m.texto}</Text>
+            {editClasseId === m.id ? (
+              <TextInput
+                style={styles.medClasseInput}
+                value={classeDraft}
+                onChangeText={setClasseDraft}
+                onBlur={() => salvarClasse(m.id)}
+                autoFocus
+                placeholder="Classe"
+                placeholderTextColor={ClinicalColors.textMuted}
+              />
+            ) : (
+              <TouchableOpacity
+                onPress={() => {
+                  setEditClasseId(m.id);
+                  setClasseDraft(m.classe);
+                }}
+              >
+                <Text
+                  style={[
+                    styles.medClasse,
+                    {
+                      backgroundColor: m.classe
+                        ? corDaClasse(m.classe)
+                        : ClinicalColors.textMuted,
+                    },
+                  ]}
+                >
+                  {m.classe || "classificando…"}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          <TouchableOpacity
+            onPress={() => onChange(medicamentos.filter((x) => x.id !== m.id))}
+            hitSlop={8}
+          >
+            <Text style={styles.anotacaoIcone}>🗑️</Text>
+          </TouchableOpacity>
+        </View>
+      ))}
+      <TextInput
+        style={[styles.campoInput, styles.medAddInput]}
+        value={texto}
+        onChangeText={setTexto}
+        placeholder="Ex.: Ceftriaxona 1g EV 1x/dia D5/7"
+        placeholderTextColor={ClinicalColors.textMuted}
       />
-      <MedList
-        titulo="Antifúngicos"
-        itens={p.antifungicos}
-        onChange={(l) => onChange({ ...p, antifungicos: l })}
-      />
-      <AnticoagList
-        itens={p.anticoagulacao}
-        onChange={(l) => onChange({ ...p, anticoagulacao: l })}
-      />
-      <View style={styles.prescCat}>
-        <Text style={styles.campoLabel}>Outros medicamentos</Text>
-        <TextInput
-          style={styles.anotacoesInput}
-          value={outros}
-          onChangeText={setOutros}
-          onBlur={() => {
-            if (outros !== p.outros) onChange({ ...p, outros });
-          }}
-          placeholder="Demais medicamentos..."
-          placeholderTextColor={ClinicalColors.textMuted}
-          multiline
-        />
-      </View>
+      <TouchableOpacity style={styles.medAddBtn} onPress={adicionar}>
+        <Text style={styles.medAddBtnTexto}>+ Adicionar medicamento</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -2627,6 +2588,7 @@ const styles = StyleSheet.create({
   campoLabelEspacado: { marginTop: 16 },
   secaoConteudo: { color: ClinicalColors.text, fontSize: 15, lineHeight: 22 },
   conteudoBlocos: { gap: 12 },
+  uniGrupo: { gap: 4, marginBottom: 8 },
   bloco: { gap: 4 },
   blocoTitulo: {
     fontSize: 13,
@@ -2880,6 +2842,13 @@ const styles = StyleSheet.create({
     color: ClinicalColors.text,
     fontSize: 15,
     lineHeight: 22,
+    marginTop: 8,
+  },
+  resumoAcoes: { flexDirection: "row", alignItems: "center", gap: 12 },
+  resumoToggle: {
+    color: ClinicalColors.primary,
+    fontSize: 13,
+    fontWeight: "600",
   },
 
   // Evolução laboratorial
@@ -3016,20 +2985,12 @@ const styles = StyleSheet.create({
   leituraVazio: { color: ClinicalColors.textMuted },
   lapisIcone: { fontSize: 15 },
 
-  // Prescrição estruturada
+  // Prescrição (texto livre + classe por IA)
   prescBox: { marginTop: 8 },
-  prescCat: { marginTop: 12 },
-  prescCatTopo: {
+  medRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 6,
-  },
-  prescAdd: { color: ClinicalColors.primary, fontSize: 13, fontWeight: "600" },
-  prescItem: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 8,
     backgroundColor: ClinicalColors.background,
     borderRadius: Radius.badge,
@@ -3037,7 +2998,43 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     marginBottom: 6,
   },
-  prescItemTexto: { flex: 1, fontSize: 14, color: ClinicalColors.text },
-  prescGrid: { flexDirection: "row", gap: 8 },
-  prescMeio: { flex: 1 },
+  medInfo: { flex: 1, gap: 4 },
+  medTexto: { fontSize: 14, color: ClinicalColors.text },
+  medClasse: {
+    alignSelf: "flex-start",
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "700",
+    borderRadius: Radius.badge,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    overflow: "hidden",
+  },
+  medClasseInput: {
+    alignSelf: "flex-start",
+    minWidth: 140,
+    backgroundColor: ClinicalColors.surface,
+    borderColor: ClinicalColors.border,
+    borderWidth: BorderWidth.hairline,
+    borderRadius: Radius.badge,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    color: ClinicalColors.text,
+    fontSize: 13,
+  },
+  medAddInput: { marginTop: 8 },
+  medAddBtn: {
+    backgroundColor: ClinicalColors.background,
+    borderColor: ClinicalColors.primary,
+    borderWidth: BorderWidth.hairline,
+    borderRadius: Radius.badge,
+    paddingVertical: 10,
+    alignItems: "center",
+    marginTop: 8,
+  },
+  medAddBtnTexto: {
+    color: ClinicalColors.primary,
+    fontSize: 14,
+    fontWeight: "600",
+  },
 });

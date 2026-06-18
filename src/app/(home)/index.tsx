@@ -171,12 +171,25 @@ export default function Index() {
 
   const avancarStatus = (id: string, atual: StatusType) => {
     // Atualiza o status na hora (o badge já muda), mas ancora o card no grupo
-    // atual para não pular; após 1,5s remove a âncora com animação de deslize.
+    // atual para não pular; após 1,5s remove a âncora com deslize contínuo.
     setAguardando((a) => ({ ...a, [id]: a[id] ?? atual }));
     atualizarPaciente(id, { status: proximoStatus(atual) });
     clearTimeout(timers.current[id]);
     timers.current[id] = setTimeout(() => {
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      // Animação longa (550ms) para o card percorrer visivelmente a tela até o
+      // grupo de destino, em vez de sumir/reaparecer.
+      LayoutAnimation.configureNext({
+        duration: 550,
+        update: { type: LayoutAnimation.Types.easeInEaseOut },
+        create: {
+          type: LayoutAnimation.Types.easeInEaseOut,
+          property: LayoutAnimation.Properties.opacity,
+        },
+        delete: {
+          type: LayoutAnimation.Types.easeInEaseOut,
+          property: LayoutAnimation.Properties.opacity,
+        },
+      });
       setAguardando((a) => {
         const copia = { ...a };
         delete copia[id];
