@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Política de Privacidade — Passando Caso</title>
+    <style>
+      :root { --azul-escuro: #0f2d52; --azul: #1a6b8a; --muted: #64748b; --corpo: #475569; --borda: #e2e8f0; }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; color: var(--corpo); line-height: 1.7; background: #f8fafb; }
+      .topo { background: var(--azul-escuro); color: #fff; padding: 16px 0; }
+      .container { max-width: 760px; margin: 0 auto; padding: 0 20px; }
+      .topo a { color: #bae6fd; font-size: 14px; }
+      .doc { background: #fff; margin: 32px auto; border: 1px solid var(--borda); border-radius: 16px; padding: 40px; }
+      h1 { color: var(--azul-escuro); font-size: 26px; margin-bottom: 4px; }
+      .versao { color: var(--muted); font-size: 13px; margin-bottom: 24px; }
+      h2 { color: var(--azul-escuro); font-size: 16px; text-transform: uppercase; letter-spacing: 0.04em; margin: 26px 0 8px; }
+      p, li { font-size: 15px; margin-bottom: 8px; }
+      ul { padding-left: 22px; }
+      .destaque { background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; padding: 14px 16px; margin: 14px 0; color: #9a3412; font-size: 14px; }
+      .empresa { background: #f8fafb; border: 1px solid var(--borda); border-radius: 8px; padding: 16px; margin: 8px 0; }
+      .empresa strong { color: var(--azul-escuro); }
+      footer { text-align: center; color: var(--muted); font-size: 12px; padding: 24px; }
+    </style>
+  </head>
+  <body>
+    <div class="topo"><div class="container"><a href="index.html">← Voltar ao site</a></div></div>
+    <div class="container">
+      <div class="doc">
+        <h1>Política de Privacidade e Proteção de Dados</h1>
+        <div class="versao">Versão 1.0 · Vigência a partir de 02/06/2026</div>
+
+        <div class="destaque">
+          ⚠️ Este sistema trata dados pessoais sensíveis de saúde, conforme o Art. 5º, II e o Art. 11 da Lei nº 13.709/2018 (LGPD). O uso é restrito a profissionais de saúde habilitados, para fins de organização da rotina clínica hospitalar.
+        </div>
+
+        <h2>1. Controlador dos Dados</h2>
+        <div class="empresa">
+          <p><strong>Safracore Ltda</strong></p>
+          <p>CNPJ: 67.126.820/0001-03</p>
+          <p>Endereço: R. Álvaro Alexandre Cardoso, 230, Apt 202, Centro — São João do Sul/SC — CEP 88.970-000</p>
+          <p>E-mail: contato@safracore.com</p>
+        </div>
+
+        <h2>2. Encarregado de Dados (DPO)</h2>
+        <div class="empresa">
+          <p><strong>Junior Guilherme Cristovam de Jesus</strong></p>
+          <p>Função: Encarregado pelo Tratamento de Dados Pessoais</p>
+          <p>Contato: contato@safracore.com</p>
+        </div>
+
+        <h2>3. Quais dados coletamos</h2>
+        <ul>
+          <li><strong>Dados de identificação do profissional:</strong> nome, e-mail, credenciais de autenticação.</li>
+          <li><strong>Dados clínicos de pacientes (sensíveis de saúde):</strong> nome parcialmente abreviado, idade, leito, setor, diagnóstico, histórico clínico, exames, sinais vitais, medicações, evoluções e pendências — inseridos manualmente pelo profissional ou extraídos por visão computacional a partir de imagens do prontuário.</li>
+          <li><strong>Dados de uso:</strong> registros de acesso, datas e horários de criação e atualização.</li>
+        </ul>
+
+        <h2>4. Finalidade do Tratamento</h2>
+        <ul>
+          <li>Organização e estruturação da rotina de visitas médicas hospitalares;</li>
+          <li>Geração de textos de passagem de caso e evolução médica;</li>
+          <li>Sincronização entre dispositivos do mesmo profissional;</li>
+          <li>Melhoria contínua da ferramenta com base em métricas de uso anonimizadas.</li>
+        </ul>
+        <p>Os dados <strong>nunca</strong> são usados para fins comerciais, publicidade, compartilhamento com terceiros não autorizados ou decisão clínica automatizada.</p>
+
+        <h2>5. Base Legal</h2>
+        <p>O tratamento de dados sensíveis de saúde se fundamenta no Art. 11, II, "f" da LGPD — tutela da saúde, exclusivamente por profissionais de saúde — e no consentimento expresso do profissional usuário.</p>
+
+        <h2>6. Armazenamento e Segurança</h2>
+        <ul>
+          <li>Armazenamento em servidores seguros na nuvem, com criptografia em trânsito (TLS 1.2+) e em repouso.</li>
+          <li>Nomes de pacientes exibidos de forma parcialmente abreviada (ex.: "Maria G. B. R.").</li>
+          <li>Acesso restrito por credenciais individuais.</li>
+          <li>Imagens enviadas para extração por IA são processadas com retenção zero — não armazenadas pelo provedor de IA.</li>
+        </ul>
+
+        <h2>7. Compartilhamento de Dados</h2>
+        <ul>
+          <li><strong>Anthropic (API de IA):</strong> exclusivamente para extração/classificação de texto, com retenção zero;</li>
+          <li><strong>Railway (infraestrutura):</strong> banco de dados e hospedagem do backend;</li>
+          <li><strong>Vercel (hospedagem web):</strong> interface web.</li>
+        </ul>
+        <p>Nenhum dado clínico é compartilhado com hospitais, planos de saúde, seguradoras ou outros terceiros.</p>
+
+        <h2>8. Direitos do Titular</h2>
+        <ul>
+          <li>Confirmação e acesso aos dados tratados;</li>
+          <li>Correção de dados incompletos ou inexatos;</li>
+          <li>Anonimização, bloqueio ou eliminação;</li>
+          <li>Portabilidade;</li>
+          <li>Eliminação dos dados tratados com consentimento;</li>
+          <li>Informação sobre compartilhamento;</li>
+          <li>Revogação do consentimento a qualquer momento.</li>
+        </ul>
+        <p>Para exercer qualquer direito, contate o Encarregado pelo e-mail <strong>contato@safracore.com</strong>.</p>
+
+        <h2>9. Responsabilidade do Profissional</h2>
+        <ul>
+          <li>Inserir apenas dados necessários à organização da rotina clínica;</li>
+          <li>Não compartilhar credenciais de acesso;</li>
+          <li>Revisar e validar as informações antes de uso clínico;</li>
+          <li>Garantir conformidade com as normas do estabelecimento de saúde.</li>
+        </ul>
+
+        <h2>10. Retenção e Exclusão</h2>
+        <p>Os dados são mantidos enquanto a conta estiver ativa. A exclusão de um paciente no app ou no companion remove permanentemente os dados do banco. O profissional pode solicitar a exclusão total a qualquer momento pelo e-mail do Encarregado.</p>
+
+        <h2>11. Alterações nesta Política</h2>
+        <p>Esta política pode ser atualizada periodicamente. Em caso de alterações relevantes, o profissional será notificado no próximo acesso. A versão vigente fica sempre disponível.</p>
+
+        <h2>12. Contato e Dúvidas</h2>
+        <div class="empresa">
+          <p><strong>Junior Guilherme Cristovam de Jesus</strong> — Encarregado de Dados (DPO)</p>
+          <p>E-mail: contato@safracore.com</p>
+          <p>Endereço: R. Álvaro Alexandre Cardoso, 230, Apt 202, Centro — São João do Sul/SC</p>
+        </div>
+        <p style="margin-top:12px; font-size:13px; color:var(--muted)">Não obtendo resposta satisfatória, você pode contatar a Autoridade Nacional de Proteção de Dados (ANPD) em www.gov.br/anpd.</p>
+      </div>
+    </div>
+    <footer>© 2026 Passando Caso · Safracore Ltda</footer>
+  </body>
+</html>

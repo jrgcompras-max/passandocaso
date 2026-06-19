@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Passando Caso — Da visita ao round em segundos</title>
+    <meta
+      name="description"
+      content="Organize as informações clínicas dos seus pacientes, registre a evolução beira-leito e gere passagens de caso estruturadas — tudo em um só lugar. 30 dias grátis."
+    />
+    <style>
+      :root {
+        --bg: #ffffff;
+        --bg-alt: #f8fafb;
+        --azul-escuro: #0f2d52;
+        --azul: #1a6b8a;
+        --azul-d: #155772;
+        --verde: #0e7a5a;
+        --verde-d: #0b6249;
+        --muted: #64748b;
+        --corpo: #475569;
+        --borda: #e2e8f0;
+      }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      html { scroll-behavior: smooth; }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        color: var(--corpo);
+        line-height: 1.6;
+        background: var(--bg);
+      }
+      h1, h2, h3 { color: var(--azul-escuro); font-weight: 700; line-height: 1.2; }
+      a { color: inherit; text-decoration: none; }
+      .container { max-width: 1100px; margin: 0 auto; padding: 0 20px; }
+      .label { text-transform: uppercase; letter-spacing: 0.06em; font-size: 12px; font-weight: 700; color: var(--azul); }
+      .btn { display: inline-flex; align-items: center; gap: 8px; border-radius: 10px; padding: 14px 22px; font-size: 15px; font-weight: 600; cursor: pointer; border: none; }
+      .btn-azul { background: var(--azul); color: #fff; }
+      .btn-azul:hover { background: var(--azul-d); }
+      .btn-verde { background: var(--verde); color: #fff; }
+      .btn-verde:hover { background: var(--verde-d); }
+      .btn-ghost { background: transparent; color: var(--azul-escuro); border: 1px solid var(--borda); }
+      .btn-loja { background: #0f2d52; color: #fff; }
+      .btn-loja:hover { background: #0a2240; }
+
+      /* HEADER */
+      header.nav {
+        position: sticky; top: 0; z-index: 50; background: rgba(255, 255, 255, 0.92);
+        backdrop-filter: blur(8px); border-bottom: 1px solid var(--borda);
+      }
+      .nav-inner { display: flex; align-items: center; justify-content: space-between; height: 64px; }
+      .logo { font-size: 20px; font-weight: 800; color: var(--azul-escuro); }
+      .logo span { color: var(--verde); }
+      .nav-links { display: flex; align-items: center; gap: 24px; }
+      .nav-links a.link { font-size: 14px; color: var(--corpo); font-weight: 500; }
+      .nav-links a.link:hover { color: var(--azul); }
+      .nav-cta { display: flex; gap: 10px; }
+      .nav-cta .btn { padding: 9px 16px; font-size: 14px; }
+      .menu-btn { display: none; background: none; border: none; font-size: 24px; color: var(--azul-escuro); cursor: pointer; }
+
+      /* HERO */
+      .hero { position: relative; color: #fff; text-align: center; overflow: hidden; }
+      .hero video, .hero .hero-fallback {
+        position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0;
+      }
+      .hero .hero-fallback { background: linear-gradient(160deg, #0f2d52, #1a6b8a); }
+      .hero .overlay { position: absolute; inset: 0; background: rgba(15, 45, 82, 0.7); z-index: 1; }
+      .hero .container { position: relative; z-index: 2; padding-top: 96px; padding-bottom: 96px; }
+      .hero .logo-hero { font-size: 22px; font-weight: 800; letter-spacing: 0.5px; margin-bottom: 24px; }
+      .hero h1 { color: #fff; font-size: 48px; margin-bottom: 16px; }
+      .hero p.sub { font-size: 18px; max-width: 640px; margin: 0 auto 28px; color: #dbeafe; }
+      .hero-ctas { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; margin-bottom: 18px; }
+      .hero .badge { font-size: 13px; color: #bbf7d0; font-weight: 600; }
+
+      section { padding: 72px 0; }
+      .sec-alt { background: var(--bg-alt); }
+      .sec-titulo { text-align: center; font-size: 32px; margin-bottom: 12px; }
+      .sec-sub { text-align: center; color: var(--muted); max-width: 620px; margin: 0 auto 44px; }
+
+      /* NÚMEROS */
+      .numeros { background: var(--azul-escuro); color: #fff; }
+      .numeros-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; text-align: center; }
+      .num-big { font-size: 44px; font-weight: 800; color: #fff; }
+      .num-label { color: #bae6fd; font-size: 15px; }
+
+      /* PROBLEMA (antes/depois) */
+      .dois { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+      .card { background: #fff; border: 1px solid var(--borda); border-radius: 16px; padding: 28px; }
+      .card.ruim { border-color: #fecaca; background: #fef2f2; }
+      .card.bom { border-color: #bbf7d0; background: #f0fdf4; }
+      .card h3 { font-size: 18px; margin-bottom: 8px; }
+
+      /* PASSOS */
+      .passos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }
+      .passo { text-align: center; }
+      .passo .ico { font-size: 44px; }
+      .passo .n { display: inline-block; width: 28px; height: 28px; border-radius: 50%; background: var(--azul); color: #fff; font-weight: 700; line-height: 28px; margin: 12px 0 8px; }
+      .passo h3 { font-size: 18px; margin-bottom: 6px; }
+
+      /* FUNCIONALIDADES */
+      .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
+      .feat { background: #fff; border: 1px solid var(--borda); border-radius: 16px; padding: 24px; }
+      .feat .ico { font-size: 32px; margin-bottom: 10px; }
+      .feat h3 { font-size: 17px; margin-bottom: 6px; }
+      .feat p { font-size: 14px; }
+
+      /* MOCKUPS */
+      .mockups { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
+      .mock { aspect-ratio: 9 / 18; background: var(--bg-alt); border: 1px solid var(--borda); border-radius: 22px; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 13px; text-align: center; padding: 12px; }
+
+      /* PÚBLICO / DEPOIMENTOS */
+      .depo { background: #fff; border: 1px solid var(--borda); border-radius: 16px; padding: 24px; }
+      .depo .quote { font-size: 15px; color: var(--azul-escuro); font-style: italic; margin-bottom: 14px; }
+      .depo .autor { font-weight: 700; color: var(--azul-escuro); font-size: 14px; }
+      .depo .esp { color: var(--muted); font-size: 13px; }
+
+      /* FAQ */
+      .faq-item { border-bottom: 1px solid var(--borda); }
+      .faq-q { width: 100%; text-align: left; background: none; border: none; padding: 18px 0; font-size: 16px; font-weight: 600; color: var(--azul-escuro); cursor: pointer; display: flex; justify-content: space-between; gap: 12px; }
+      .faq-a { display: none; padding: 0 0 18px; color: var(--corpo); font-size: 15px; }
+      .faq-item.aberto .faq-a { display: block; }
+      .faq-item.aberto .faq-q .chev { transform: rotate(180deg); }
+      .faq-q .chev { transition: transform 0.2s; color: var(--azul); }
+
+      /* CTA FINAL */
+      .cta-final { background: var(--verde); color: #fff; text-align: center; }
+      .cta-final h2 { color: #fff; font-size: 32px; margin-bottom: 10px; }
+      .cta-final p { color: #d1fae5; margin-bottom: 24px; }
+      .cta-final .badge { display: block; margin-top: 16px; font-size: 13px; color: #d1fae5; }
+
+      /* FOOTER */
+      footer { background: var(--azul-escuro); color: #94a3b8; padding: 48px 0; font-size: 14px; }
+      footer .logo { color: #fff; }
+      footer .cols { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 24px; margin-bottom: 24px; }
+      footer a.link { color: #bae6fd; }
+      footer .fine { border-top: 1px solid #1e3a5f; padding-top: 16px; font-size: 12px; color: #64748b; line-height: 1.7; }
+
+      @media (max-width: 820px) {
+        .nav-links { display: none; }
+        .menu-btn { display: block; }
+        .hero h1 { font-size: 34px; }
+        .numeros-grid, .passos, .grid3, .dois, .mockups { grid-template-columns: 1fr; }
+        .mockups { grid-template-columns: 1fr 1fr; }
+        section { padding: 52px 0; }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- HEADER -->
+    <header class="nav">
+      <div class="container nav-inner">
+        <a href="#" class="logo">Passando Caso</a>
+        <nav class="nav-links">
+          <a class="link" href="#como">Como funciona</a>
+          <a class="link" href="#features">Funcionalidades</a>
+          <a class="link" href="#faq">FAQ</a>
+        </nav>
+        <div class="nav-cta">
+          <a class="btn btn-ghost" href="https://app.passandocaso.com.br">Entrar</a>
+          <a class="btn btn-verde" href="#baixar">Começar grátis</a>
+        </div>
+      </div>
+    </header>
+
+    <!-- HERO -->
+    <section class="hero" style="padding:0">
+      <!-- TODO: adicionar o arquivo IMG_2675.mov em site/ para o vídeo de fundo -->
+      <video autoplay muted loop playsinline poster="">
+        <source src="IMG_2675.mov" type="video/quicktime" />
+        <source src="IMG_2675.mp4" type="video/mp4" />
+      </video>
+      <div class="hero-fallback" aria-hidden="true"></div>
+      <div class="overlay"></div>
+      <div class="container">
+        <div class="logo-hero">📋 Passando Caso</div>
+        <h1>Da visita ao round<br />em segundos.</h1>
+        <p class="sub">
+          Organize as informações clínicas dos seus pacientes, registre a
+          evolução beira-leito e gere passagens de caso estruturadas — tudo em um
+          só lugar.
+        </p>
+        <div class="hero-ctas" id="baixar">
+          <!-- TODO: substituir # pelos links reais das lojas -->
+          <a class="btn btn-loja" href="#">📱 Baixar na App Store</a>
+          <a class="btn btn-loja" href="#">📱 Baixar no Google Play</a>
+        </div>
+        <span class="badge">✓ 30 dias grátis · Sem cartão de crédito</span>
+      </div>
+    </section>
+
+    <!-- NÚMEROS -->
+    <section class="numeros">
+      <div class="container numeros-grid">
+        <div><div class="num-big">30 dias</div><div class="num-label">Trial gratuito completo</div></div>
+        <div><div class="num-big">0 papel</div><div class="num-label">Fim das anotações manuais</div></div>
+        <div><div class="num-big">1 toque</div><div class="num-label">Passagem de caso gerada</div></div>
+      </div>
+    </section>
+
+    <!-- PROBLEMA -->
+    <section>
+      <div class="container">
+        <h2 class="sec-titulo">Você ainda anota tudo no papel antes da visita?</h2>
+        <div class="dois" style="margin-top:32px">
+          <div class="card ruim">
+            <h3>❌ Antes</h3>
+            <p>A médica senta e copia os dados do prontuário para uma folha de
+            papel, transcreve tudo duas vezes, perde tempo precioso e ainda corre
+            risco de erro na cópia manual.</p>
+          </div>
+          <div class="card bom">
+            <h3>✅ Depois</h3>
+            <p>Fotografa o prontuário, os dados são organizados automaticamente
+            por seção clínica e a passagem de caso é gerada em segundos — pronta
+            para copiar.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- COMO FUNCIONA -->
+    <section id="como" class="sec-alt">
+      <div class="container">
+        <h2 class="sec-titulo">Como funciona</h2>
+        <p class="sec-sub">Três passos, do prontuário à passagem de caso.</p>
+        <div class="passos">
+          <div class="passo">
+            <div class="ico">📷</div><div class="n">1</div>
+            <h3>Fotografe o prontuário</h3>
+            <p>Aponte a câmera para a tela do sistema do hospital. Nossa IA extrai
+            e organiza os dados automaticamente.</p>
+          </div>
+          <div class="passo">
+            <div class="ico">📋</div><div class="n">2</div>
+            <h3>Complete na beira do leito</h3>
+            <p>Adicione achados do exame físico, sinais vitais e evolução
+            diretamente no app, sem papel.</p>
+          </div>
+          <div class="passo">
+            <div class="ico">✅</div><div class="n">3</div>
+            <h3>Passe o caso</h3>
+            <p>Gere a evolução estruturada com um toque e acesse pelo computador
+            do hospital para copiar no prontuário.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FUNCIONALIDADES -->
+    <section id="features">
+      <div class="container">
+        <h2 class="sec-titulo">Tudo que você precisa, em um só lugar</h2>
+        <div class="grid3" style="margin-top:32px">
+          <div class="feat"><div class="ico">🏥</div><h3>Múltiplos hospitais</h3><p>Trabalha em mais de um hospital? Organize cada rotina separadamente.</p></div>
+          <div class="feat"><div class="ico">📊</div><h3>Lista inteligente</h3><p>Pacientes agrupados por status: não visitado, revisando, pendente, alta provável.</p></div>
+          <div class="feat"><div class="ico">🔬</div><h3>Exames com tendência</h3><p>Acompanhe a evolução laboratorial com indicadores de melhora ou piora.</p></div>
+          <div class="feat"><div class="ico">💊</div><h3>Prescrição categorizada</h3><p>ATB, antifúngico, anticoagulante e corticoide identificados automaticamente pela IA.</p></div>
+          <div class="feat"><div class="ico">🖥️</div><h3>Acessa no computador</h3><p>Companion web disponível no navegador do hospital para copiar a evolução.</p></div>
+          <div class="feat"><div class="ico">🔒</div><h3>Dados protegidos</h3><p>Nomes abreviados, criptografia e conformidade total com a LGPD.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- MOCKUPS -->
+    <section class="sec-alt">
+      <div class="container">
+        <h2 class="sec-titulo">Veja o app em ação</h2>
+        <p class="sec-sub">As telas principais do Passando Caso.</p>
+        <!-- TODO: substituir os placeholders por prints reais do app (PNG) -->
+        <div class="mockups">
+          <div class="mock">Rotina do Dia<br />(print)</div>
+          <div class="mock">Tela do paciente<br />(print)</div>
+          <div class="mock">Passar o Caso<br />(print)</div>
+          <div class="mock">Companion web<br />(print)</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PARA QUEM -->
+    <section>
+      <div class="container">
+        <h2 class="sec-titulo">Para quem é</h2>
+        <div class="grid3" style="margin-top:32px">
+          <div class="feat"><div class="ico">👨‍⚕️</div><h3>Médicos residentes</h3><p>Organize a visita, apresente casos ao preceptor e evolua pacientes com muito mais agilidade.</p></div>
+          <div class="feat"><div class="ico">🎓</div><h3>Estudantes de medicina</h3><p>Aprenda a estruturar apresentações clínicas desde cedo com o formato correto.</p></div>
+          <div class="feat"><div class="ico">🏃</div><h3>Plantonistas</h3><p>Receba o plantão com informações organizadas e passe o caso com clareza.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- DEPOIMENTOS -->
+    <section class="sec-alt">
+      <div class="container">
+        <h2 class="sec-titulo">Quem já usa, não volta pro papel</h2>
+        <div class="grid3" style="margin-top:32px" id="depoimentos">
+          <div class="depo">
+            <p class="quote">"Usei no primeiro plantão e nunca mais quis voltar ao papel. A extração automática dos dados do prontuário economiza pelo menos 40 minutos por turno."</p>
+            <div class="autor">Letícia Pimentel Venturine</div>
+            <div class="esp">Médica residente</div>
+          </div>
+          <!-- Adicione novos depoimentos copiando o bloco .depo acima -->
+        </div>
+      </div>
+    </section>
+
+    <!-- FAQ -->
+    <section id="faq">
+      <div class="container" style="max-width:760px">
+        <h2 class="sec-titulo">Perguntas frequentes</h2>
+        <div style="margin-top:32px" id="faq-lista"></div>
+      </div>
+    </section>
+
+    <!-- CTA FINAL -->
+    <section class="cta-final">
+      <div class="container">
+        <h2>Comece hoje. É grátis por 30 dias.</h2>
+        <p>Sem cartão de crédito. Sem limite de pacientes. Cancele quando quiser.</p>
+        <div class="hero-ctas" style="margin-bottom:0">
+          <a class="btn btn-loja" href="#">📱 App Store</a>
+          <a class="btn btn-loja" href="#">📱 Google Play</a>
+        </div>
+        <span class="badge">Desenvolvido por Safracore · Conforme a LGPD</span>
+      </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer>
+      <div class="container">
+        <div class="cols">
+          <div>
+            <div class="logo">📋 Passando Caso</div>
+            <div style="margin-top:6px">Da visita ao round em segundos.</div>
+          </div>
+          <div>
+            <a class="link" href="privacidade.html">Política de Privacidade</a> ·
+            <a class="link" href="termos.html">Termos de Uso</a> ·
+            <a class="link" href="mailto:contato@safracore.com">Contato</a>
+          </div>
+        </div>
+        <div class="fine">
+          Safracore Ltda · CNPJ 67.126.820/0001-03<br />
+          R. Álvaro Alexandre Cardoso, 230, Apt 202, Centro — São João do Sul/SC — CEP 88.970-000 · contato@safracore.com<br />
+          © 2026 Passando Caso. Todos os direitos reservados.
+        </div>
+      </div>
+    </footer>
+
+    <script>
+      const FAQ = [
+        ["É gratuito?", "Sim! Você tem 30 dias de acesso completo, sem cartão de crédito e sem limite de pacientes. Após o período trial, escolha um plano na App Store ou Google Play."],
+        ["Funciona com qualquer sistema de prontuário?", "Sim. Como usamos foto da tela, funciona com qualquer sistema — Tasy, MV, Wareline, sistemas locais ou qualquer outro."],
+        ["Precisa de internet para usar?", "O app funciona offline para consulta e anotações. A sincronização com a nuvem e o companion web requerem conexão."],
+        ["Meus dados de pacientes são seguros?", "Sim. Os nomes são exibidos de forma abreviada, os dados são criptografados e processamos tudo em conformidade com a LGPD. Imagens enviadas para IA são processadas com retenção zero."],
+        ["Posso usar em mais de um hospital?", "Sim. O app permite cadastrar múltiplos hospitais e gerenciar rotinas separadas para cada um."],
+        ["Funciona para estudantes de medicina?", "Sim! Não exigimos CRM. Estudantes, internos e residentes podem usar normalmente."],
+        ["O que é o Companion Web?", "É uma página web que você acessa no computador do hospital. Lá você vê a evolução gerada pelo app e copia para o prontuário com um clique."],
+      ];
+      function esc(s) { return s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]); }
+      document.getElementById("faq-lista").innerHTML = FAQ.map(([q, a], i) => `
+        <div class="faq-item" id="faq-${i}">
+          <button class="faq-q" onclick="document.getElementById('faq-${i}').classList.toggle('aberto')">
+            <span>${esc(q)}</span><span class="chev">▾</span>
+          </button>
+          <div class="faq-a">${esc(a)}</div>
+        </div>`).join("");
+    </script>
+  </body>
+</html>
