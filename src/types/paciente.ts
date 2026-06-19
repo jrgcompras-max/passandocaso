@@ -150,6 +150,8 @@ export type EvolucaoBeiraLeito = {
   dispositivosObs: Record<string, string>;
   /** Exame físico legado (texto único); mantido para registros antigos. */
   exameFisico: string;
+  /** Estado geral objetivo do exame (REG/BEG/MEG); inicia o *O:. */
+  estadoGeralExame?: string;
   /** Exame físico estruturado por aparelho (texto livre cada). */
   neurologico?: string;
   cardiovascular?: string;

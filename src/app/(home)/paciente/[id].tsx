@@ -1301,9 +1301,9 @@ function EvolucaoBeiraLeitoSecao({
             onSelecionar={(v) => selecionarUnico("orientacao", v)}
           />
           <CampoTexto
-            label="Estado geral"
+            label="Estado geral (subjetivo / queixas)"
             value={evo.estadoGeral}
-            placeholder="Descreva o estado geral..."
+            placeholder="Ex: refere dor abdominal, sem queixas..."
             onChangeText={(t) => aplicar({ estadoGeral: t }, false)}
             onBlur={() => onSalvar(evo)}
           />
@@ -1366,6 +1366,13 @@ function EvolucaoBeiraLeitoSecao({
           ))}
 
           <Text style={styles.evoGrupo}>Exame Físico</Text>
+          <CampoTexto
+            label="Estado geral (objetivo)"
+            value={evo.estadoGeralExame ?? ""}
+            placeholder="Ex: REG, LOC, MUC, AAA"
+            onChangeText={(t) => aplicar({ estadoGeralExame: t }, false)}
+            onBlur={() => onSalvar(evo)}
+          />
           <CampoTexto
             label="Neurológico"
             value={evo.neurologico ?? ""}

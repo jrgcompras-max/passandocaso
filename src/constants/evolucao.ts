@@ -50,6 +50,7 @@ export const EVOLUCAO_VAZIA: EvolucaoBeiraLeito = {
   dispositivos: [],
   dispositivosObs: {},
   exameFisico: "",
+  estadoGeralExame: "",
   neurologico: "",
   cardiovascular: "",
   respiratorio: "",

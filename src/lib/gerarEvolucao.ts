@@ -144,8 +144,9 @@ export function montarTextoEvolucao(paciente: Paciente, hoje: string): string {
   ].filter(Boolean);
   const ssvv = ssvvPartes.length ? `SSVV: ${ssvvPartes.join(" | ")}` : null;
 
-  // — Objetivo: exame físico por aparelho (sem consciência/orientação) —
+  // — Objetivo: estado geral (REG/BEG/MEG) + aparelhos (sem consciência/orientação) —
   const oCorpo = [
+    evo?.estadoGeralExame?.trim() || null,
     evo?.neurologico?.trim() || null,
     evo?.cardiovascular?.trim() ? `AC ${evo.cardiovascular.trim()}` : null,
     evo?.respiratorio?.trim() ? `AP ${evo.respiratorio.trim()}` : null,

@@ -446,6 +446,7 @@
         const ssvv = ssvvP.length ? `SSVV: ${ssvvP.join(" | ")}` : null;
 
         const oCorpo = e ? [
+          (e.estadoGeralExame || "").trim() || null,
           (e.neurologico || "").trim() || null,
           (e.cardiovascular || "").trim() ? `AC ${e.cardiovascular.trim()}` : null,
           (e.respiratorio || "").trim() ? `AP ${e.respiratorio.trim()}` : null,
