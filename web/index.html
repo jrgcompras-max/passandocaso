@@ -408,20 +408,19 @@
       function gerarTextoEvolucao(p, data) {
         const e = (p.evolucoes || {})[data];
         const sv = (p.sinaisVitais || {})[data];
-        const bloco = (titulo, linhas) => { const ls = (linhas || []).map((l) => (l || "").trim()).filter(Boolean); return ls.length ? [titulo, ...ls].join("\n") : null; };
 
-        const ativos = (p.problemas || []).filter((x) => x.status === "ativo").map((x) => x.titulo.trim());
+        const ativos = (p.problemas || []).filter((x) => x.status === "ativo").map((x) => x.titulo.trim()).filter(Boolean);
         const atual = [(p.diagnosticoPrincipal || "").trim(), ...ativos].filter(Boolean);
+        const blocoAtual = atual.length ? `- Atual: ${atual.join("\n")}` : null;
         const atb = antibioticoterapiaLinhas(p);
         const cult = culturasPendentes(p);
-        const sec1 = [
-          atual.length ? `- Atual: ${atual.join(", ")}` : null,
-          atb.length ? `- Antibióticos: ${atb.join(", ")}` : null,
+        const blocoTrat = [
+          `- Antibióticos: ${atb.length ? atb.join(", ") : "--"}`,
           `- Culturais: ${cult.length ? cult.join(", ") : "---"}`,
-        ].filter(Boolean).join("\n");
+        ].join("\n");
 
         const { comorb, muc } = comorbMUC(p);
-        const sec2 = [
+        const blocoComorb = [
           `* Comorbidades: ${comorb.length ? comorb.join(", ") : "nega"}`,
           `* MUC: ${muc.length ? muc.join(", ") : "nega"}`,
           `* Alergias: nega`,
@@ -442,8 +441,8 @@
 
         const oPrim = [
           e && (e.estadoGeral || "").trim(),
-          e && e.nivelConsciencia ? rotulo("consciencia", e.nivelConsciencia) : null,
-          e && e.orientacao ? rotulo("orientacao", e.orientacao) : null,
+          e && e.nivelConsciencia ? rotulo("consciencia", e.nivelConsciencia).toLowerCase() : null,
+          e && e.orientacao ? rotulo("orientacao", e.orientacao).toLowerCase() : null,
         ].filter(Boolean).join(", ");
         const oCorpo = e ? [
           (e.neurologico || "").trim() || null,
@@ -460,11 +459,10 @@
         const img = secaoLinhas(p, "imagem");
         const imagem = img.length ? `Exames de imagem:\n${img.join("\n")}` : null;
 
-        const aLista = (p.problemas || []).filter((x) => x.status === "ativo" || x.status === "resolvendo").map((x) => `${x.titulo.trim()} (${x.status})`);
-        const a = aLista.length ? `*A: ${aLista.join("; ")}` : null;
+        const a = ativos.length ? `*A: ${ativos.join("\n")}` : null;
         const plano = e && (e.condutaDoDia || "").trim() ? `*P: ${e.condutaDoDia.trim()}` : null;
 
-        return ["                    Evolução Médica", sec1, sec2, hma, s, ssvv, o, exames, imagem, a, plano].filter(Boolean).join("\n\n");
+        return ["                    Evolução Médica", blocoAtual, blocoTrat, blocoComorb, hma, s, ssvv, o, exames, imagem, a, plano].filter(Boolean).join("\n\n");
       }
 
       // ======== API ========

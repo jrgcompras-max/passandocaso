@@ -6,17 +6,10 @@ import {
 import {
   type Anotacao,
   type Paciente,
-  type ProblemaStatus,
   type SecaoId,
 } from "@/types/paciente";
 
 import { agruparPorExame } from "./lab";
-
-const PROBLEMA_STATUS_LABEL: Record<ProblemaStatus, string> = {
-  ativo: "ativo",
-  resolvendo: "resolvendo",
-  resolvido: "resolvido",
-};
 
 type Bloco = { titulo: string; itens: string[] };
 
@@ -100,22 +93,25 @@ export function montarTextoEvolucao(paciente: Paciente, hoje: string): string {
   const evo = paciente.evolucoes?.[hoje];
   const sv = paciente.sinaisVitais?.[hoje];
 
-  // — Problemas / tratamento —
+  // — Atual: diagnóstico principal + problemas ativos, um por linha —
   const ativos = (paciente.problemas || [])
     .filter((x) => x.status === "ativo")
-    .map((x) => x.titulo.trim());
+    .map((x) => x.titulo.trim())
+    .filter(Boolean);
   const atual = [paciente.diagnosticoPrincipal?.trim(), ...ativos].filter(Boolean);
+  const blocoAtual = atual.length ? `- Atual: ${atual.join("\n")}` : null;
+
+  // — Antibióticos / Culturais (com padrões -- / ---) —
   const atb = antibioticos(paciente);
   const culturas = culturasPendentes(paciente);
-  const sec1 = [
-    atual.length ? `- Atual: ${atual.join(", ")}` : null,
-    atb.length ? `- Antibióticos: ${atb.join(", ")}` : null,
+  const blocoTrat = [
+    `- Antibióticos: ${atb.length ? atb.join(", ") : "--"}`,
     `- Culturais: ${culturas.length ? culturas.join(", ") : "---"}`,
-  ].filter(Boolean).join("\n");
+  ].join("\n");
 
   // — Comorbidades / MUC / Alergias —
   const { comorb, muc } = comorbidadesMUC(paciente);
-  const sec2 = [
+  const blocoComorb = [
     `* Comorbidades: ${comorb.length ? comorb.join(", ") : "nega"}`,
     `* MUC: ${muc.length ? muc.join(", ") : "nega"}`,
     `* Alergias: nega`,
@@ -128,7 +124,7 @@ export function montarTextoEvolucao(paciente: Paciente, hoje: string): string {
   // — Subjetivo —
   const s = evo?.estadoGeral?.trim() ? `*S: ${evo.estadoGeral.trim()}` : null;
 
-  // — Sinais vitais —
+  // — Sinais vitais (omite campos vazios; some se não houver nenhum) —
   const ssvvPartes = [
     sv?.paSist && sv?.paDiast ? `PA ${sv.paSist}/${sv.paDiast}` : null,
     sv?.fc ? `FC ${sv.fc}` : null,
@@ -138,14 +134,14 @@ export function montarTextoEvolucao(paciente: Paciente, hoje: string): string {
   ].filter(Boolean);
   const ssvv = ssvvPartes.length ? `SSVV: ${ssvvPartes.join(" | ")}` : null;
 
-  // — Objetivo (exame físico por aparelho) —
+  // — Objetivo: estado geral + consciência/orientação (minúsculas) + aparelhos —
   const oPrimeira = [
-    evo?.estadoGeral?.trim(),
-    rotuloDe(OPC_CONSCIENCIA, evo?.nivelConsciencia ?? null),
-    rotuloDe(OPC_ORIENTACAO, evo?.orientacao ?? null),
+    evo?.estadoGeral?.trim() || null,
+    rotuloDe(OPC_CONSCIENCIA, evo?.nivelConsciencia ?? null).toLowerCase() || null,
+    rotuloDe(OPC_ORIENTACAO, evo?.orientacao ?? null).toLowerCase() || null,
   ].filter(Boolean).join(", ");
   const oCorpo = [
-    evo?.neurologico?.trim(),
+    evo?.neurologico?.trim() || null,
     evo?.cardiovascular?.trim() ? `AC ${evo.cardiovascular.trim()}` : null,
     evo?.respiratorio?.trim() ? `AP ${evo.respiratorio.trim()}` : null,
     evo?.abdominal?.trim() ? `Abdome ${evo.abdominal.trim()}` : null,
@@ -161,16 +157,24 @@ export function montarTextoEvolucao(paciente: Paciente, hoje: string): string {
   const img = secaoLinhas(paciente, "imagem");
   const imagem = img.length ? `Exames de imagem:\n${img.join("\n")}` : null;
 
-  // — Avaliação / Plano —
-  const aLista = (paciente.problemas || [])
-    .filter((x) => x.status === "ativo" || x.status === "resolvendo")
-    .map((x) => `${x.titulo.trim()} (${PROBLEMA_STATUS_LABEL[x.status]})`);
-  const a = aLista.length ? `*A: ${aLista.join("; ")}` : null;
+  // — Avaliação (problemas ativos, um por linha) / Plano (conduta do dia) —
+  const a = ativos.length ? `*A: ${ativos.join("\n")}` : null;
   const plano = evo?.condutaDoDia?.trim() ? `*P: ${evo.condutaDoDia.trim()}` : null;
 
-  const titulo = "                    Evolução Médica";
-
-  return [titulo, sec1, sec2, hma, s, ssvv, o, exames, imagem, a, plano]
+  return [
+    "                    Evolução Médica",
+    blocoAtual,
+    blocoTrat,
+    blocoComorb,
+    hma,
+    s,
+    ssvv,
+    o,
+    exames,
+    imagem,
+    a,
+    plano,
+  ]
     .filter(Boolean)
     .join("\n\n");
 }

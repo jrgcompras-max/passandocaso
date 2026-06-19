@@ -13,7 +13,6 @@ import {
 import { ClinicalColors, Radius } from "@/constants/clinicalTheme";
 import { diaDeInternacao, hojeISO } from "@/lib/datas";
 import { formatarNome } from "@/lib/formatarNome";
-import { formatarEvolucaoIA } from "@/lib/formatarEvolucaoIA";
 import { montarTextoEvolucao } from "@/lib/gerarEvolucao";
 import { salvarEvolucao } from "@/lib/salvarEvolucao";
 import { usePacientes } from "@/store/PacientesContext";
@@ -42,7 +41,6 @@ export default function Evolucao() {
 
   const [texto, setTexto] = useState("");
   const [gerando, setGerando] = useState(true);
-  const [formatando, setFormatando] = useState(false);
   const [copiado, setCopiado] = useState(false);
   const [salvamento, setSalvamento] = useState<SalvamentoStatus>("ocioso");
 
@@ -58,18 +56,14 @@ export default function Evolucao() {
     setSalvamento(ok ? "salvo" : "erro");
   };
 
-  const gerar = async () => {
+  const gerar = () => {
     if (!paciente) return;
     setGerando(true);
+    // Texto determinístico no formato exato — sem passar pela IA (que reformata).
     const base = montarTextoEvolucao(paciente, hojeISO());
     setTexto(base);
     setGerando(false);
-    // Passo híbrido: a IA só padroniza a formatação (com fallback ao texto bruto).
-    setFormatando(true);
-    const formatado = await formatarEvolucaoIA(base);
-    setTexto(formatado);
-    setFormatando(false);
-    persistir(formatado);
+    persistir(base);
   };
 
   // Gera uma vez ao abrir (quando o paciente já carregou).
@@ -101,12 +95,10 @@ export default function Evolucao() {
             : "Carregando..."}
       </Text>
 
-      {(gerando || formatando) && (
+      {gerando && (
         <View style={styles.statusLinha}>
           <ActivityIndicator color={ClinicalColors.primary} />
-          <Text style={styles.statusTexto}>
-            {gerando ? "Montando o caso..." : "Padronizando a formatação..."}
-          </Text>
+          <Text style={styles.statusTexto}>Montando o caso...</Text>
         </View>
       )}
 
