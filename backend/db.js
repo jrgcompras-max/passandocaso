@@ -15,6 +15,21 @@ const pool = new Pool({
 /** Cria as tabelas se ainda não existirem. Idempotente. */
 async function initDB() {
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS usuarios (
+      id TEXT PRIMARY KEY,
+      nome TEXT NOT NULL,
+      email TEXT NOT NULL UNIQUE,
+      senha_hash TEXT NOT NULL,
+      plano TEXT NOT NULL DEFAULT 'trial',
+      is_admin BOOLEAN NOT NULL DEFAULT FALSE,
+      trial_inicio TIMESTAMP NOT NULL DEFAULT NOW(),
+      trial_fim TIMESTAMP NOT NULL DEFAULT (NOW() + INTERVAL '30 days'),
+      reset_token TEXT,
+      reset_token_exp TIMESTAMP,
+      created_at TIMESTAMP NOT NULL DEFAULT NOW()
+    );
+  `);
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS pacientes (
       id TEXT PRIMARY KEY,
       medico_id TEXT NOT NULL,
