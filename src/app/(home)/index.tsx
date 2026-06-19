@@ -2,21 +2,19 @@ import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import { useRef, useState } from "react";
 import ReanimatedSwipeable from "react-native-gesture-handler/ReanimatedSwipeable";
+import Reanimated, { FadeOut, LinearTransition } from "react-native-reanimated";
 import {
   ActivityIndicator,
   Alert,
   Animated,
   KeyboardAvoidingView,
-  LayoutAnimation,
   Modal,
   Platform,
   ScrollView,
-  SectionList,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  UIManager,
   View,
 } from "react-native";
 
@@ -34,14 +32,6 @@ import { converterParaJpegBase64 } from "@/lib/imagem";
 import { useHospitais } from "@/store/HospitaisContext";
 import { usePacientes } from "@/store/PacientesContext";
 import { type CabecalhoProntuario, type Hospital } from "@/types/paciente";
-
-// Habilita LayoutAnimation no Android (no-op em quem já suporta).
-if (
-  Platform.OS === "android" &&
-  UIManager.setLayoutAnimationEnabledExperimental
-) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 /** Ordem de prioridade (topo → fim) usada tanto para avançar quanto para ordenar. */
 const ORDEM_STATUS: StatusType[] = [
@@ -176,20 +166,8 @@ export default function Index() {
     atualizarPaciente(id, { status: proximoStatus(atual) });
     clearTimeout(timers.current[id]);
     timers.current[id] = setTimeout(() => {
-      // Animação longa (550ms) para o card percorrer visivelmente a tela até o
-      // grupo de destino, em vez de sumir/reaparecer.
-      LayoutAnimation.configureNext({
-        duration: 550,
-        update: { type: LayoutAnimation.Types.easeInEaseOut },
-        create: {
-          type: LayoutAnimation.Types.easeInEaseOut,
-          property: LayoutAnimation.Properties.opacity,
-        },
-        delete: {
-          type: LayoutAnimation.Types.easeInEaseOut,
-          property: LayoutAnimation.Properties.opacity,
-        },
-      });
+      // Remove a âncora; o reanimated (layout=LinearTransition no card) desliza
+      // o card continuamente até o grupo de destino.
       setAguardando((a) => {
         const copia = { ...a };
         delete copia[id];
@@ -208,9 +186,7 @@ export default function Index() {
           text: "Excluir",
           style: "destructive",
           onPress: () => {
-            LayoutAnimation.configureNext(
-              LayoutAnimation.Presets.easeInEaseOut,
-            );
+            // O reanimated (exiting=FadeOut no card) anima a saída suavemente.
             removerPaciente(id);
           },
         },
@@ -365,93 +341,110 @@ export default function Index() {
         </View>
       )}
 
-      <SectionList
-        sections={secoes}
-        keyExtractor={(item) => item.id}
-        stickySectionHeadersEnabled={false}
+      <ScrollView
+        style={{ flex: 1 }}
         contentContainerStyle={
           pacientesHosp.length === 0 ? styles.vazioContainer : styles.listaConteudo
         }
-        ListEmptyComponent={
-          !processando ? (
-            <View style={styles.vazio}>
-              <Text style={styles.vazioTitulo}>Nenhum paciente ainda</Text>
-              <Text style={styles.vazioTexto}>
-                Toque em + para fotografar o cabeçalho do primeiro prontuário.
-              </Text>
-            </View>
-          ) : null
-        }
-        renderSectionHeader={({ section }) => (
-          <Text style={styles.separador}>
-            — {section.titulo} ({section.data.length}) —
-          </Text>
-        )}
-        renderItem={({ item }) => {
-          const dia = diaDeInternacao(item.dataEntrada);
-          const pendenciasAbertas =
-            item.pendencias?.filter((p) => !p.feito).length ?? 0;
-          return (
-            <ReanimatedSwipeable
-              friction={2}
-              rightThreshold={40}
-              overshootRight={false}
-              renderRightActions={() => (
-                <TouchableOpacity
-                  style={styles.swipeExcluir}
-                  onPress={() => confirmarExcluir(item.id, item.nomeCompleto)}
-                >
-                  <Text style={styles.swipeExcluirTexto}>Excluir</Text>
-                </TouchableOpacity>
-              )}
-            >
-              <TouchableOpacity
-                style={styles.card}
-                onPress={() =>
-                  router.push({ pathname: "/paciente/[id]", params: { id: item.id } })
-                }
+        keyboardShouldPersistTaps="handled"
+      >
+        {pacientesHosp.length === 0
+          ? !processando && (
+              <View style={styles.vazio}>
+                <Text style={styles.vazioTitulo}>Nenhum paciente ainda</Text>
+                <Text style={styles.vazioTexto}>
+                  Toque em + para fotografar o cabeçalho do primeiro prontuário.
+                </Text>
+              </View>
+            )
+          : secoes.flatMap((s) => [
+              <Reanimated.View
+                key={`h-${s.status}`}
+                layout={LinearTransition.duration(450)}
               >
-                <View style={styles.cardLeft}>
-                  {(!!item.leito || !!item.setor) && (
-                    <Text style={styles.leito}>
-                      {[item.leito && `Leito ${item.leito}`, item.setor]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </Text>
-                  )}
-                  <Text style={styles.nome}>
-                    {formatarNome(item.nomeCompleto) || "Sem nome"}
-                  </Text>
-                  <Text style={styles.idade}>
-                    {item.idade != null ? `${item.idade} anos` : "Idade —"}
-                    {item.numeroProntuario
-                      ? ` · Prontuário ${item.numeroProntuario}`
-                      : ""}
-                  </Text>
-                  {!!item.diagnosticoPrincipal && (
-                    <Text style={styles.diagnostico} numberOfLines={2}>
-                      {item.diagnosticoPrincipal}
-                    </Text>
-                  )}
-                  <View style={styles.metaRow}>
-                    {dia != null && <Text style={styles.diaBadge}>D{dia}</Text>}
-                    {pendenciasAbertas > 0 && (
-                      <Text style={styles.pendenciasIndicador}>
-                        {pendenciasAbertas}{" "}
-                        {pendenciasAbertas === 1 ? "pendência" : "pendências"}
-                      </Text>
-                    )}
-                  </View>
-                </View>
-                <BadgeStatus
-                  status={item.status}
-                  onAvancar={() => avancarStatus(item.id, item.status)}
-                />
-              </TouchableOpacity>
-            </ReanimatedSwipeable>
-          );
-        }}
-      />
+                <Text style={styles.separador}>
+                  — {s.titulo} ({s.data.length}) —
+                </Text>
+              </Reanimated.View>,
+              ...s.data.map((item) => {
+                const dia = diaDeInternacao(item.dataEntrada);
+                const pendenciasAbertas =
+                  item.pendencias?.filter((p) => !p.feito).length ?? 0;
+                return (
+                  <Reanimated.View
+                    key={item.id}
+                    layout={LinearTransition.duration(450)}
+                    exiting={FadeOut.duration(250)}
+                  >
+                    <ReanimatedSwipeable
+                      friction={2}
+                      rightThreshold={40}
+                      overshootRight={false}
+                      renderRightActions={() => (
+                        <TouchableOpacity
+                          style={styles.swipeExcluir}
+                          onPress={() =>
+                            confirmarExcluir(item.id, item.nomeCompleto)
+                          }
+                        >
+                          <Text style={styles.swipeExcluirTexto}>Excluir</Text>
+                        </TouchableOpacity>
+                      )}
+                    >
+                      <TouchableOpacity
+                        style={styles.card}
+                        onPress={() =>
+                          router.push({
+                            pathname: "/paciente/[id]",
+                            params: { id: item.id },
+                          })
+                        }
+                      >
+                        <View style={styles.cardLeft}>
+                          {(!!item.leito || !!item.setor) && (
+                            <Text style={styles.leito}>
+                              {[item.leito && `Leito ${item.leito}`, item.setor]
+                                .filter(Boolean)
+                                .join(" · ")}
+                            </Text>
+                          )}
+                          <Text style={styles.nome}>
+                            {formatarNome(item.nomeCompleto) || "Sem nome"}
+                          </Text>
+                          <Text style={styles.idade}>
+                            {item.idade != null ? `${item.idade} anos` : "Idade —"}
+                            {item.numeroProntuario
+                              ? ` · Prontuário ${item.numeroProntuario}`
+                              : ""}
+                          </Text>
+                          {!!item.diagnosticoPrincipal && (
+                            <Text style={styles.diagnostico} numberOfLines={2}>
+                              {item.diagnosticoPrincipal}
+                            </Text>
+                          )}
+                          <View style={styles.metaRow}>
+                            {dia != null && (
+                              <Text style={styles.diaBadge}>D{dia}</Text>
+                            )}
+                            {pendenciasAbertas > 0 && (
+                              <Text style={styles.pendenciasIndicador}>
+                                {pendenciasAbertas}{" "}
+                                {pendenciasAbertas === 1 ? "pendência" : "pendências"}
+                              </Text>
+                            )}
+                          </View>
+                        </View>
+                        <BadgeStatus
+                          status={item.status}
+                          onAvancar={() => avancarStatus(item.id, item.status)}
+                        />
+                      </TouchableOpacity>
+                    </ReanimatedSwipeable>
+                  </Reanimated.View>
+                );
+              }),
+            ])}
+      </ScrollView>
 
       <Modal
         visible={modalVisivel}
