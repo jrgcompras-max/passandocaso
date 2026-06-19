@@ -268,6 +268,24 @@
             <a href="#" onclick="mostrarPane('login');return false">Voltar ao login</a>
           </div>
         </div>
+
+        <!-- Redefinir senha (a partir do link do e-mail) -->
+        <div id="pane-redefinir" class="hidden">
+          <p>Defina uma nova senha para sua conta.</p>
+          <div class="field">
+            <label class="label" for="rd-senha">Nova senha</label>
+            <input id="rd-senha" type="password" placeholder="mínimo 6 caracteres" />
+          </div>
+          <div class="field">
+            <label class="label" for="rd-conf">Confirmar senha</label>
+            <input id="rd-conf" type="password" placeholder="repita a senha" onkeydown="if(event.key==='Enter')redefinir()" />
+          </div>
+          <button class="btn-primario" onclick="redefinir()">Redefinir senha</button>
+          <p id="rd-msg" style="margin-top:12px;font-size:14px"></p>
+          <div class="auth-links">
+            <a href="#" onclick="mostrarPane('login');return false">Voltar ao login</a>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -586,12 +604,28 @@
 
       // ======== AUTENTICAÇÃO ========
       function mostrarPane(nome) {
-        for (const n of ["login", "cadastro", "recuperar"]) {
+        document.getElementById("tela-login").classList.remove("hidden");
+        for (const n of ["login", "cadastro", "recuperar", "redefinir"]) {
           document.getElementById("pane-" + n).classList.toggle("hidden", n !== nome);
         }
         document.getElementById("login-erro").textContent = "";
         document.getElementById("cad-erro").textContent = "";
         document.getElementById("rec-msg").textContent = "";
+      }
+      async function redefinir() {
+        const senha = document.getElementById("rd-senha").value;
+        const conf = document.getElementById("rd-conf").value;
+        const msg = document.getElementById("rd-msg");
+        const tk = new URLSearchParams(location.search).get("token");
+        if (!tk) { msg.className = "erro"; msg.textContent = "Link inválido ou expirado."; return; }
+        if (senha.length < 6) { msg.className = "erro"; msg.textContent = "A senha deve ter ao menos 6 caracteres."; return; }
+        if (senha !== conf) { msg.className = "erro"; msg.textContent = "As senhas não coincidem."; return; }
+        try {
+          await apiPost("/api/auth/redefinir", { token: tk, senha });
+          msg.className = ""; msg.style.color = "var(--accent-d)";
+          msg.textContent = "Senha redefinida! Você já pode entrar.";
+          setTimeout(() => { history.replaceState(null, "", "/"); mostrarPane("login"); }, 1600);
+        } catch (e) { msg.className = "erro"; msg.textContent = e.message || "Falha ao redefinir."; }
       }
       function aplicarSessao(t, u) {
         token = t; usuario = u;
@@ -1164,7 +1198,9 @@
       }
 
       // ======== BOOT ========
-      if (token) { iniciar(); } else { mostrarPane("login"); }
+      if (new URLSearchParams(location.search).get("token")) { mostrarPane("redefinir"); }
+      else if (token) { iniciar(); }
+      else { mostrarPane("login"); }
     </script>
   </body>
 </html>
