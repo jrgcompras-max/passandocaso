@@ -114,7 +114,7 @@ export function montarTextoEvolucao(paciente: Paciente, hoje: string): string {
   const blocoComorb = [
     `* Comorbidades: ${comorb.length ? comorb.join(", ") : "nega"}`,
     `* MUC: ${muc.length ? muc.join(", ") : "nega"}`,
-    `* Alergias: nega`,
+    `* Alergias: --`,
   ].join("\n");
 
   // — HMA —
