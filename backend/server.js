@@ -351,6 +351,171 @@ app.post("/api/auth/redefinir", async (req, res) => {
   }
 });
 
+// --- Super Admin (admin.passandocaso.com.br) ---
+
+/** Status efetivo do usuário (trial pode ter expirado pela data). */
+function statusUsuario(u) {
+  if (u.plano === "ativo") return "ativo";
+  if (u.plano === "expirado") return "expirado";
+  if (u.trial_fim && new Date(u.trial_fim) < new Date()) return "expirado";
+  return "trial";
+}
+
+/**
+ * Login de admin: valida credenciais e exige que o e-mail esteja em
+ * ADMIN_EMAILS. Garante a flag is_admin no banco. Body: { email, senha }.
+ */
+app.post("/api/admin/login", async (req, res) => {
+  const email = String((req.body || {}).email || "").trim().toLowerCase();
+  const senha = String((req.body || {}).senha || "");
+  if (!email || !senha) {
+    return res.status(400).json({ erro: "Campos obrigatórios: email, senha." });
+  }
+  if (!auth.ehAdmin(email)) {
+    return res.status(403).json({ erro: "Acesso restrito a administradores." });
+  }
+  try {
+    const r = await db.query("SELECT * FROM usuarios WHERE email = $1", [email]);
+    let usuario = r.rows[0];
+    if (!usuario || !(await auth.conferirSenha(senha, usuario.senha_hash))) {
+      return res.status(401).json({ erro: "E-mail ou senha incorretos." });
+    }
+    if (!usuario.is_admin) {
+      const u2 = await db.query(
+        "UPDATE usuarios SET is_admin = TRUE WHERE id = $1 RETURNING *",
+        [usuario.id],
+      );
+      usuario = u2.rows[0];
+    }
+    res.json({ token: auth.gerarToken(usuario), usuario: auth.usuarioPublico(usuario) });
+  } catch (e) {
+    console.error("Erro em /api/admin/login:", e);
+    res.status(500).json({ erro: e.message || "Falha ao entrar." });
+  }
+});
+
+/** Métricas + crescimento de cadastros (últimas 8 semanas). */
+app.get("/api/admin/dashboard", auth.autenticar, auth.exigirAdmin, async (_req, res) => {
+  try {
+    const m = await db.query(`
+      SELECT
+        COUNT(*)::int AS total,
+        COUNT(*) FILTER (WHERE plano = 'trial' AND trial_fim >= NOW())::int AS em_trial,
+        COUNT(*) FILTER (WHERE plano = 'ativo')::int AS ativos,
+        COUNT(*) FILTER (WHERE plano = 'expirado' OR (plano = 'trial' AND trial_fim < NOW()))::int AS expirados,
+        COUNT(*) FILTER (WHERE created_at >= date_trunc('day', NOW()))::int AS novos_hoje,
+        COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '7 days')::int AS novos_semana,
+        COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days')::int AS novos_mes
+      FROM usuarios;
+    `);
+    const g = await db.query(`
+      SELECT to_char(date_trunc('week', created_at), 'YYYY-MM-DD') AS semana,
+             COUNT(*)::int AS total
+        FROM usuarios
+       WHERE created_at >= date_trunc('week', NOW()) - INTERVAL '7 weeks'
+       GROUP BY 1 ORDER BY 1;
+    `);
+    res.json({ metricas: m.rows[0], crescimento: g.rows });
+  } catch (e) {
+    console.error("Erro em GET /api/admin/dashboard:", e);
+    res.status(500).json({ erro: e.message || "Falha ao carregar o dashboard." });
+  }
+});
+
+/** Lista usuários (opcional ?status=trial|ativo|expirado), com contagem de pacientes. */
+app.get("/api/admin/usuarios", auth.autenticar, auth.exigirAdmin, async (req, res) => {
+  const filtro = String(req.query.status || "").toLowerCase();
+  try {
+    const r = await db.query(`
+      SELECT u.id, u.nome, u.email, u.plano, u.is_admin, u.trial_fim, u.created_at,
+             (SELECT COUNT(*) FROM pacientes p WHERE p.medico_id = u.id)::int AS pacientes
+        FROM usuarios u
+       ORDER BY u.created_at DESC
+    `);
+    let usuarios = r.rows.map((u) => {
+      const fim = u.trial_fim ? new Date(u.trial_fim) : null;
+      const diasRestantes = fim
+        ? Math.max(0, Math.ceil((fim.getTime() - Date.now()) / 86_400_000))
+        : null;
+      return {
+        id: u.id,
+        nome: u.nome,
+        email: u.email,
+        plano: u.plano,
+        isAdmin: u.is_admin,
+        trialFim: u.trial_fim,
+        criadoEm: u.created_at,
+        pacientes: u.pacientes,
+        diasRestantes,
+        status: statusUsuario(u),
+      };
+    });
+    if (["trial", "ativo", "expirado"].includes(filtro)) {
+      usuarios = usuarios.filter((u) => u.status === filtro);
+    }
+    res.json({ usuarios });
+  } catch (e) {
+    console.error("Erro em GET /api/admin/usuarios:", e);
+    res.status(500).json({ erro: e.message || "Falha ao listar usuários." });
+  }
+});
+
+/**
+ * Ações sobre um usuário. Body: { acao: "estender"|"ativar"|"bloquear", dias? }.
+ * - estender: dias ∈ {7,15,30}, soma ao maior entre trial_fim e agora; plano=trial.
+ * - ativar: plano=ativo. - bloquear: plano=expirado.
+ */
+app.put("/api/admin/usuarios/:id", auth.autenticar, auth.exigirAdmin, async (req, res) => {
+  const { id } = req.params;
+  const acao = String((req.body || {}).acao || "");
+  const dias = Number((req.body || {}).dias || 0);
+  try {
+    let q;
+    let params;
+    if (acao === "estender") {
+      if (![7, 15, 30].includes(dias)) {
+        return res.status(400).json({ erro: "dias deve ser 7, 15 ou 30." });
+      }
+      q =
+        "UPDATE usuarios SET plano = 'trial', trial_fim = GREATEST(trial_fim, NOW()) + make_interval(days => $1) WHERE id = $2 RETURNING *";
+      params = [dias, id];
+    } else if (acao === "ativar") {
+      q = "UPDATE usuarios SET plano = 'ativo' WHERE id = $1 RETURNING *";
+      params = [id];
+    } else if (acao === "bloquear") {
+      q = "UPDATE usuarios SET plano = 'expirado' WHERE id = $1 RETURNING *";
+      params = [id];
+    } else {
+      return res.status(400).json({ erro: "Ação inválida. Use estender, ativar ou bloquear." });
+    }
+    const r = await db.query(q, params);
+    if (!r.rows.length) return res.status(404).json({ erro: "Usuário não encontrado." });
+    res.json({ usuario: auth.usuarioPublico(r.rows[0]) });
+  } catch (e) {
+    console.error("Erro em PUT /api/admin/usuarios/:id:", e);
+    res.status(500).json({ erro: e.message || "Falha ao atualizar usuário." });
+  }
+});
+
+/** Exclui um usuário e todos os seus dados (pacientes, hospitais, evoluções). */
+app.delete("/api/admin/usuarios/:id", auth.autenticar, auth.exigirAdmin, async (req, res) => {
+  const { id } = req.params;
+  if (id === req.usuario.id) {
+    return res.status(400).json({ erro: "Você não pode excluir a própria conta." });
+  }
+  try {
+    await db.query("DELETE FROM pacientes WHERE medico_id = $1", [id]);
+    await db.query("DELETE FROM hospitais WHERE medico_id = $1", [id]);
+    await db.query("DELETE FROM evolucoes WHERE medico_id = $1", [id]);
+    const r = await db.query("DELETE FROM usuarios WHERE id = $1 RETURNING id", [id]);
+    if (!r.rows.length) return res.status(404).json({ erro: "Usuário não encontrado." });
+    res.json({ status: "ok" });
+  } catch (e) {
+    console.error("Erro em DELETE /api/admin/usuarios/:id:", e);
+    res.status(500).json({ erro: e.message || "Falha ao excluir usuário." });
+  }
+});
+
 // --- Pacientes (sincronização app ⇄ banco) — escopo: usuário autenticado ---
 
 /** Lista todos os pacientes do usuário (mais recentes primeiro). */

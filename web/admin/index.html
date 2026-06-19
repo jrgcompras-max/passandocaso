@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Passando o Caso — Admin</title>
+    <style>
+      :root {
+        --bg: #f8fafb;
+        --surface: #ffffff;
+        --border: #e2e8f0;
+        --primary: #1a6b8a;
+        --primary-d: #155772;
+        --accent: #0e7a5a;
+        --accent-d: #0b6249;
+        --text: #0f2d52;
+        --muted: #64748b;
+        --danger: #991b1b;
+        --warning: #b45309;
+      }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); }
+      button { font: inherit; cursor: pointer; border: none; border-radius: 8px; }
+      input, select { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; color: var(--text); background: #fff; }
+      input:focus, select:focus { outline: 2px solid var(--primary); border-color: var(--primary); }
+      .hidden { display: none !important; }
+      .erro { color: var(--danger); }
+      a { color: var(--primary); }
+
+      /* Login */
+      .login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+      .login { width: 100%; max-width: 380px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; box-shadow: 0 4px 20px rgba(15,45,82,.06); }
+      .login h2 { font-size: 20px; margin-bottom: 2px; }
+      .login .tag { display: inline-block; font-size: 11px; font-weight: 700; color: var(--primary); background: #e6f2f7; border-radius: 6px; padding: 2px 8px; margin-bottom: 14px; letter-spacing: .04em; }
+      .login p { color: var(--muted); font-size: 14px; margin-bottom: 18px; }
+      .field { margin-bottom: 12px; }
+      .label { display: block; font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 6px; }
+      .btn-primario { width: 100%; margin-top: 8px; background: var(--primary); color: #fff; padding: 12px; font-size: 15px; font-weight: 600; }
+      .btn-primario:hover { background: var(--primary-d); }
+
+      /* App */
+      header.top { background: var(--surface); border-bottom: 1px solid var(--border); padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 5; }
+      header.top h1 { font-size: 18px; } header.top .tag { font-size: 11px; font-weight: 700; color: var(--primary); background: #e6f2f7; border-radius: 6px; padding: 2px 8px; margin-left: 8px; }
+      header.top .right { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--muted); }
+      .btn-ghost { background: #fff; border: 1px solid var(--border); color: var(--primary); padding: 8px 14px; font-size: 13px; font-weight: 600; }
+      .btn-ghost:hover { background: #f1f5f9; }
+      main { max-width: 1140px; margin: 0 auto; padding: 24px; }
+
+      /* Métricas */
+      .metricas { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 22px; }
+      .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; box-shadow: 0 2px 8px rgba(15,45,82,.04); }
+      .card .n { font-size: 28px; font-weight: 800; }
+      .card .l { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+      .card.trial .n { color: var(--primary); } .card.ativo .n { color: var(--accent); }
+      .card.exp .n { color: var(--danger); } .card.total .n { color: var(--text); }
+      .mini { display: flex; gap: 14px; margin-bottom: 22px; flex-wrap: wrap; }
+      .mini .card { flex: 1; min-width: 150px; } .mini .card .n { font-size: 20px; }
+
+      /* Gráfico */
+      .secao-titulo { font-size: 15px; font-weight: 700; margin: 4px 0 12px; }
+      .grafico { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-bottom: 22px; }
+      .barras { display: flex; align-items: flex-end; gap: 10px; height: 140px; }
+      .barra-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; justify-content: flex-end; }
+      .barra { width: 100%; max-width: 46px; background: var(--primary); border-radius: 6px 6px 0 0; min-height: 3px; transition: height .3s; }
+      .barra-val { font-size: 12px; font-weight: 700; color: var(--text); }
+      .barra-lbl { font-size: 10.5px; color: var(--muted); }
+
+      /* Tabela */
+      .barra-acoes { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+      .filtros { display: flex; gap: 8px; }
+      .chip { background: #fff; border: 1px solid var(--border); color: var(--muted); padding: 7px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; }
+      .chip.ativo { background: var(--primary); color: #fff; border-color: var(--primary); }
+      .tabela-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+      table { width: 100%; border-collapse: collapse; }
+      th, td { text-align: left; padding: 11px 14px; font-size: 13.5px; border-bottom: 1px solid var(--border); }
+      th { background: #f1f5f9; color: var(--muted); font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; }
+      tr:last-child td { border-bottom: none; }
+      tr:hover td { background: #f8fafb; }
+      .badge { display: inline-block; padding: 2px 9px; border-radius: 12px; font-size: 11.5px; font-weight: 700; }
+      .b-trial { background: #e6f2f7; color: var(--primary); }
+      .b-ativo { background: #dcfce7; color: #166534; }
+      .b-expirado { background: #fee2e2; color: var(--danger); }
+      .b-admin { background: #ede9fe; color: #6b21a8; margin-left: 6px; }
+      .acoes-cel { display: flex; gap: 6px; flex-wrap: wrap; }
+      .btn-mini { padding: 5px 9px; font-size: 12px; border: 1px solid var(--border); background: #fff; color: var(--primary); }
+      .btn-mini:hover { background: #f1f5f9; }
+      .btn-mini.danger { color: var(--danger); border-color: #fecaca; }
+      .vazio { padding: 30px; text-align: center; color: var(--muted); font-size: 14px; }
+
+      /* Modal */
+      .modal-bg { position: fixed; inset: 0; background: rgba(15,45,82,.45); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 20; }
+      .modal { background: #fff; border-radius: 14px; padding: 24px; max-width: 460px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,.25); }
+      .modal h3 { font-size: 18px; margin-bottom: 14px; }
+      .modal .linha { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+      .modal .linha .k { color: var(--muted); }
+      .modal-acoes { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+      .btn-sec { background: #fff; border: 1px solid var(--border); color: var(--text); padding: 10px 16px; font-weight: 600; }
+      .btn-ok { background: var(--primary); color: #fff; padding: 10px 16px; font-weight: 600; }
+      .btn-ok.danger { background: var(--danger); }
+      .estender-grp { display: flex; gap: 8px; margin: 10px 0; }
+      .estender-grp button { flex: 1; padding: 9px; border: 1px solid var(--border); background: #fff; color: var(--primary); font-weight: 600; }
+      .estender-grp button:hover { background: #f0f7fa; }
+
+      @media (max-width: 820px) {
+        .metricas { grid-template-columns: 1fr 1fr; }
+        table { font-size: 12.5px; } th, td { padding: 9px 10px; }
+        .col-mobile-hide { display: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- LOGIN -->
+    <div id="tela-login" class="login-wrap">
+      <div class="login">
+        <span class="tag">PAINEL ADMIN</span>
+        <h2>Passando o Caso</h2>
+        <p>Acesso restrito a administradores.</p>
+        <div class="field">
+          <label class="label" for="email">E-mail</label>
+          <input id="email" type="email" autocomplete="username" placeholder="admin@email.com" />
+        </div>
+        <div class="field">
+          <label class="label" for="senha">Senha</label>
+          <input id="senha" type="password" autocomplete="current-password" placeholder="••••••" onkeydown="if(event.key==='Enter')entrar()" />
+        </div>
+        <button class="btn-primario" onclick="entrar()">Entrar</button>
+        <p id="login-erro" class="erro" style="margin-top:12px"></p>
+      </div>
+    </div>
+
+    <!-- APP -->
+    <div id="app" class="hidden">
+      <header class="top">
+        <div><strong style="font-size:18px">Passando o Caso</strong><span class="tag">ADMIN</span></div>
+        <div class="right">
+          <span id="admin-email"></span>
+          <button class="btn-ghost" onclick="recarregar()">↻ Atualizar</button>
+          <button class="btn-ghost" onclick="sair()">Sair</button>
+        </div>
+      </header>
+      <main>
+        <div class="metricas" id="metricas"></div>
+        <div class="mini" id="mini"></div>
+
+        <div class="grafico">
+          <div class="secao-titulo">Cadastros por semana</div>
+          <div class="barras" id="grafico"></div>
+        </div>
+
+        <div class="barra-acoes">
+          <div class="secao-titulo" style="margin:0">Usuários</div>
+          <div class="filtros" id="filtros">
+            <button class="chip ativo" data-f="" onclick="filtrar('')">Todos</button>
+            <button class="chip" data-f="trial" onclick="filtrar('trial')">Trial</button>
+            <button class="chip" data-f="ativo" onclick="filtrar('ativo')">Ativos</button>
+            <button class="chip" data-f="expirado" onclick="filtrar('expirado')">Expirados</button>
+          </div>
+        </div>
+        <div class="tabela-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th class="col-mobile-hide">E-mail</th>
+                <th>Status</th>
+                <th class="col-mobile-hide">Pac.</th>
+                <th class="col-mobile-hide">Cadastro</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="tbody"><tr><td colspan="6" class="vazio">Carregando…</td></tr></tbody>
+          </table>
+        </div>
+      </main>
+    </div>
+
+    <div id="modais"></div>
+
+    <script>
+      // ======== CONFIG / ESTADO ========
+      const API_URL = "https://api.passandocaso.com.br";
+      let token = sessionStorage.getItem("pc_admin_token") || "";
+      let adminUser = JSON.parse(sessionStorage.getItem("pc_admin_user") || "null");
+      let usuarios = [];
+      let filtroAtual = "";
+
+      // ======== UTIL ========
+      function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]); }
+      function dataBR(iso) { if (!iso) return "—"; const d = new Date(iso); return d.toLocaleDateString("pt-BR"); }
+
+      // ======== API ========
+      function authHeaders(extra) { const h = Object.assign({}, extra || {}); if (token) h["Authorization"] = "Bearer " + token; return h; }
+      async function req(rota, opts) {
+        const r = await fetch(API_URL + rota, opts);
+        if ((r.status === 401 || r.status === 403) && token) { sair(); throw new Error("Sessão expirada."); }
+        const dados = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(dados.erro || ("HTTP " + r.status));
+        return dados;
+      }
+      const apiGet = (rota) => req(rota, { headers: authHeaders() });
+      const apiPost = (rota, body) => req(rota, { method: "POST", headers: authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify(body) });
+      const apiPut = (rota, body) => req(rota, { method: "PUT", headers: authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify(body) });
+      const apiDelete = (rota) => req(rota, { method: "DELETE", headers: authHeaders() });
+
+      // ======== AUTENTICAÇÃO ========
+      async function entrar() {
+        const email = document.getElementById("email").value.trim();
+        const senha = document.getElementById("senha").value;
+        const err = document.getElementById("login-erro"); err.textContent = "";
+        if (!email || !senha) { err.textContent = "Preencha e-mail e senha."; return; }
+        try {
+          const r = await apiPost("/api/admin/login", { email, senha });
+          token = r.token; adminUser = r.usuario;
+          sessionStorage.setItem("pc_admin_token", token);
+          sessionStorage.setItem("pc_admin_user", JSON.stringify(adminUser));
+          iniciar();
+        } catch (e) { err.textContent = e.message || "Falha ao entrar."; }
+      }
+      function sair() {
+        token = ""; adminUser = null;
+        sessionStorage.removeItem("pc_admin_token");
+        sessionStorage.removeItem("pc_admin_user");
+        document.getElementById("app").classList.add("hidden");
+        document.getElementById("tela-login").classList.remove("hidden");
+      }
+      function iniciar() {
+        document.getElementById("tela-login").classList.add("hidden");
+        document.getElementById("app").classList.remove("hidden");
+        document.getElementById("admin-email").textContent = adminUser ? adminUser.email : "";
+        recarregar();
+      }
+      async function recarregar() {
+        await Promise.all([carregarDashboard(), carregarUsuarios()]);
+      }
+
+      // ======== DASHBOARD ========
+      async function carregarDashboard() {
+        try {
+          const { metricas: m, crescimento } = await apiGet("/api/admin/dashboard");
+          document.getElementById("metricas").innerHTML = `
+            ${cardMetrica("total", m.total, "Total de usuários")}
+            ${cardMetrica("trial", m.em_trial, "Em trial")}
+            ${cardMetrica("ativo", m.ativos, "Ativos")}
+            ${cardMetrica("exp", m.expirados, "Expirados")}`;
+          document.getElementById("mini").innerHTML = `
+            ${cardMetrica("", m.novos_hoje, "Novos hoje")}
+            ${cardMetrica("", m.novos_semana, "Novos (7 dias)")}
+            ${cardMetrica("", m.novos_mes, "Novos (30 dias)")}`;
+          renderGrafico(crescimento || []);
+        } catch (e) {
+          document.getElementById("metricas").innerHTML = `<div class="erro">${esc(e.message)}</div>`;
+        }
+      }
+      function cardMetrica(cls, n, l) {
+        return `<div class="card ${cls}"><div class="n">${n ?? 0}</div><div class="l">${l}</div></div>`;
+      }
+      function renderGrafico(dados) {
+        const el = document.getElementById("grafico");
+        if (!dados.length) { el.innerHTML = '<div class="vazio">Sem dados de cadastro ainda.</div>'; return; }
+        const max = Math.max(1, ...dados.map((d) => d.total));
+        el.innerHTML = dados.map((d) => {
+          const h = Math.round((d.total / max) * 100);
+          const lbl = new Date(d.semana).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+          return `<div class="barra-col"><div class="barra-val">${d.total}</div><div class="barra" style="height:${h}%"></div><div class="barra-lbl">${lbl}</div></div>`;
+        }).join("");
+      }
+
+      // ======== USUÁRIOS ========
+      function filtrar(f) {
+        filtroAtual = f;
+        document.querySelectorAll("#filtros .chip").forEach((c) => c.classList.toggle("ativo", c.dataset.f === f));
+        carregarUsuarios();
+      }
+      async function carregarUsuarios() {
+        const tb = document.getElementById("tbody");
+        try {
+          const r = await apiGet("/api/admin/usuarios" + (filtroAtual ? "?status=" + filtroAtual : ""));
+          usuarios = r.usuarios || [];
+          if (!usuarios.length) { tb.innerHTML = '<tr><td colspan="6" class="vazio">Nenhum usuário.</td></tr>'; return; }
+          tb.innerHTML = usuarios.map(linhaUsuario).join("");
+        } catch (e) {
+          tb.innerHTML = `<tr><td colspan="6" class="vazio erro">${esc(e.message)}</td></tr>`;
+        }
+      }
+      function badgeStatus(u) {
+        const cls = { trial: "b-trial", ativo: "b-ativo", expirado: "b-expirado" }[u.status] || "b-trial";
+        const txt = { trial: `Trial · ${u.diasRestantes ?? 0}d`, ativo: "Ativo", expirado: "Expirado" }[u.status] || u.status;
+        return `<span class="badge ${cls}">${txt}</span>${u.isAdmin ? '<span class="badge b-admin">admin</span>' : ""}`;
+      }
+      function linhaUsuario(u) {
+        return `<tr>
+          <td><strong>${esc(u.nome)}</strong></td>
+          <td class="col-mobile-hide">${esc(u.email)}</td>
+          <td>${badgeStatus(u)}</td>
+          <td class="col-mobile-hide">${u.pacientes ?? 0}</td>
+          <td class="col-mobile-hide">${dataBR(u.criadoEm)}</td>
+          <td><div class="acoes-cel">
+            <button class="btn-mini" onclick="verDetalhes('${u.id}')">Detalhes</button>
+            <button class="btn-mini" onclick="abrirEstender('${u.id}')">Estender</button>
+            ${u.status === "ativo" ? "" : `<button class="btn-mini" onclick="acao('${u.id}','ativar')">Ativar</button>`}
+            ${u.status === "expirado" ? "" : `<button class="btn-mini" onclick="acao('${u.id}','bloquear')">Bloquear</button>`}
+            <button class="btn-mini danger" onclick="excluir('${u.id}')">Excluir</button>
+          </div></td>
+        </tr>`;
+      }
+
+      // ======== AÇÕES ========
+      async function acao(id, ac, dias) {
+        try {
+          await apiPut("/api/admin/usuarios/" + encodeURIComponent(id), { acao: ac, dias });
+          fecharModal();
+          await recarregar();
+        } catch (e) { alert(e.message); }
+      }
+      async function excluir(id) {
+        const u = usuarios.find((x) => x.id === id);
+        if (!confirm(`Excluir ${u ? u.nome : "o usuário"} e TODOS os seus dados (pacientes, hospitais, evoluções)?\n\nEsta ação é irreversível.`)) return;
+        try { await apiDelete("/api/admin/usuarios/" + encodeURIComponent(id)); await recarregar(); }
+        catch (e) { alert(e.message); }
+      }
+      function verDetalhes(id) {
+        const u = usuarios.find((x) => x.id === id); if (!u) return;
+        document.getElementById("modais").innerHTML = `<div class="modal-bg" onclick="if(event.target===this)fecharModal()"><div class="modal">
+          <h3>${esc(u.nome)} ${badgeStatus(u)}</h3>
+          <div class="linha"><span class="k">E-mail</span><span>${esc(u.email)}</span></div>
+          <div class="linha"><span class="k">Plano</span><span>${esc(u.plano)}</span></div>
+          <div class="linha"><span class="k">Fim do trial</span><span>${dataBR(u.trialFim)}</span></div>
+          <div class="linha"><span class="k">Dias restantes</span><span>${u.diasRestantes ?? "—"}</span></div>
+          <div class="linha"><span class="k">Pacientes</span><span>${u.pacientes ?? 0}</span></div>
+          <div class="linha"><span class="k">Cadastro</span><span>${dataBR(u.criadoEm)}</span></div>
+          <div class="modal-acoes"><button class="btn-sec" onclick="fecharModal()">Fechar</button></div>
+        </div></div>`;
+      }
+      function abrirEstender(id) {
+        const u = usuarios.find((x) => x.id === id); if (!u) return;
+        document.getElementById("modais").innerHTML = `<div class="modal-bg" onclick="if(event.target===this)fecharModal()"><div class="modal">
+          <h3>Estender trial — ${esc(u.nome)}</h3>
+          <p style="color:var(--muted);font-size:14px">Adiciona dias ao trial (a partir de hoje ou do fim atual, o que for maior).</p>
+          <div class="estender-grp">
+            <button onclick="acao('${u.id}','estender',7)">+7 dias</button>
+            <button onclick="acao('${u.id}','estender',15)">+15 dias</button>
+            <button onclick="acao('${u.id}','estender',30)">+30 dias</button>
+          </div>
+          <div class="modal-acoes"><button class="btn-sec" onclick="fecharModal()">Cancelar</button></div>
+        </div></div>`;
+      }
+      function fecharModal() { document.getElementById("modais").innerHTML = ""; }
+
+      // ======== BOOT ========
+      if (token) { iniciar(); }
+    </script>
+  </body>
+</html>
