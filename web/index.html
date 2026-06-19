@@ -47,6 +47,19 @@
       .btn-primario { width: 100%; margin-top: 8px; background: var(--primary); color: #fff; padding: 12px; font-size: 15px; }
       .btn-primario:hover { background: var(--primary-d); }
 
+      /* Auth */
+      .auth-links { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+      .auth-links a { color: var(--primary); font-size: 13px; font-weight: 600; text-decoration: none; }
+      .auth-links a:hover { text-decoration: underline; }
+      .lgpd { display: flex; align-items: flex-start; gap: 8px; margin: 6px 0 4px; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+      .lgpd input { width: auto; margin-top: 2px; flex-shrink: 0; }
+      .lgpd a { color: var(--primary); }
+      .lojas { display: flex; gap: 10px; justify-content: center; margin-top: 18px; flex-wrap: wrap; }
+      .btn-loja { display: inline-block; background: #0f2d52; color: #fff; padding: 11px 18px; border-radius: 8px; font-size: 14px; font-weight: 600; text-decoration: none; }
+      .btn-loja:hover { background: #0a2240; }
+      .trial-banner { margin-top: 12px; background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; border-radius: 8px; padding: 8px 12px; font-size: 12.5px; font-weight: 600; }
+      .trial-banner a { color: var(--accent-d); }
+
       /* App shell */
       #app { display: flex; height: 100vh; overflow: hidden; }
       .sidebar { width: 340px; flex-shrink: 0; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
@@ -188,17 +201,88 @@
     </style>
   </head>
   <body>
-    <!-- LOGIN -->
+    <!-- AUTENTICAÇÃO -->
     <div id="tela-login" class="login-wrap">
       <div class="login">
         <h2>Passando o Caso</h2>
-        <p>Companion web — entre com seu ID de médico.</p>
-        <div class="field">
-          <label class="label" for="medicoId">ID do médico</label>
-          <input id="medicoId" type="text" placeholder="ex.: medico-001" autocomplete="username" />
+
+        <!-- Entrar -->
+        <div id="pane-login">
+          <p>Companion web — entre na sua conta.</p>
+          <div class="field">
+            <label class="label" for="li-email">E-mail</label>
+            <input id="li-email" type="email" autocomplete="username" placeholder="seu@email.com" />
+          </div>
+          <div class="field">
+            <label class="label" for="li-senha">Senha</label>
+            <input id="li-senha" type="password" autocomplete="current-password" placeholder="••••••" onkeydown="if(event.key==='Enter')entrar()" />
+          </div>
+          <button class="btn-primario" onclick="entrar()">Entrar</button>
+          <p id="login-erro" class="erro" style="margin-top:12px"></p>
+          <div class="auth-links">
+            <a href="#" onclick="mostrarPane('recuperar');return false">Esqueci minha senha</a>
+            <a href="#" onclick="mostrarPane('cadastro');return false">Criar conta</a>
+          </div>
         </div>
-        <button class="btn-primario" onclick="entrar()">Entrar</button>
-        <p id="login-erro" class="erro" style="margin-top:12px"></p>
+
+        <!-- Cadastro -->
+        <div id="pane-cadastro" class="hidden">
+          <p>Crie sua conta — 30 dias grátis, sem cartão.</p>
+          <div class="field">
+            <label class="label" for="cd-nome">Nome</label>
+            <input id="cd-nome" type="text" placeholder="Seu nome" />
+          </div>
+          <div class="field">
+            <label class="label" for="cd-email">E-mail</label>
+            <input id="cd-email" type="email" placeholder="seu@email.com" />
+          </div>
+          <div class="field">
+            <label class="label" for="cd-senha">Senha</label>
+            <input id="cd-senha" type="password" placeholder="mínimo 6 caracteres" />
+          </div>
+          <div class="field">
+            <label class="label" for="cd-conf">Confirmar senha</label>
+            <input id="cd-conf" type="password" placeholder="repita a senha" />
+          </div>
+          <label class="lgpd">
+            <input id="cd-lgpd" type="checkbox" />
+            <span>Li e aceito a <a href="https://passandocaso.com.br/privacidade.html" target="_blank">Política de Privacidade</a> e os <a href="https://passandocaso.com.br/termos.html" target="_blank">Termos de Uso</a>.</span>
+          </label>
+          <button class="btn-primario" onclick="cadastrar()">Criar conta</button>
+          <p id="cad-erro" class="erro" style="margin-top:12px"></p>
+          <div class="auth-links">
+            <a href="#" onclick="mostrarPane('login');return false">Já tenho conta — entrar</a>
+          </div>
+        </div>
+
+        <!-- Recuperar senha -->
+        <div id="pane-recuperar" class="hidden">
+          <p>Recuperar senha — enviaremos um link por e-mail.</p>
+          <div class="field">
+            <label class="label" for="rc-email">E-mail</label>
+            <input id="rc-email" type="email" placeholder="seu@email.com" onkeydown="if(event.key==='Enter')recuperar()" />
+          </div>
+          <button class="btn-primario" onclick="recuperar()">Enviar link</button>
+          <p id="rec-msg" style="margin-top:12px;font-size:14px"></p>
+          <div class="auth-links">
+            <a href="#" onclick="mostrarPane('login');return false">Voltar ao login</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BLOQUEIO (trial expirado) -->
+    <div id="tela-bloqueio" class="login-wrap hidden">
+      <div class="login" style="text-align:center;max-width:440px">
+        <div style="font-size:42px">🔒</div>
+        <h2>Seu período de teste terminou</h2>
+        <p>Para continuar usando o Passando o Caso, baixe o app e assine um plano.</p>
+        <div class="lojas">
+          <!-- TODO: substituir # pelos links reais das lojas -->
+          <a class="btn-loja" href="#" target="_blank">📱 App Store</a>
+          <a class="btn-loja" href="#" target="_blank">📱 Google Play</a>
+        </div>
+        <button class="btn-ghost" style="margin-top:18px;width:100%" onclick="sair()">Sair</button>
       </div>
     </div>
 
@@ -213,6 +297,7 @@
             <button class="btn-ghost" onclick="recarregar()">↻ Atualizar</button>
             <button class="btn-ghost" onclick="sair()">Sair</button>
           </div>
+          <div id="trial-banner" class="trial-banner hidden"></div>
         </div>
         <div class="sb-lista" id="sb-lista"></div>
       </aside>
@@ -233,9 +318,9 @@
 
     <script>
       // ======== CONFIG ========
-      const API_URL = "https://passandocaso-production.up.railway.app";
-      const MEDICO_ID_PADRAO = "medico-001";
-      let medicoId = sessionStorage.getItem("pc_medicoId") || "";
+      const API_URL = "https://api.passandocaso.com.br";
+      let token = sessionStorage.getItem("pc_token") || "";
+      let usuario = JSON.parse(sessionStorage.getItem("pc_usuario") || "null");
 
       // ======== ESTADO ========
       let pacientes = [];
@@ -468,9 +553,18 @@
       }
 
       // ======== API ========
-      async function apiGet(rota) { const r = await fetch(API_URL + rota); if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); }
-      async function apiPost(rota, body) { const r = await fetch(API_URL + rota, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); }
-      async function apiDelete(rota) { const r = await fetch(API_URL + rota, { method: "DELETE" }); if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); }
+      function authHeaders(extra) { const h = Object.assign({}, extra || {}); if (token) h["Authorization"] = "Bearer " + token; return h; }
+      async function req(rota, opts) {
+        const r = await fetch(API_URL + rota, opts);
+        // 401 com token = sessão expirada/inválida → derruba a sessão.
+        if (r.status === 401 && token) { sair(); throw new Error("Sessão expirada. Entre novamente."); }
+        const dados = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(dados.erro || ("HTTP " + r.status));
+        return dados;
+      }
+      async function apiGet(rota) { return req(rota, { headers: authHeaders() }); }
+      async function apiPost(rota, body) { return req(rota, { method: "POST", headers: authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify(body) }); }
+      async function apiDelete(rota) { return req(rota, { method: "DELETE", headers: authHeaders() }); }
 
       function setSync(estado) {
         const el = document.getElementById("sync");
@@ -483,24 +577,103 @@
         setSync("salvando");
         clearTimeout(syncTimers[p.id]);
         syncTimers[p.id] = setTimeout(async () => {
-          try { await apiPost("/api/pacientes/sync", { medicoId, pacientes: [p] }); setSync("salvo"); setTimeout(() => setSync(null), 1500); }
+          try { await apiPost("/api/pacientes/sync", { pacientes: [p] }); setSync("salvo"); setTimeout(() => setSync(null), 1500); }
           catch { setSync("erro"); }
         }, 1500);
       }
       function pa() { return pacientes.find((p) => p.id === ativoId); }
       function mut(fn) { const p = pa(); if (!p) return; fn(p); agendarSync(p); }
 
-      // ======== LOGIN / CARGA ========
-      function entrar() {
-        const v = document.getElementById("medicoId").value.trim() || MEDICO_ID_PADRAO;
-        medicoId = v; sessionStorage.setItem("pc_medicoId", v);
-        iniciar();
+      // ======== AUTENTICAÇÃO ========
+      function mostrarPane(nome) {
+        for (const n of ["login", "cadastro", "recuperar"]) {
+          document.getElementById("pane-" + n).classList.toggle("hidden", n !== nome);
+        }
+        document.getElementById("login-erro").textContent = "";
+        document.getElementById("cad-erro").textContent = "";
+        document.getElementById("rec-msg").textContent = "";
       }
-      function sair() { sessionStorage.removeItem("pc_medicoId"); medicoId = ""; ativoId = null; document.getElementById("app").classList.add("hidden"); document.getElementById("tela-login").classList.remove("hidden"); }
+      function aplicarSessao(t, u) {
+        token = t; usuario = u;
+        sessionStorage.setItem("pc_token", t);
+        sessionStorage.setItem("pc_usuario", JSON.stringify(u));
+      }
+      async function entrar() {
+        const email = document.getElementById("li-email").value.trim();
+        const senha = document.getElementById("li-senha").value;
+        const err = document.getElementById("login-erro"); err.textContent = "";
+        if (!email || !senha) { err.textContent = "Preencha e-mail e senha."; return; }
+        try {
+          const r = await apiPost("/api/auth/login", { email, senha });
+          aplicarSessao(r.token, r.usuario);
+          iniciar();
+        } catch (e) { err.textContent = e.message || "Falha ao entrar."; }
+      }
+      async function cadastrar() {
+        const nome = document.getElementById("cd-nome").value.trim();
+        const email = document.getElementById("cd-email").value.trim();
+        const senha = document.getElementById("cd-senha").value;
+        const conf = document.getElementById("cd-conf").value;
+        const lgpd = document.getElementById("cd-lgpd").checked;
+        const err = document.getElementById("cad-erro"); err.textContent = "";
+        if (!nome || !email || !senha) { err.textContent = "Preencha todos os campos."; return; }
+        if (senha.length < 6) { err.textContent = "A senha deve ter ao menos 6 caracteres."; return; }
+        if (senha !== conf) { err.textContent = "As senhas não coincidem."; return; }
+        if (!lgpd) { err.textContent = "Você precisa aceitar a Política de Privacidade e os Termos."; return; }
+        try {
+          const r = await apiPost("/api/auth/cadastro", { nome, email, senha });
+          aplicarSessao(r.token, r.usuario);
+          iniciar();
+        } catch (e) { err.textContent = e.message || "Falha ao cadastrar."; }
+      }
+      async function recuperar() {
+        const email = document.getElementById("rc-email").value.trim();
+        const msg = document.getElementById("rec-msg");
+        if (!email) { msg.className = "erro"; msg.textContent = "Informe seu e-mail."; return; }
+        try {
+          await apiPost("/api/auth/recuperar", { email });
+          msg.className = ""; msg.style.color = "var(--accent-d)";
+          msg.textContent = "Se houver uma conta com este e-mail, enviamos um link de redefinição. Verifique a caixa de entrada e o spam.";
+        } catch (e) { msg.className = "erro"; msg.textContent = e.message || "Falha ao solicitar recuperação."; }
+      }
+      function sair() {
+        token = ""; usuario = null; ativoId = null;
+        sessionStorage.removeItem("pc_token");
+        sessionStorage.removeItem("pc_usuario");
+        document.getElementById("app").classList.add("hidden");
+        document.getElementById("tela-bloqueio").classList.add("hidden");
+        document.getElementById("tela-login").classList.remove("hidden");
+        mostrarPane("login");
+      }
+
+      // ======== CARGA ========
+      function renderTrialBanner() {
+        const el = document.getElementById("trial-banner");
+        if (!usuario || usuario.plano !== "trial" || usuario.diasRestantes == null) { el.classList.add("hidden"); return; }
+        const d = usuario.diasRestantes;
+        el.innerHTML = `✓ Trial ativo — ${d} ${d === 1 ? "dia restante" : "dias restantes"} · <a href="https://passandocaso.com.br" target="_blank">Baixar o app</a>`;
+        el.classList.remove("hidden");
+      }
+      function mostrarBloqueio() {
+        document.getElementById("app").classList.add("hidden");
+        document.getElementById("tela-login").classList.add("hidden");
+        document.getElementById("tela-bloqueio").classList.remove("hidden");
+      }
       async function iniciar() {
         document.getElementById("tela-login").classList.add("hidden");
+        // Revalida a sessão e o estado do trial.
+        try {
+          const me = await apiGet("/api/auth/me");
+          usuario = me.usuario;
+          sessionStorage.setItem("pc_usuario", JSON.stringify(usuario));
+        } catch (e) {
+          if (!usuario) return; // sessão derrubada (sair já tratou)
+        }
+        if (usuario && usuario.expirado) { mostrarBloqueio(); return; }
+        document.getElementById("tela-bloqueio").classList.add("hidden");
         document.getElementById("app").classList.remove("hidden");
         document.getElementById("data-extenso").textContent = dataExtenso();
+        renderTrialBanner();
         await recarregar();
       }
       async function recarregar() {
@@ -508,8 +681,8 @@
         lista.innerHTML = '<div class="vazio" style="padding:16px">Carregando...</div>';
         try {
           const [rp, re] = await Promise.all([
-            apiGet("/api/pacientes/" + encodeURIComponent(medicoId)),
-            apiGet("/api/evolucao/" + encodeURIComponent(medicoId) + "/" + hojeISO()).catch(() => ({ evolucoes: [] })),
+            apiGet("/api/pacientes"),
+            apiGet("/api/evolucao/" + hojeISO()).catch(() => ({ evolucoes: [] })),
           ]);
           pacientes = rp.pacientes || [];
           evolucoesDia = {};
@@ -960,7 +1133,7 @@
       async function excluirPaciente() {
         const p = pa(); if (!p) return; if (!confirm(`Excluir ${p.nomeCompleto}?`)) return;
         pacientes = pacientes.filter((x) => x.id !== p.id); ativoId = null;
-        try { await apiDelete("/api/pacientes/" + encodeURIComponent(medicoId) + "/" + encodeURIComponent(p.id)); } catch {}
+        try { await apiDelete("/api/pacientes/" + encodeURIComponent(p.hospitalId || "geral") + "/" + encodeURIComponent(p.id)); } catch {}
         renderSidebar(); document.getElementById("detalhe").innerHTML = '<div class="vazio-main">Selecione um paciente na lista.</div>';
       }
 
@@ -983,7 +1156,7 @@
         try { await navigator.clipboard.writeText(texto); } catch { ta.select(); document.execCommand("copy"); }
         const btn = document.getElementById("pc-copiar"); btn.textContent = "✓ Copiado!";
         try {
-          await apiPost("/api/evolucao/salvar", { medicoId, data: hojeISO(), pacienteId: p.id, nome: p.nomeCompleto, texto });
+          await apiPost("/api/evolucao/salvar", { data: hojeISO(), pacienteId: p.id, nome: p.nomeCompleto, texto });
           evolucoesDia[p.id] = texto;
           document.getElementById("pc-status").innerHTML = '<span style="color:var(--accent)">✓ Salvo na nuvem</span>';
         } catch { document.getElementById("pc-status").innerHTML = '<span class="erro">⚠️ Não salvo</span>'; }
@@ -991,7 +1164,7 @@
       }
 
       // ======== BOOT ========
-      if (medicoId) { document.getElementById("medicoId").value = medicoId; iniciar(); }
+      if (token) { iniciar(); } else { mostrarPane("login"); }
     </script>
   </body>
 </html>
