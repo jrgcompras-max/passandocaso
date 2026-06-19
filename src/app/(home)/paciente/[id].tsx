@@ -48,12 +48,7 @@ import { gerarResumoIA } from "@/lib/gerarResumoIA";
 import { converterParaJpegBase64 } from "@/lib/imagem";
 import { agruparPorExame, TENDENCIA_INFO } from "@/lib/lab";
 import { montarDadosParaResumo } from "@/lib/resumoPaciente";
-import {
-  fraseSinaisVitais,
-  O2_OPCOES,
-  SV_VAZIO,
-  svVazio,
-} from "@/lib/sinaisVitais";
+import { fraseSinaisVitais, O2_OPCOES, SV_VAZIO } from "@/lib/sinaisVitais";
 import { usePacientes } from "@/store/PacientesContext";
 import {
   type Anotacao,
@@ -2068,8 +2063,6 @@ function SinaisVitaisSecao({
     { k: "diurese", label: "Diurese (mL/24h)", ph: "—" },
   ];
 
-  const frase = fraseSinaisVitais(sv);
-
   return (
     <View style={styles.svBox}>
       <Text style={[styles.campoLabel, styles.campoLabelEspacado]}>
@@ -2141,13 +2134,6 @@ function SinaisVitaisSecao({
         multiline
         placeholder="Intercorrências nas últimas 24h..."
       />
-
-      {!svVazio(sv) && !!frase && (
-        <View style={styles.svFraseBox}>
-          <Text style={styles.svFraseLabel}>Frase gerada</Text>
-          <Text style={styles.svFrase}>{frase}</Text>
-        </View>
-      )}
     </View>
   );
 }
