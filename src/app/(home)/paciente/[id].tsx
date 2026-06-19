@@ -1,15 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
-    FlatList,
-    KeyboardAvoidingView,
     LayoutAnimation,
     Modal,
-    Platform,
     ScrollView,
     StyleSheet,
     Text,
@@ -17,6 +14,7 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
+import { KeyboardAwareFlatList } from "react-native-keyboard-aware-scroll-view";
 
 import {
     BorderWidth,
@@ -161,34 +159,8 @@ function extraidoLegado(
   }
 }
 
-// Coordena o auto-scroll dos campos para acima do teclado. A tela (que detém o
-// ref da lista) registra a função aqui; os componentes de campo a consomem no
-// onFocus, passando o node handle do TextInput focado.
-let rolarCampoParaTeclado: ((no: number) => void) | null = null;
-
-/** onFocus padrão dos campos de texto: rola o campo focado para acima do teclado. */
-function aoFocarCampo(e: { nativeEvent: { target?: number | null } }) {
-  const no = e?.nativeEvent?.target;
-  if (typeof no === "number") rolarCampoParaTeclado?.(no);
-}
-
 export default function Paciente() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const listaRef = useRef<FlatList<(typeof SECOES)[number]>>(null);
-
-  // Registra o auto-scroll: ao focar um campo, mantém-no ~120px acima do teclado.
-  useEffect(() => {
-    rolarCampoParaTeclado = (no) => {
-      const resp = listaRef.current?.getScrollResponder?.() as
-        | { scrollResponderScrollNativeHandleToKeyboard?: (n: number, off: number, prevent: boolean) => void }
-        | undefined;
-      // Método do responder do ScrollView (mantém o node visível acima do teclado).
-      resp?.scrollResponderScrollNativeHandleToKeyboard?.(no, 120, true);
-    };
-    return () => {
-      rolarCampoParaTeclado = null;
-    };
-  }, []);
   const router = useRouter();
   const {
     carregado,
@@ -525,20 +497,17 @@ export default function Paciente() {
 
   return (
     <>
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-    >
-    <FlatList
-      ref={listaRef}
+    <KeyboardAwareFlatList
       style={styles.container}
       contentContainerStyle={styles.containerConteudo}
       keyboardShouldPersistTaps="handled"
-      keyboardDismissMode="interactive"
+      enableOnAndroid
+      enableAutomaticScroll
+      extraScrollHeight={20}
       ListHeaderComponent={cabecalho}
       data={mostrarSecoes ? SECOES : []}
-      keyExtractor={(item) => item.id}
-      renderItem={({ item }) => (
+      keyExtractor={(item) => (item as (typeof SECOES)[number]).id}
+      renderItem={({ item }: { item: (typeof SECOES)[number] }) => (
         <SecaoExpansivel
           titulo={item.titulo}
           instrucao={item.instrucao}
@@ -610,7 +579,6 @@ export default function Paciente() {
         ) : null
       }
     />
-    </KeyboardAvoidingView>
     {paciente && (
       <ModoRound
         visivel={modoRound}
@@ -641,9 +609,7 @@ function Campo({
       <TextInput
         style={styles.campoInput}
         value={value}
-        onChangeText={onChange}
-        onFocus={aoFocarCampo}
-        keyboardType={keyboardType ?? "default"}
+        onChangeText={onChange}        keyboardType={keyboardType ?? "default"}
         placeholder="—"
         placeholderTextColor={ClinicalColors.textMuted}
       />
@@ -996,9 +962,7 @@ function SecaoExpansivel({
           <TextInput
             style={styles.anotacoesInput}
             value={rascunho}
-            onChangeText={setRascunho}
-            onFocus={aoFocarCampo}
-            placeholder="Digite uma anotação..."
+            onChangeText={setRascunho}            placeholder="Digite uma anotação..."
             placeholderTextColor={ClinicalColors.textMuted}
             multiline
           />
@@ -1147,9 +1111,7 @@ function CampoTexto({
         <TextInput
           style={styles.evoInput}
           value={value}
-          onChangeText={onChangeText}
-          onFocus={aoFocarCampo}
-          onBlur={() => {
+          onChangeText={onChangeText}          onBlur={() => {
             setEditando(false);
             onBlur();
           }}
@@ -1201,9 +1163,7 @@ function CampoSimples({
       <TextInput
         style={multiline ? styles.anotacoesInput : styles.campoInput}
         value={texto}
-        onChangeText={setTexto}
-        onFocus={aoFocarCampo}
-        onBlur={() => {
+        onChangeText={setTexto}        onBlur={() => {
           if (texto !== value) onChange(texto);
         }}
         keyboardType={keyboardType ?? "default"}
@@ -1250,9 +1210,7 @@ function CampoLeitura({
         <TextInput
           style={multiline ? styles.anotacoesInput : styles.campoInput}
           value={texto}
-          onChangeText={setTexto}
-          onFocus={aoFocarCampo}
-          onBlur={salvar}
+          onChangeText={setTexto}          onBlur={salvar}
           autoFocus
           multiline={multiline}
           keyboardType={keyboardType ?? "default"}
@@ -2477,7 +2435,7 @@ const styles = StyleSheet.create({
   containerConteudo: {
     paddingTop: 60,
     paddingHorizontal: 16,
-    paddingBottom: 320,
+    paddingBottom: 160,
   },
   botaoVoltarTexto: { color: ClinicalColors.primary, fontSize: 16 },
   aviso: { color: ClinicalColors.textMuted, fontSize: 15, marginTop: 24 },

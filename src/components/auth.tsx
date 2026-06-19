@@ -1,16 +1,14 @@
 import { type ReactNode } from "react";
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
   type TextInputProps,
 } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ClinicalColors as C, Radius } from "@/constants/clinicalTheme";
@@ -19,24 +17,23 @@ import { ClinicalColors as C, Radius } from "@/constants/clinicalTheme";
 export function AuthScreen({ children }: { children: ReactNode }) {
   const insets = useSafeAreaInsets();
   return (
-    <KeyboardAvoidingView
+    <KeyboardAwareScrollView
       style={styles.fundo}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      contentContainerStyle={[
+        styles.scroll,
+        { paddingTop: insets.top + 56, paddingBottom: insets.bottom + 32 },
+      ]}
+      keyboardShouldPersistTaps="handled"
+      enableOnAndroid
+      enableAutomaticScroll
+      extraScrollHeight={20}
     >
-      <ScrollView
-        contentContainerStyle={[
-          styles.scroll,
-          { paddingTop: insets.top + 56, paddingBottom: insets.bottom + 32 },
-        ]}
-        keyboardShouldPersistTaps="handled"
-      >
-        <View style={styles.marca}>
-          <Text style={styles.marcaIcone}>📋</Text>
-          <Text style={styles.marcaNome}>Passando Caso</Text>
-        </View>
-        {children}
-      </ScrollView>
-    </KeyboardAvoidingView>
+      <View style={styles.marca}>
+        <Text style={styles.marcaIcone}>📋</Text>
+        <Text style={styles.marcaNome}>Passando Caso</Text>
+      </View>
+      {children}
+    </KeyboardAwareScrollView>
   );
 }
 

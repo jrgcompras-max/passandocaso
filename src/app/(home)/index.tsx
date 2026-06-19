@@ -7,9 +7,7 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
-  KeyboardAvoidingView,
   Modal,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -17,6 +15,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 
 import {
   BorderWidth,
@@ -470,10 +469,7 @@ export default function Index() {
         transparent
         onRequestClose={fecharModal}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-          style={styles.modalOverlay}
-        >
+        <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitulo}>
@@ -505,9 +501,12 @@ export default function Index() {
                 </TouchableOpacity>
               </View>
             ) : (
-              <ScrollView
+              <KeyboardAwareScrollView
                 style={styles.modalForm}
                 keyboardShouldPersistTaps="handled"
+                enableOnAndroid
+                enableAutomaticScroll
+                extraScrollHeight={20}
               >
                 <CampoForm
                   label="Nome completo *"
@@ -562,10 +561,10 @@ export default function Index() {
                 >
                   <Text style={styles.salvarBtnTexto}>Salvar paciente</Text>
                 </TouchableOpacity>
-              </ScrollView>
+              </KeyboardAwareScrollView>
             )}
           </View>
-        </KeyboardAvoidingView>
+        </View>
       </Modal>
     </View>
   );
