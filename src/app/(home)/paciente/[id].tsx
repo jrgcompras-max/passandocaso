@@ -1374,42 +1374,42 @@ function EvolucaoBeiraLeitoSecao({
           <CampoTexto
             label="Neurológico"
             value={evo.neurologico ?? ""}
-            placeholder="Glasgow 15, PIRF, sem déficits focais..."
+            placeholder="Ex: Glasgow 15, PIRF, sem déficits focais"
             onChangeText={(t) => aplicar({ neurologico: t }, false)}
             onBlur={() => onSalvar(evo)}
           />
           <CampoTexto
             label="Cardiovascular"
             value={evo.cardiovascular ?? ""}
-            placeholder="AC RR 2T BNF, sem sopros..."
+            placeholder="Ex: AC RR 2T BNF, sem sopros"
             onChangeText={(t) => aplicar({ cardiovascular: t }, false)}
             onBlur={() => onSalvar(evo)}
           />
           <CampoTexto
             label="Respiratório"
             value={evo.respiratorio ?? ""}
-            placeholder="AP MV+ bilat simétrico, sem RA..."
+            placeholder="Ex: AP MV+ bilat simétrico, sem RA"
             onChangeText={(t) => aplicar({ respiratorio: t }, false)}
             onBlur={() => onSalvar(evo)}
           />
           <CampoTexto
             label="Abdominal"
             value={evo.abdominal ?? ""}
-            placeholder="Abdome flácido, indolor, RHA+..."
+            placeholder="Ex: Abdome flácido, indolor, RHA+"
             onChangeText={(t) => aplicar({ abdominal: t }, false)}
             onBlur={() => onSalvar(evo)}
           />
           <CampoTexto
             label="Membros inferiores"
             value={evo.mmii ?? ""}
-            placeholder="MMII sem edema, panturrilhas livres..."
+            placeholder="Ex: MMII sem edema, panturrilhas livres"
             onChangeText={(t) => aplicar({ mmii: t }, false)}
             onBlur={() => onSalvar(evo)}
           />
           <CampoTexto
             label="Extremidades"
             value={evo.extremidades ?? ""}
-            placeholder="Extremidades aquecidas, TEC < 3s..."
+            placeholder="Ex: Extremidades aquecidas, TEC < 3s"
             onChangeText={(t) => aplicar({ extremidades: t }, false)}
             onBlur={() => onSalvar(evo)}
           />
