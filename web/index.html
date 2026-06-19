@@ -427,7 +427,7 @@
         ].join("\n");
 
         const hda = secaoLinhas(p, "historia");
-        const hma = hda.length ? `*HMA: ${hda.join(" ")}` : null;
+        const hma = hda.length ? `*HDA: ${hda.join(" ")}` : null;
         const s = e && (e.estadoGeral || "").trim() ? `*S: ${e.estadoGeral.trim()}` : null;
 
         const ssvvP = [

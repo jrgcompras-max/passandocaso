@@ -119,7 +119,7 @@ export function montarTextoEvolucao(paciente: Paciente, hoje: string): string {
 
   // — HMA —
   const hda = secaoLinhas(paciente, "historia");
-  const hma = hda.length ? `*HMA: ${hda.join(" ")}` : null;
+  const hma = hda.length ? `*HDA: ${hda.join(" ")}` : null;
 
   // — Subjetivo —
   const s = evo?.estadoGeral?.trim() ? `*S: ${evo.estadoGeral.trim()}` : null;
