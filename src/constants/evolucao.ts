@@ -4,11 +4,13 @@ export type Opcao = { valor: string; rotulo: string };
 
 export const OPC_CONSCIENCIA: Opcao[] = [
   { valor: "lucido", rotulo: "Lúcido" },
+  { valor: "sonolento", rotulo: "Sonolento" },
   { valor: "torporoso", rotulo: "Torporoso" },
   { valor: "comatoso", rotulo: "Comatoso" },
 ];
 export const OPC_ORIENTACAO: Opcao[] = [
   { valor: "orientado", rotulo: "Orientado" },
+  { valor: "parcialmenteOrientado", rotulo: "Parcialmente orientado" },
   { valor: "desorientado", rotulo: "Desorientado" },
 ];
 export const OPC_ALIMENTACAO: Opcao[] = [
@@ -48,6 +50,12 @@ export const EVOLUCAO_VAZIA: EvolucaoBeiraLeito = {
   dispositivos: [],
   dispositivosObs: {},
   exameFisico: "",
+  neurologico: "",
+  cardiovascular: "",
+  respiratorio: "",
+  abdominal: "",
+  mmii: "",
+  extremidades: "",
   condutaDoDia: "",
 };
 

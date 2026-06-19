@@ -1,5 +1,4 @@
 import {
-  DISPOSITIVOS,
   OPC_CONSCIENCIA,
   OPC_ORIENTACAO,
   rotuloDe,
@@ -11,151 +10,167 @@ import {
   type SecaoId,
 } from "@/types/paciente";
 
-import { diaDeInternacao } from "./datas";
-import { agruparPorExame, TENDENCIA_INFO } from "./lab";
-import { fraseSinaisVitais } from "./sinaisVitais";
+import { agruparPorExame } from "./lab";
 
 const PROBLEMA_STATUS_LABEL: Record<ProblemaStatus, string> = {
-  ativo: "Ativo",
-  resolvendo: "Resolvendo",
-  resolvido: "Resolvido",
+  ativo: "ativo",
+  resolvendo: "resolvendo",
+  resolvido: "resolvido",
 };
 
-/** Converte o conteúdo extraído (JSON de blocos ou texto) em linhas legíveis. */
-function extraidoParaLinhas(extraido: string): string[] {
+type Bloco = { titulo: string; itens: string[] };
+
+/** Interpreta o conteúdo extraído (JSON de blocos ou texto) em blocos. */
+function parseBlocos(extraido: string | undefined): Bloco[] {
   const t = (extraido || "").trim();
   if (!t) return [];
   if (t.startsWith("[")) {
     try {
-      const blocos = JSON.parse(t) as { titulo?: string; itens: string[] }[];
-      if (Array.isArray(blocos)) {
-        return blocos
-          .map((b) => {
-            const itens = (b.itens ?? []).map((i) => String(i).trim()).filter(Boolean);
-            if (!itens.length) return "";
-            return b.titulo ? `${b.titulo}: ${itens.join("; ")}` : itens.join("; ");
-          })
-          .filter(Boolean);
+      const v = JSON.parse(t) as Bloco[];
+      if (Array.isArray(v)) {
+        return v.map((b) => ({
+          titulo: b.titulo || "",
+          itens: (b.itens || []).map((i) => String(i).trim()).filter(Boolean),
+        }));
       }
     } catch {
-      // cai para texto puro
+      // texto puro
     }
   }
-  return [t];
+  return [{ titulo: "", itens: [t] }];
 }
 
-/** Normaliza anotações (lista nova ou string legada) em textos. */
-function anotacoesParaTextos(valor: unknown): string[] {
-  if (Array.isArray(valor)) {
-    return (valor as Anotacao[]).map((a) => a.texto.trim()).filter(Boolean);
+/** Linhas legíveis de uma seção foto (extração + anotações). */
+function secaoLinhas(p: Paciente, id: SecaoId): string[] {
+  const sec = p.secoes?.[id];
+  const linhas = parseBlocos(sec?.extraido)
+    .map((b) =>
+      b.itens.length ? (b.titulo ? `${b.titulo}: ${b.itens.join("; ")}` : b.itens.join("; ")) : "",
+    )
+    .filter(Boolean);
+  const anots = ((sec?.anotacoes as Anotacao[]) || [])
+    .map((a) => (a.texto || "").trim())
+    .filter(Boolean);
+  return [...linhas, ...anots];
+}
+
+/** Comorbidades e medicações de uso contínuo (foto + anotações classificadas). */
+function comorbidadesMUC(p: Paciente): { comorb: string[]; muc: string[] } {
+  const sec = p.secoes?.comorbidadesMedicacoes;
+  const comorb: string[] = [];
+  const muc: string[] = [];
+  for (const b of parseBlocos(sec?.extraido)) {
+    (/medica|muc/i.test(b.titulo) ? muc : comorb).push(...b.itens);
   }
-  if (typeof valor === "string" && valor.trim()) return [valor.trim()];
-  return [];
+  for (const a of (sec?.anotacoes as Anotacao[]) || []) {
+    const t = (a.texto || "").trim();
+    if (t) (a.categoria === "medicacao" ? muc : comorb).push(t);
+  }
+  return { comorb, muc };
 }
 
-/** "YYYY-MM-DD" -> "DD/MM/YYYY". */
-function dataBR(iso: string): string {
-  const m = iso.match(/(\d{4})-(\d{2})-(\d{2})/);
-  return m ? `${m[3]}/${m[2]}/${m[1]}` : iso;
-}
-
-/** Conteúdo extraído + anotações de uma seção foto. */
-function secaoLinhas(paciente: Paciente, id: SecaoId): string[] {
-  const s = paciente.secoes?.[id];
-  const linhas = extraidoParaLinhas(s?.extraido ?? "");
-  const anots = anotacoesParaTextos(s?.anotacoes);
-  if (anots.length) linhas.push(`Anotações: ${anots.join("; ")}`);
-  return linhas;
-}
-
-/** Medicamentos classificados como antibiótico pela IA → texto da prescrição. */
-function antibioticoterapiaLinhas(paciente: Paciente): string[] {
-  return (paciente.medicamentos ?? [])
+/** Antibióticos da prescrição (medicamentos classificados como antibiótico). */
+function antibioticos(p: Paciente): string[] {
+  return (p.medicamentos || [])
     .filter((m) => /antibi|\batb\b/i.test(m.classe || ""))
     .map((m) => (m.texto || "").trim())
     .filter(Boolean);
 }
 
-/** Exame físico = sinais vitais + achados da evolução beira-leito. */
-function exameFisicoLinhas(paciente: Paciente, hoje: string): string[] {
-  const linhas: string[] = [];
-  const frase = fraseSinaisVitais(paciente.sinaisVitais?.[hoje]);
-  if (frase) linhas.push(frase);
-  const evo = paciente.evolucoes?.[hoje];
-  if (evo) {
-    if (evo.nivelConsciencia)
-      linhas.push(`Nível de consciência: ${rotuloDe(OPC_CONSCIENCIA, evo.nivelConsciencia)}`);
-    if (evo.orientacao)
-      linhas.push(`Orientação: ${rotuloDe(OPC_ORIENTACAO, evo.orientacao)}`);
-    if (evo.estadoGeral.trim()) linhas.push(`Estado geral: ${evo.estadoGeral.trim()}`);
-    if (evo.dispositivos.length) {
-      const disp = DISPOSITIVOS.filter((d) => evo.dispositivos.includes(d)).map((d) => {
-        const obs = (evo.dispositivosObs[d] ?? "").trim();
-        return obs ? `${d} (${obs})` : d;
-      });
-      linhas.push(`Invasões/dispositivos: ${disp.join("; ")}`);
-    }
-    if (evo.exameFisico.trim()) linhas.push(`Exame físico: ${evo.exameFisico.trim()}`);
-  }
-  return linhas;
+/** Culturas pendentes (pendências não-feitas que mencionam cultura). */
+function culturasPendentes(p: Paciente): string[] {
+  return (p.pendencias || [])
+    .filter((x) => !x.feito && /cultura|hemocult|urocult/i.test(x.descricao || ""))
+    .map((x) => x.descricao.trim());
 }
 
-/** Exames laboratoriais como série temporal por exame com tendência. */
-function laboratorioLinhas(paciente: Paciente): string[] {
-  return agruparPorExame(paciente.resultadosLab ?? []).map((s) => {
-    const seq = s.pontos
-      .map((p) => `${p.valor} (${dataBR(p.data).slice(0, 5)})`)
-      .join(" → ");
-    const tend = s.tendencia ? ` ${TENDENCIA_INFO[s.tendencia].icone}` : "";
-    return `${s.exame}: ${seq}${tend}`;
-  });
-}
-
-/** Problemas ativos: "título — status — conduta". */
-function problemasLinhas(paciente: Paciente): string[] {
-  return (paciente.problemas ?? []).map((p) => {
-    const partes = [p.titulo.trim(), PROBLEMA_STATUS_LABEL[p.status] ?? p.status];
-    if (p.conduta?.trim()) partes.push(p.conduta.trim());
-    return partes.join(" — ");
-  });
-}
-
-/** Junta título + linhas num bloco; retorna null se não houver conteúdo. */
-function bloco(titulo: string, linhas: (string | undefined)[]): string | null {
-  const ls = linhas.map((l) => (l || "").trim()).filter(Boolean);
-  return ls.length ? [titulo, ...ls].join("\n") : null;
+/** Linha compacta dos exames laboratoriais (valor mais recente por exame). */
+function laboratorioLinha(p: Paciente): string {
+  return agruparPorExame(p.resultadosLab || [])
+    .map((s) => `${s.exame} ${s.pontos[s.pontos.length - 1].valor}`)
+    .join(" / ");
 }
 
 /**
- * Monta deterministicamente o texto de passagem de caso na estrutura clínica
- * padronizada. Não interpreta nem adiciona conteúdo — apenas organiza o que a
- * médica já validou. Seções vazias são omitidas.
+ * Gera o texto do "Passar o Caso" no formato "Evolução Médica". Sem cabeçalho de
+ * identificação (já está no título da tela) e sem assinatura. Linhas sem
+ * conteúdo são omitidas (salvo os padrões "nega"/"---"/"--" do modelo).
  */
 export function montarTextoEvolucao(paciente: Paciente, hoje: string): string {
-  const dia = diaDeInternacao(paciente.dataEntrada);
-  const identificacao = [
-    paciente.nomeCompleto || "Sem nome",
-    paciente.idade != null ? `${paciente.idade} anos` : null,
-    paciente.leito ? `Leito ${paciente.leito}` : null,
-    paciente.setor || null,
-    dia != null ? `Dia ${dia} de internação` : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  const evo = paciente.evolucoes?.[hoje];
+  const sv = paciente.sinaisVitais?.[hoje];
 
-  const blocos = [
-    bloco("IDENTIFICAÇÃO", [identificacao]),
-    // Apenas o diagnóstico principal, limpo e objetivo (não o motivo/sintomas).
-    bloco("MOTIVO DA INTERNAÇÃO", [paciente.diagnosticoPrincipal]),
-    bloco("ANTIBIOTICOTERAPIA EM USO", antibioticoterapiaLinhas(paciente)),
-    bloco("COMORBIDADES E MUC", secaoLinhas(paciente, "comorbidadesMedicacoes")),
-    bloco("HDA — HISTÓRIA DA DOENÇA ATUAL", secaoLinhas(paciente, "historia")),
-    bloco("EXAME FÍSICO", exameFisicoLinhas(paciente, hoje)),
-    bloco("EXAMES LABORATORIAIS", laboratorioLinhas(paciente)),
-    bloco("EXAMES DE IMAGEM", secaoLinhas(paciente, "imagem")),
-    bloco("PROBLEMAS ATIVOS", problemasLinhas(paciente)),
-    bloco("CONDUTA", [paciente.evolucoes?.[hoje]?.condutaDoDia]),
+  // — Problemas / tratamento —
+  const ativos = (paciente.problemas || [])
+    .filter((x) => x.status === "ativo")
+    .map((x) => x.titulo.trim());
+  const atual = [paciente.diagnosticoPrincipal?.trim(), ...ativos].filter(Boolean);
+  const atb = antibioticos(paciente);
+  const culturas = culturasPendentes(paciente);
+  const sec1 = [
+    atual.length ? `- Atual: ${atual.join(", ")}` : null,
+    atb.length ? `- Antibióticos: ${atb.join(", ")}` : null,
+    `- Culturais: ${culturas.length ? culturas.join(", ") : "---"}`,
+  ].filter(Boolean).join("\n");
+
+  // — Comorbidades / MUC / Alergias —
+  const { comorb, muc } = comorbidadesMUC(paciente);
+  const sec2 = [
+    `* Comorbidades: ${comorb.length ? comorb.join(", ") : "nega"}`,
+    `* MUC: ${muc.length ? muc.join(", ") : "nega"}`,
+    `* Alergias: nega`,
+  ].join("\n");
+
+  // — HMA —
+  const hda = secaoLinhas(paciente, "historia");
+  const hma = hda.length ? `*HMA: ${hda.join(" ")}` : null;
+
+  // — Subjetivo —
+  const s = evo?.estadoGeral?.trim() ? `*S: ${evo.estadoGeral.trim()}` : null;
+
+  // — Sinais vitais —
+  const ssvvPartes = [
+    sv?.paSist && sv?.paDiast ? `PA ${sv.paSist}/${sv.paDiast}` : null,
+    sv?.fc ? `FC ${sv.fc}` : null,
+    sv?.fr ? `FR ${sv.fr}` : null,
+    sv?.sato2 ? `SatO2 ${sv.sato2}` : null,
+    sv?.temp ? `Tax ${sv.temp}` : null,
   ].filter(Boolean);
+  const ssvv = ssvvPartes.length ? `SSVV: ${ssvvPartes.join(" | ")}` : null;
 
-  return blocos.join("\n\n");
+  // — Objetivo (exame físico por aparelho) —
+  const oPrimeira = [
+    evo?.estadoGeral?.trim(),
+    rotuloDe(OPC_CONSCIENCIA, evo?.nivelConsciencia ?? null),
+    rotuloDe(OPC_ORIENTACAO, evo?.orientacao ?? null),
+  ].filter(Boolean).join(", ");
+  const oCorpo = [
+    evo?.neurologico?.trim(),
+    evo?.cardiovascular?.trim() ? `AC ${evo.cardiovascular.trim()}` : null,
+    evo?.respiratorio?.trim() ? `AP ${evo.respiratorio.trim()}` : null,
+    evo?.abdominal?.trim() ? `Abdome ${evo.abdominal.trim()}` : null,
+    evo?.mmii?.trim() ? `MMII ${evo.mmii.trim()}` : null,
+    evo?.extremidades?.trim() ? `Extremidades ${evo.extremidades.trim()}` : null,
+  ].filter(Boolean);
+  const o =
+    oPrimeira || oCorpo.length ? [`*O: ${oPrimeira}`.trim(), ...oCorpo].join("\n") : null;
+
+  // — Exames —
+  const lab = laboratorioLinha(paciente);
+  const exames = lab ? `Exames laboratoriais:\n${lab}` : null;
+  const img = secaoLinhas(paciente, "imagem");
+  const imagem = img.length ? `Exames de imagem:\n${img.join("\n")}` : null;
+
+  // — Avaliação / Plano —
+  const aLista = (paciente.problemas || [])
+    .filter((x) => x.status === "ativo" || x.status === "resolvendo")
+    .map((x) => `${x.titulo.trim()} (${PROBLEMA_STATUS_LABEL[x.status]})`);
+  const a = aLista.length ? `*A: ${aLista.join("; ")}` : null;
+  const plano = evo?.condutaDoDia?.trim() ? `*P: ${evo.condutaDoDia.trim()}` : null;
+
+  const titulo = "                    Evolução Médica";
+
+  return [titulo, sec1, sec2, hma, s, ssvv, o, exames, imagem, a, plano]
+    .filter(Boolean)
+    .join("\n\n");
 }

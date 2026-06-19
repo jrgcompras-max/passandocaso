@@ -148,7 +148,15 @@ export type EvolucaoBeiraLeito = {
   dispositivos: string[];
   /** Observação livre por dispositivo marcado (rótulo → texto). */
   dispositivosObs: Record<string, string>;
+  /** Exame físico legado (texto único); mantido para registros antigos. */
   exameFisico: string;
+  /** Exame físico estruturado por aparelho (texto livre cada). */
+  neurologico?: string;
+  cardiovascular?: string;
+  respiratorio?: string;
+  abdominal?: string;
+  mmii?: string;
+  extremidades?: string;
   condutaDoDia: string;
 };
 

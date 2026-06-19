@@ -558,6 +558,11 @@ export default function Paciente() {
               evolucao={paciente?.evolucoes?.[hoje] ?? EVOLUCAO_VAZIA}
               onSalvar={(evo) => atualizarEvolucao(id, hoje, evo)}
             />
+            <CondutaSecao
+              key={`conduta-${hoje}`}
+              evolucao={paciente?.evolucoes?.[hoje] ?? EVOLUCAO_VAZIA}
+              onSalvar={(evo) => atualizarEvolucao(id, hoje, evo)}
+            />
             {mostrarChecklistAlta && (
               <ChecklistAltaSecao
                 checklist={paciente?.checklistAlta ?? {}}
@@ -1137,6 +1142,46 @@ function CampoTexto({
 }
 
 /**
+ * Campo simples sempre editável (SEM ✏️) — usado em Sinais Vitais, onde os
+ * campos já são autoexplicativos. Persiste via onChange ao perder o foco.
+ */
+function CampoSimples({
+  label,
+  value,
+  onChange,
+  placeholder,
+  keyboardType,
+  multiline,
+}: {
+  label?: string;
+  value: string;
+  onChange: (t: string) => void;
+  placeholder?: string;
+  keyboardType?: "default" | "numeric";
+  multiline?: boolean;
+}) {
+  const [texto, setTexto] = useState(value);
+  useEffect(() => setTexto(value), [value]);
+  return (
+    <View style={styles.campo}>
+      {!!label && <Text style={styles.campoLabel}>{label}</Text>}
+      <TextInput
+        style={multiline ? styles.anotacoesInput : styles.campoInput}
+        value={texto}
+        onChangeText={setTexto}
+        onBlur={() => {
+          if (texto !== value) onChange(texto);
+        }}
+        keyboardType={keyboardType ?? "default"}
+        multiline={multiline}
+        placeholder={placeholder}
+        placeholderTextColor={ClinicalColors.textMuted}
+      />
+    </View>
+  );
+}
+
+/**
  * Campo inline (uma linha ou multiline) em MODO LEITURA por padrão, com ✏️ para
  * editar. Gerencia o próprio rascunho e persiste via onChange ao perder o foco.
  */
@@ -1325,19 +1370,86 @@ function EvolucaoBeiraLeitoSecao({
             </View>
           ))}
 
-          <Text style={styles.evoGrupo}>Achados do Exame Físico</Text>
+          <Text style={styles.evoGrupo}>Exame Físico</Text>
           <CampoTexto
-            value={evo.exameFisico}
-            placeholder="Descreva os achados do exame físico..."
-            onChangeText={(t) => aplicar({ exameFisico: t }, false)}
+            label="Neurológico"
+            value={evo.neurologico ?? ""}
+            placeholder="Glasgow 15, PIRF, sem déficits focais..."
+            onChangeText={(t) => aplicar({ neurologico: t }, false)}
             onBlur={() => onSalvar(evo)}
           />
+          <CampoTexto
+            label="Cardiovascular"
+            value={evo.cardiovascular ?? ""}
+            placeholder="AC RR 2T BNF, sem sopros..."
+            onChangeText={(t) => aplicar({ cardiovascular: t }, false)}
+            onBlur={() => onSalvar(evo)}
+          />
+          <CampoTexto
+            label="Respiratório"
+            value={evo.respiratorio ?? ""}
+            placeholder="AP MV+ bilat simétrico, sem RA..."
+            onChangeText={(t) => aplicar({ respiratorio: t }, false)}
+            onBlur={() => onSalvar(evo)}
+          />
+          <CampoTexto
+            label="Abdominal"
+            value={evo.abdominal ?? ""}
+            placeholder="Abdome flácido, indolor, RHA+..."
+            onChangeText={(t) => aplicar({ abdominal: t }, false)}
+            onBlur={() => onSalvar(evo)}
+          />
+          <CampoTexto
+            label="Membros inferiores"
+            value={evo.mmii ?? ""}
+            placeholder="MMII sem edema, panturrilhas livres..."
+            onChangeText={(t) => aplicar({ mmii: t }, false)}
+            onBlur={() => onSalvar(evo)}
+          />
+          <CampoTexto
+            label="Extremidades"
+            value={evo.extremidades ?? ""}
+            placeholder="Extremidades aquecidas, TEC < 3s..."
+            onChangeText={(t) => aplicar({ extremidades: t }, false)}
+            onBlur={() => onSalvar(evo)}
+          />
+        </View>
+      )}
+    </View>
+  );
+}
 
-          <Text style={styles.evoGrupo}>Conduta do Dia</Text>
+/**
+ * Conduta do Dia — seção independente (texto livre, sem foto). Guardada em
+ * evolucoes[hoje].condutaDoDia; alimenta o *P: do "Passar o Caso".
+ */
+function CondutaSecao({
+  evolucao,
+  onSalvar,
+}: {
+  evolucao: EvolucaoBeiraLeito;
+  onSalvar: (evo: EvolucaoBeiraLeito) => void;
+}) {
+  const [aberto, setAberto] = useState(false);
+  const [evo, setEvo] = useState(evolucao);
+  useEffect(() => setEvo(evolucao), [evolucao]);
+
+  return (
+    <View style={styles.secao}>
+      <TouchableOpacity
+        style={styles.secaoHeader}
+        onPress={() => setAberto((v) => !v)}
+        activeOpacity={0.7}
+      >
+        <Text style={styles.secaoHeaderTitulo}>Conduta do Dia</Text>
+        <Text style={styles.secaoChevron}>{aberto ? "▲" : "▼"}</Text>
+      </TouchableOpacity>
+      {aberto && (
+        <View style={styles.secaoBody}>
           <CampoTexto
             value={evo.condutaDoDia}
             placeholder="Condutas definidas na discussão com o preceptor..."
-            onChangeText={(t) => aplicar({ condutaDoDia: t }, false)}
+            onChangeText={(t) => setEvo((e) => ({ ...e, condutaDoDia: t }))}
             onBlur={() => onSalvar(evo)}
           />
         </View>
@@ -1965,7 +2077,7 @@ function SinaisVitaisSecao({
       </Text>
       <View style={styles.svGrid}>
         <View style={styles.svCampo}>
-          <CampoLeitura
+          <CampoSimples
             label="PA sistólica"
             value={sv.paSist}
             onChange={set("paSist")}
@@ -1974,7 +2086,7 @@ function SinaisVitaisSecao({
           />
         </View>
         <View style={styles.svCampo}>
-          <CampoLeitura
+          <CampoSimples
             label="PA diastólica"
             value={sv.paDiast}
             onChange={set("paDiast")}
@@ -1984,7 +2096,7 @@ function SinaisVitaisSecao({
         </View>
         {camposNum.map((c) => (
           <View key={c.k} style={styles.svCampo}>
-            <CampoLeitura
+            <CampoSimples
               label={c.label}
               value={sv[c.k]}
               onChange={set(c.k)}
@@ -2023,7 +2135,7 @@ function SinaisVitaisSecao({
       <Text style={[styles.campoLabel, styles.campoLabelEspacado]}>
         Intercorrências
       </Text>
-      <CampoLeitura
+      <CampoSimples
         value={sv.intercorrencias}
         onChange={(t) => onChange({ ...sv, intercorrencias: t })}
         multiline

@@ -11,14 +11,28 @@ import {
 } from "react-native";
 
 import { ClinicalColors, Radius } from "@/constants/clinicalTheme";
-import { hojeISO } from "@/lib/datas";
+import { diaDeInternacao, hojeISO } from "@/lib/datas";
 import { formatarNome } from "@/lib/formatarNome";
 import { formatarEvolucaoIA } from "@/lib/formatarEvolucaoIA";
 import { montarTextoEvolucao } from "@/lib/gerarEvolucao";
 import { salvarEvolucao } from "@/lib/salvarEvolucao";
 import { usePacientes } from "@/store/PacientesContext";
+import { type Paciente } from "@/types/paciente";
 
 type SalvamentoStatus = "ocioso" | "salvando" | "salvo" | "erro";
+
+/** Linha de identificação: "Nome · Idade anos · Leito X · D{dia}". */
+function identificacaoLinha(p: Paciente): string {
+  const dia = diaDeInternacao(p.dataEntrada);
+  return [
+    formatarNome(p.nomeCompleto) || "Sem nome",
+    p.idade != null ? `${p.idade} anos` : null,
+    p.leito ? `Leito ${p.leito}` : null,
+    dia != null ? `D${dia}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
 
 export default function Evolucao() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -81,7 +95,7 @@ export default function Evolucao() {
       <Text style={styles.titulo}>Passar o Caso</Text>
       <Text style={styles.subtitulo}>
         {paciente
-          ? formatarNome(paciente.nomeCompleto) || "Sem nome"
+          ? identificacaoLinha(paciente)
           : carregado
             ? "Paciente não encontrado"
             : "Carregando..."}
