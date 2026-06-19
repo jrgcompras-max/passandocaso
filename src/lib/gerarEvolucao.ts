@@ -121,8 +121,18 @@ export function montarTextoEvolucao(paciente: Paciente, hoje: string): string {
   const hda = secaoLinhas(paciente, "historia");
   const hma = hda.length ? `*HDA: ${hda.join(" ")}` : null;
 
-  // — Subjetivo —
-  const s = evo?.estadoGeral?.trim() ? `*S: ${evo.estadoGeral.trim()}` : null;
+  // — Subjetivo: consciência/orientação (minúsculas) + queixas (estadoGeral) —
+  const sConsc = [
+    rotuloDe(OPC_CONSCIENCIA, evo?.nivelConsciencia ?? null).toLowerCase() || null,
+    rotuloDe(OPC_ORIENTACAO, evo?.orientacao ?? null).toLowerCase() || null,
+  ]
+    .filter(Boolean)
+    .join(", ");
+  const sQueixa = evo?.estadoGeral?.trim() || "";
+  const sConteudo = [sConsc, sQueixa]
+    .filter(Boolean)
+    .join(sConsc && sQueixa ? ". " : "");
+  const s = sConteudo ? `*S: ${sConteudo}` : null;
 
   // — Sinais vitais (omite campos vazios; some se não houver nenhum) —
   const ssvvPartes = [
@@ -134,12 +144,7 @@ export function montarTextoEvolucao(paciente: Paciente, hoje: string): string {
   ].filter(Boolean);
   const ssvv = ssvvPartes.length ? `SSVV: ${ssvvPartes.join(" | ")}` : null;
 
-  // — Objetivo: estado geral + consciência/orientação (minúsculas) + aparelhos —
-  const oPrimeira = [
-    evo?.estadoGeral?.trim() || null,
-    rotuloDe(OPC_CONSCIENCIA, evo?.nivelConsciencia ?? null).toLowerCase() || null,
-    rotuloDe(OPC_ORIENTACAO, evo?.orientacao ?? null).toLowerCase() || null,
-  ].filter(Boolean).join(", ");
+  // — Objetivo: exame físico por aparelho (sem consciência/orientação) —
   const oCorpo = [
     evo?.neurologico?.trim() || null,
     evo?.cardiovascular?.trim() ? `AC ${evo.cardiovascular.trim()}` : null,
@@ -148,8 +153,7 @@ export function montarTextoEvolucao(paciente: Paciente, hoje: string): string {
     evo?.mmii?.trim() ? `MMII ${evo.mmii.trim()}` : null,
     evo?.extremidades?.trim() ? `Extremidades ${evo.extremidades.trim()}` : null,
   ].filter(Boolean);
-  const o =
-    oPrimeira || oCorpo.length ? [`*O: ${oPrimeira}`.trim(), ...oCorpo].join("\n") : null;
+  const o = oCorpo.length ? `*O: ${oCorpo.join("\n")}` : null;
 
   // — Exames —
   const lab = laboratorioLinha(paciente);

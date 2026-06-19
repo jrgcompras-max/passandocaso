@@ -428,7 +428,13 @@
 
         const hda = secaoLinhas(p, "historia");
         const hma = hda.length ? `*HDA: ${hda.join(" ")}` : null;
-        const s = e && (e.estadoGeral || "").trim() ? `*S: ${e.estadoGeral.trim()}` : null;
+        const sConsc = [
+          e && e.nivelConsciencia ? rotulo("consciencia", e.nivelConsciencia).toLowerCase() : null,
+          e && e.orientacao ? rotulo("orientacao", e.orientacao).toLowerCase() : null,
+        ].filter(Boolean).join(", ");
+        const sQueixa = e && (e.estadoGeral || "").trim() ? e.estadoGeral.trim() : "";
+        const sConteudo = [sConsc, sQueixa].filter(Boolean).join(sConsc && sQueixa ? ". " : "");
+        const s = sConteudo ? `*S: ${sConteudo}` : null;
 
         const ssvvP = [
           sv && sv.paSist && sv.paDiast ? `PA ${sv.paSist}/${sv.paDiast}` : null,
@@ -439,11 +445,6 @@
         ].filter(Boolean);
         const ssvv = ssvvP.length ? `SSVV: ${ssvvP.join(" | ")}` : null;
 
-        const oPrim = [
-          e && (e.estadoGeral || "").trim(),
-          e && e.nivelConsciencia ? rotulo("consciencia", e.nivelConsciencia).toLowerCase() : null,
-          e && e.orientacao ? rotulo("orientacao", e.orientacao).toLowerCase() : null,
-        ].filter(Boolean).join(", ");
         const oCorpo = e ? [
           (e.neurologico || "").trim() || null,
           (e.cardiovascular || "").trim() ? `AC ${e.cardiovascular.trim()}` : null,
@@ -452,7 +453,7 @@
           (e.mmii || "").trim() ? `MMII ${e.mmii.trim()}` : null,
           (e.extremidades || "").trim() ? `Extremidades ${e.extremidades.trim()}` : null,
         ].filter(Boolean) : [];
-        const o = oPrim || oCorpo.length ? [`*O: ${oPrim}`.trim(), ...oCorpo].join("\n") : null;
+        const o = oCorpo.length ? `*O: ${oCorpo.join("\n")}` : null;
 
         const lab = laboratorioLinha(p);
         const exames = lab ? `Exames laboratoriais:\n${lab}` : null;
