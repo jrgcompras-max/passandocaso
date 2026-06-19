@@ -23,7 +23,7 @@ export const SECOES: SecaoConfig[] = [
   },
   {
     id: "historia",
-    titulo: "HDA — História da Doença Atual",
+    titulo: "História da Doença Atual",
     instrucao:
       "Extraia a história clínica desta tela de prontuário. " +
       "Use blocos como 'Motivo da internação', 'História da doença atual' e 'Antecedentes', cada fato relevante como um item.",
