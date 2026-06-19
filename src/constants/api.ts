@@ -7,9 +7,3 @@
  * (equivalente ao host do Railway: https://passandocaso-production.up.railway.app)
  */
 export const API_URL = "https://api.passandocaso.com.br";
-
-/**
- * Identificador do médico. Fixo e temporário até existir autenticação real.
- * TODO: substituir pelo id do médico logado.
- */
-export const MEDICO_ID = "medico-001";

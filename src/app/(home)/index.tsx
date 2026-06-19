@@ -29,6 +29,7 @@ import { diaDeInternacao } from "@/lib/datas";
 import { extrairDadosImagem } from "@/lib/extrairDadosImagem";
 import { formatarNome } from "@/lib/formatarNome";
 import { converterParaJpegBase64 } from "@/lib/imagem";
+import { useAuth } from "@/store/AuthContext";
 import { useHospitais } from "@/store/HospitaisContext";
 import { usePacientes } from "@/store/PacientesContext";
 import { type CabecalhoProntuario, type Hospital } from "@/types/paciente";
@@ -122,6 +123,7 @@ const INSTRUCAO_CABECALHO =
 
 export default function Index() {
   const router = useRouter();
+  const { usuario, sair } = useAuth();
   const { pacientes, adicionarPorCabecalho, atualizarPaciente, removerPaciente } =
     usePacientes();
   const {
@@ -292,6 +294,17 @@ export default function Index() {
   const hospitalNome =
     hospitais.find((h) => h.id === hospitalAtivo)?.nome ?? "";
 
+  const confirmarSair = () => {
+    Alert.alert(
+      "Sair da conta",
+      usuario?.nome ? `Encerrar a sessão de ${usuario.nome}?` : "Encerrar a sessão?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        { text: "Sair", style: "destructive", onPress: () => void sair() },
+      ],
+    );
+  };
+
   // Antes da Rotina: tela de seleção de hospital.
   if (hospCarregado && !hospitalAtivo) {
     return (
@@ -307,11 +320,16 @@ export default function Index() {
     <View style={styles.container}>
       <View style={styles.header}>
         <View style={styles.headerTextos}>
-          <TouchableOpacity onPress={trocarHospital} style={styles.trocarHosp}>
-            <Text style={styles.trocarHospTexto}>
-              🏥 {hospitalNome || "Hospital"} ⌄
-            </Text>
-          </TouchableOpacity>
+          <View style={styles.topoLinha}>
+            <TouchableOpacity onPress={trocarHospital} style={styles.trocarHosp}>
+              <Text style={styles.trocarHospTexto}>
+                🏥 {hospitalNome || "Hospital"} ⌄
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={confirmarSair} hitSlop={8}>
+              <Text style={styles.sairTexto}>Sair</Text>
+            </TouchableOpacity>
+          </View>
           <Text style={styles.titulo}>Rotina do Dia</Text>
           <Text style={styles.subtitulo}>{dataPorExtenso()}</Text>
         </View>
@@ -851,6 +869,17 @@ const styles = StyleSheet.create({
   swipeExcluirTexto: { color: "#FFFFFF", fontSize: 15, fontWeight: "700" },
 
   // Multi-hospital
+  topoLinha: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  sairTexto: {
+    color: ClinicalColors.textMuted,
+    fontSize: 13,
+    fontWeight: "600",
+    marginBottom: 4,
+  },
   trocarHosp: { marginBottom: 4, alignSelf: "flex-start" },
   trocarHospTexto: {
     color: ClinicalColors.primary,

@@ -1,4 +1,4 @@
-import { API_URL } from "@/constants/api";
+import { apiFetch } from "./sessao";
 
 /**
  * Classifica a CLASSE FARMACOLÓGICA de um medicamento (texto livre) via backend
@@ -15,9 +15,8 @@ export async function classificarMedicamento(
     "Hipoglicemiante, Anti-hipertensivo). Sempre identifique uma classe específica; " +
     "NUNCA responda 'Outro' nem frases — só o nome da classe.";
   try {
-    const r = await fetch(`${API_URL}/api/formatar`, {
+    const r = await apiFetch("/api/formatar", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ texto, instrucao }),
     });
     if (!r.ok) return null;

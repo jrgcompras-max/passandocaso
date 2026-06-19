@@ -1,4 +1,4 @@
-import { API_URL } from "@/constants/api";
+import { apiFetch } from "./sessao";
 
 /**
  * Passo de formatação (híbrido): envia o texto já montado ao backend, que pede
@@ -12,9 +12,8 @@ export async function formatarEvolucaoIA(texto: string): Promise<string> {
   if (!texto.trim()) return texto;
 
   try {
-    const response = await fetch(`${API_URL}/api/formatar`, {
+    const response = await apiFetch("/api/formatar", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ texto }),
     });
 

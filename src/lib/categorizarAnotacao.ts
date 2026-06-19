@@ -1,4 +1,4 @@
-import { API_URL } from "@/constants/api";
+import { apiFetch } from "./sessao";
 
 /**
  * Classifica uma anotação em uma das categorias informadas, usando o backend
@@ -14,9 +14,8 @@ export async function categorizarAnotacao(
     `destas categorias: ${chaves.join(", ")}. ` +
     "Responda SOMENTE com a palavra-chave da categoria escolhida, em minúsculas, sem mais nada.";
   try {
-    const r = await fetch(`${API_URL}/api/formatar`, {
+    const r = await apiFetch("/api/formatar", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ texto, instrucao }),
     });
     if (!r.ok) return null;

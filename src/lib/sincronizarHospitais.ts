@@ -1,30 +1,27 @@
-import { API_URL, MEDICO_ID } from "@/constants/api";
 import { type Hospital } from "@/types/paciente";
+
+import { apiFetch } from "./sessao";
 
 /** Sincronização dos hospitais com o backend (best-effort, offline-first). */
 
 export async function buscarHospitais(): Promise<Hospital[]> {
-  const resp = await fetch(
-    `${API_URL}/api/hospitais/${encodeURIComponent(MEDICO_ID)}`,
-  );
+  const resp = await apiFetch("/api/hospitais");
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
   const json = await resp.json();
   return Array.isArray(json?.hospitais) ? (json.hospitais as Hospital[]) : [];
 }
 
 export async function enviarHospitais(hospitais: Hospital[]): Promise<void> {
-  await fetch(`${API_URL}/api/hospitais/sync`, {
+  await apiFetch("/api/hospitais/sync", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ medicoId: MEDICO_ID, hospitais }),
+    body: JSON.stringify({ hospitais }),
   });
 }
 
 export async function removerHospitalRemoto(id: string): Promise<void> {
-  await fetch(
-    `${API_URL}/api/hospitais/${encodeURIComponent(MEDICO_ID)}/${encodeURIComponent(id)}`,
-    { method: "DELETE" },
-  );
+  await apiFetch(`/api/hospitais/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
 }
 
 /** Une local + remoto por id (local tem prioridade). */

@@ -1,4 +1,4 @@
-import { API_URL } from "@/constants/api";
+import { apiFetch } from "./sessao";
 
 /**
  * Pede ao backend (/api/resumo) um resumo executivo do paciente a partir dos
@@ -6,9 +6,8 @@ import { API_URL } from "@/constants/api";
  * falha (o chamador exibe a mensagem).
  */
 export async function gerarResumoIA(dados: string): Promise<string> {
-  const response = await fetch(`${API_URL}/api/resumo`, {
+  const response = await apiFetch("/api/resumo", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ dados }),
   });
 

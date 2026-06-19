@@ -1,17 +1,17 @@
-import { API_URL, MEDICO_ID } from "@/constants/api";
 import { type Paciente } from "@/types/paciente";
+
+import { apiFetch } from "./sessao";
 
 /**
  * Sincronização dos pacientes com o backend (PostgreSQL). O AsyncStorage segue
  * como cache local (offline-first); estas funções são best-effort — falham em
- * silêncio quando não há rede, sem bloquear o app.
+ * silêncio quando não há rede, sem bloquear o app. O escopo (médico) vem do
+ * token de sessão no backend, não mais de um id no path/body.
  */
 
-/** Busca todos os pacientes do médico no backend. Lança em falha. */
+/** Busca todos os pacientes do usuário no backend. Lança em falha. */
 export async function buscarPacientes(): Promise<Paciente[]> {
-  const resp = await fetch(
-    `${API_URL}/api/pacientes/${encodeURIComponent(MEDICO_ID)}`,
-  );
+  const resp = await apiFetch("/api/pacientes");
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
   const json = await resp.json();
   return Array.isArray(json?.pacientes) ? (json.pacientes as Paciente[]) : [];
@@ -19,10 +19,9 @@ export async function buscarPacientes(): Promise<Paciente[]> {
 
 /** Envia (upsert) a lista completa de pacientes para o backend. */
 export async function enviarPacientes(pacientes: Paciente[]): Promise<void> {
-  await fetch(`${API_URL}/api/pacientes/sync`, {
+  await apiFetch("/api/pacientes/sync", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ medicoId: MEDICO_ID, pacientes }),
+    body: JSON.stringify({ pacientes }),
   });
 }
 
@@ -31,8 +30,8 @@ export async function removerPacienteRemoto(
   pacienteId: string,
   hospitalId: string,
 ): Promise<void> {
-  await fetch(
-    `${API_URL}/api/pacientes/${encodeURIComponent(MEDICO_ID)}/${encodeURIComponent(hospitalId)}/${encodeURIComponent(pacienteId)}`,
+  await apiFetch(
+    `/api/pacientes/${encodeURIComponent(hospitalId)}/${encodeURIComponent(pacienteId)}`,
     { method: "DELETE" },
   );
 }

@@ -1,4 +1,4 @@
-import { API_URL } from "@/constants/api";
+import { apiFetch } from "./sessao";
 
 /**
  * Envia uma imagem (base64 JPEG) + instrução ao backend proxy, que chama o
@@ -14,9 +14,8 @@ export async function extrairDadosImagem<T>(
   base64: string,
   instrucao: string,
 ): Promise<T> {
-  const response = await fetch(`${API_URL}/api/extract`, {
+  const response = await apiFetch("/api/extract", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ imagemBase64: base64, instrucao }),
   });
 
