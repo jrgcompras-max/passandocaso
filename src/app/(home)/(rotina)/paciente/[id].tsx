@@ -43,7 +43,7 @@ import { CHECKLIST_ALTA } from "@/constants/checklistAlta";
 import { SECOES } from "@/constants/secoes";
 import { categorizarAnotacao } from "@/lib/categorizarAnotacao";
 import { classificarMedicamento } from "@/lib/classificarMedicamento";
-import { diaDeInternacao, formatarDataBR, hojeISO } from "@/lib/datas";
+import { diaDeInternacao, formatarDataBR, hojeISO, limparDataEmTexto } from "@/lib/datas";
 import { extrairDadosImagem } from "@/lib/extrairDadosImagem";
 import { formatarNome } from "@/lib/formatarNome";
 import { gerarResumoIA } from "@/lib/gerarResumoIA";
@@ -1256,7 +1256,7 @@ function ImagemSecao({
       {blocos.map((b, i) => (
         <View key={i} style={styles.imgCard}>
           <View style={styles.imgCardTopo}>
-            <Text style={styles.imgNome}>{b.titulo || "Exame"}</Text>
+            <Text style={styles.imgNome}>{limparDataEmTexto(b.titulo || "") || "Exame"}</Text>
             {editando && (
               <TouchableOpacity onPress={() => remover(i)} hitSlop={8}>
                 <Ionicons name="trash-outline" size={16} color={ClinicalColors.danger} />

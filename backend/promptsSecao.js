@@ -67,6 +67,16 @@ function naoVazio(v) {
   return v !== null && v !== undefined && String(v).trim() !== "";
 }
 
+/** Limpa data malformada da IA: "31/05/null" → "31/05"; sem dia/mês → "". */
+function limparData(v) {
+  let t = String(v ?? "").trim();
+  if (!t || /^(null|undefined)$/i.test(t)) return "";
+  t = t.replace(/\b(\d{1,2}\/\d{1,2})\/(?:null|undefined)\b/gi, "$1");
+  t = t.replace(/\b(?:null|undefined)\/(?:null|undefined)\/(\d{2,4})\b/gi, "$1");
+  if (/(null|undefined)/i.test(t) && !/\d/.test(t.replace(/null|undefined/gi, ""))) return "";
+  return t.replace(/\b(?:null|undefined)\b/gi, "").replace(/\s{2,}/g, " ").trim();
+}
+
 /** Converte o JSON estruturado em blocos (compatibilidade com a UI atual). */
 function deriveBlocos(secao, d) {
   if (!d || typeof d !== "object") return [];
@@ -118,10 +128,13 @@ function deriveBlocos(secao, d) {
   if (secao === "imagem") {
     return (d.exames || [])
       .filter((e) => naoVazio(e.nome) || naoVazio(e.laudo))
-      .map((e) => ({
-        titulo: [e.nome, naoVazio(e.data) ? `(${e.data})` : ""].filter(Boolean).join(" "),
-        itens: naoVazio(e.laudo) ? [e.laudo] : [],
-      }));
+      .map((e) => {
+        const data = limparData(e.data);
+        return {
+          titulo: [e.nome, data ? `(${data})` : ""].filter(Boolean).join(" "),
+          itens: naoVazio(e.laudo) ? [e.laudo] : [],
+        };
+      });
   }
   if (secao === "prescricaoHospitalar") {
     const itens = (d.medicamentos || []).map((m) =>

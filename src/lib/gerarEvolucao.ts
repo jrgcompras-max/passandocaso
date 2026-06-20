@@ -9,6 +9,7 @@ import {
   type SecaoId,
 } from "@/types/paciente";
 
+import { limparDataEmTexto } from "./datas";
 import { escoresCalculaveis } from "./escoresClinicos";
 import { agruparPorExame } from "./lab";
 
@@ -49,23 +50,26 @@ function secaoLinhas(p: Paciente, id: SecaoId): string[] {
 }
 
 /**
- * Linhas dos exames de imagem, uma por exame no formato "Nome: laudo" (o título
- * do bloco é o nome do exame; os achados viram o laudo). Anotações entram como
- * linhas avulsas.
+ * Blocos dos exames de imagem: cada exame é um bloco "Nome (data):\nlaudo".
+ * O nome+data ficam na primeira linha (data malformada é limpa) e o laudo na
+ * linha seguinte. Anotações entram como blocos avulsos. Os blocos são separados
+ * por linha em branco em `montarTextoEvolucao`.
  */
 function imagemLinhas(p: Paciente): string[] {
   const sec = p.secoes?.imagem;
-  const linhas = parseBlocos(sec?.extraido)
+  const blocos = parseBlocos(sec?.extraido)
     .map((b) => {
-      const laudo = b.itens.join(". ");
-      if (!laudo && !b.titulo) return "";
-      return b.titulo ? `${b.titulo}: ${laudo}` : laudo;
+      const nome = limparDataEmTexto((b.titulo || "").trim());
+      const laudo = b.itens.join(". ").trim();
+      if (!nome && !laudo) return "";
+      if (nome && laudo) return `${nome}:\n${laudo}`;
+      return nome || laudo;
     })
     .filter(Boolean);
   const anots = ((sec?.anotacoes as Anotacao[]) || [])
     .map((a) => (a.texto || "").trim())
     .filter(Boolean);
-  return [...linhas, ...anots];
+  return [...blocos, ...anots];
 }
 
 /** Comorbidades e medicações de uso contínuo (seções separadas + fallback combinado). */
@@ -210,7 +214,8 @@ export function montarTextoEvolucao(paciente: Paciente, hoje: string): string {
   const lab = laboratorioLinha(paciente);
   const exames = lab ? `Exames laboratoriais:\n${lab}` : null;
   const img = imagemLinhas(paciente);
-  const imagem = img.length ? `Exames de imagem:\n${img.join("\n")}` : null;
+  // Cada exame é um bloco; linha em branco entre eles (não vira parágrafo).
+  const imagem = img.length ? `Exames de imagem:\n${img.join("\n\n")}` : null;
 
   // — Avaliação (problemas ativos, um por linha) / Plano (conduta do dia) —
   const a = ativos.length ? `*A: ${ativos.join("\n")}` : null;

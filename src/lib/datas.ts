@@ -20,6 +20,24 @@ export function formatarDataBR(texto: string): string {
 }
 
 /**
+ * Limpa datas malformadas dentro de um texto (ex.: títulos de exame). Remove
+ * partes "null"/"undefined": "31/05/null" → "31/05"; uma data totalmente vazia
+ * ("(null/null/null)") é removida junto com os parênteses. Idempotente.
+ */
+export function limparDataEmTexto(texto: string): string {
+  let t = texto ?? "";
+  // dd/mm/null → dd/mm  (ano ausente)
+  t = t.replace(/\b(\d{1,2}\/\d{1,2})\/(?:null|undefined)\b/gi, "$1");
+  // null/null/aaaa → aaaa  (dia/mês ausentes)
+  t = t.replace(/\b(?:null|undefined)\/(?:null|undefined)\/(\d{2,4})\b/gi, "$1");
+  // qualquer "null"/"undefined" remanescente em contexto de data
+  t = t.replace(/\b(?:null|undefined)\b/gi, "");
+  // parênteses que ficaram vazios ou só com barras/espaços
+  t = t.replace(/\(\s*[/\s]*\)/g, "");
+  return t.replace(/\s{2,}/g, " ").trim();
+}
+
+/**
  * Tenta interpretar a data de entrada extraída pela IA (texto livre, formato
  * incerto) como um Date no meio-dia local. Aceita ISO (YYYY-MM-DD) e BR
  * (DD/MM/YYYY), com hora opcional ignorada. Retorna null se não reconhecer.
