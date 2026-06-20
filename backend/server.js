@@ -632,7 +632,21 @@ const normalizar = (s) =>
     .toLowerCase()
     .trim();
 
-/** Converte nome de cidade (+UF) no código IBGE do município (filtro real do CNES). */
+// Tipos de unidade do CNES que interessam (hospitais, UPA, PS, postos/UBS) —
+// EXCLUI consultório isolado (22), laboratório (39), farmácia (43), etc.
+const CNES_TIPOS = {
+  "1": "Posto de saúde",
+  "2": "UBS",
+  "4": "Policlínica",
+  "5": "Hospital",
+  "7": "Hospital especializado",
+  "15": "Unidade mista",
+  "20": "Pronto-socorro",
+  "21": "Pronto-socorro",
+  "73": "UPA",
+};
+
+/** Converte nome de cidade (+UF) no código de município do CNES (6 dígitos). */
 async function codigoMunicipio(cidade, uf) {
   const chave = `${normalizar(cidade)}|${uf}`;
   const c = cacheMunic.get(chave);
@@ -647,7 +661,8 @@ async function codigoMunicipio(cidade, uf) {
     const m = (Array.isArray(arr) ? arr : []).find(
       (x) => normalizar(x.nome) === normalizar(cidade),
     );
-    const cod = m?.id ? String(m.id) : "";
+    // CNES usa o código IBGE de 6 dígitos (sem o dígito verificador).
+    const cod = m?.id ? String(m.id).slice(0, 6) : "";
     cacheMunic.set(chave, { ts: Date.now(), cod });
     return cod;
   } catch (e) {
@@ -656,17 +671,35 @@ async function codigoMunicipio(cidade, uf) {
   }
 }
 
+/** Busca uma página (até 20) de um tipo de unidade num município. */
+async function paginaCnes(codMunic, tipo, offset) {
+  const params = new URLSearchParams({
+    codigo_municipio: codMunic,
+    codigo_tipo_unidade: tipo,
+    limit: "20",
+    offset: String(offset),
+  });
+  const r = await fetch(
+    `https://apidadosabertos.saude.gov.br/cnes/estabelecimentos?${params}`,
+    { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(8000) },
+  );
+  if (!r.ok) throw new Error(`CNES HTTP ${r.status}`);
+  const data = await r.json();
+  return data.estabelecimentos || [];
+}
+
 /**
  * GET /api/hospitais/buscar?cidade=&uf=&termo=
- * Filtra por município (via código IBGE) e/ou por nome (substring). Em qualquer
- * falha devolve lista vazia (o app cai para entrada manual).
+ * Lista estabelecimentos institucionais (hospitais/UPA/PS/postos) do município,
+ * via código IBGE de 6 dígitos + filtro por tipo de unidade (exclui consultórios).
+ * `termo` filtra por nome (substring). Sem cidade não há como filtrar → [].
  */
 app.get("/api/hospitais/buscar", auth.autenticar, async (req, res) => {
   const cidade = String(req.query.cidade || "").trim();
   const uf = String(req.query.uf || "").trim().toUpperCase();
   const termo = String(req.query.termo || "").trim();
-  if (!cidade && !termo) {
-    return res.json({ hospitais: [], fonte: "vazio" });
+  if (!cidade) {
+    return res.json({ hospitais: [], fonte: "sem_cidade" });
   }
   const chave = `${normalizar(cidade)}|${uf}|${normalizar(termo)}`;
   const cache = cacheCnes.get(chave);
@@ -674,44 +707,50 @@ app.get("/api/hospitais/buscar", auth.autenticar, async (req, res) => {
     return res.json({ hospitais: cache.dados, fonte: "cache" });
   }
   try {
-    const params = new URLSearchParams({ limit: "50" });
-    if (termo) params.set("nome_fantasia", termo);
-    if (cidade) {
-      const cod = await codigoMunicipio(cidade, uf);
-      if (cod) params.set("codigo_municipio", cod);
+    const cod = await codigoMunicipio(cidade, uf);
+    if (!cod) return res.json({ hospitais: [], fonte: "municipio_nao_encontrado" });
+
+    // Para cada tipo relevante, busca 2 páginas (até 40) em paralelo.
+    const tarefas = [];
+    for (const tipo of Object.keys(CNES_TIPOS)) {
+      tarefas.push(paginaCnes(cod, tipo, 0).catch(() => []));
+      tarefas.push(paginaCnes(cod, tipo, 20).catch(() => []));
     }
-    const url = `https://apidadosabertos.saude.gov.br/cnes/estabelecimentos?${params}`;
-    const r = await fetch(url, {
-      headers: { Accept: "application/json" },
-      signal: AbortSignal.timeout(8000),
-    });
-    if (!r.ok) throw new Error(`CNES HTTP ${r.status}`);
-    const data = await r.json();
-    const bruto = Array.isArray(data)
-      ? data
-      : data.estabelecimentos || data.results || data.data || [];
-    let hospitais = bruto
-      .map((e) => ({
-        cnes: String(e.codigo_cnes || e.cnes || ""),
-        nomeFantasia: e.nome_fantasia || e.nome_razao_social || "",
-        cidade: cidade || "",
-        uf,
-        endereco: e.endereco_estabelecimento || "",
-        telefone: e.numero_telefone_estabelecimento || "",
-        tipo: e.descricao_tipo_unidade || "",
-      }))
-      .filter((e) => e.nomeFantasia);
-    // A API às vezes ignora nome_fantasia — filtra por substring no servidor.
+    const paginas = await Promise.all(tarefas);
+
+    const porCnes = new Map();
+    for (const pag of paginas) {
+      for (const e of pag) {
+        const cnes = String(e.codigo_cnes || "");
+        if (!cnes || porCnes.has(cnes)) continue;
+        porCnes.set(cnes, {
+          cnes,
+          nomeFantasia: e.nome_fantasia || e.nome_razao_social || "",
+          cidade,
+          uf,
+          endereco: e.endereco_estabelecimento || "",
+          telefone: e.numero_telefone_estabelecimento || "",
+          tipo: CNES_TIPOS[String(e.codigo_tipo_unidade)] || "",
+        });
+      }
+    }
+    let hospitais = [...porCnes.values()].filter((e) => e.nomeFantasia);
     if (termo) {
       const t = normalizar(termo);
       hospitais = hospitais.filter((e) => normalizar(e.nomeFantasia).includes(t));
     }
-    hospitais = hospitais.slice(0, 25);
+    // Hospitais primeiro, depois alfabético.
+    const ordem = { Hospital: 0, "Hospital especializado": 1, UPA: 2, "Pronto-socorro": 3 };
+    hospitais.sort(
+      (a, b) =>
+        (ordem[a.tipo] ?? 9) - (ordem[b.tipo] ?? 9) ||
+        a.nomeFantasia.localeCompare(b.nomeFantasia),
+    );
+    hospitais = hospitais.slice(0, 40);
     cacheCnes.set(chave, { ts: Date.now(), dados: hospitais });
     res.json({ hospitais, fonte: "cnes" });
   } catch (e) {
     console.error("Erro em /api/hospitais/buscar:", e.message);
-    // Fallback gracioso: o app permite entrada manual.
     res.json({ hospitais: [], fonte: "indisponivel" });
   }
 });

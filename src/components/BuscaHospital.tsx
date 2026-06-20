@@ -47,41 +47,41 @@ export function BuscaHospital({
   const [manNome, setManNome] = useState("");
   const [manCidade, setManCidade] = useState("");
 
-  // Ao abrir: tenta localização → hospitais próximos.
+  // Ao abrir: tenta geolocalização e pré-preenche a cidade (no build atual sem
+  // expo-location vira no-op — o usuário digita a cidade manualmente).
   useEffect(() => {
     if (!visivel) return;
     let vivo = true;
     (async () => {
-      setCarregando(true);
       const loc = await localizarCidade();
-      if (!vivo) return;
-      if (loc) {
+      if (vivo && loc) {
         setGeoOk(true);
         setCidade(loc.cidade);
         setUf(loc.uf);
-        const r = await buscarHospitaisCnes({ cidade: loc.cidade, uf: loc.uf });
-        if (vivo) setResultados(r);
       }
-      if (vivo) setCarregando(false);
     })();
     return () => {
       vivo = false;
     };
   }, [visivel]);
 
-  // Busca por termo (debounce 500ms).
+  // Busca pelo município (debounce 500ms). O CNES filtra por cidade; o nome
+  // (termo) é um filtro adicional opcional. Sem cidade não há o que buscar.
   useEffect(() => {
     if (!visivel) return;
-    const t = termo.trim();
-    if (t.length < 2) return;
+    const cid = cidade.trim();
+    if (cid.length < 3) {
+      setResultados([]);
+      return;
+    }
     const timer = setTimeout(async () => {
       setCarregando(true);
-      const r = await buscarHospitaisCnes({ termo: t, cidade, uf });
+      const r = await buscarHospitaisCnes({ cidade: cid, uf, termo: termo.trim() });
       setResultados(r);
       setCarregando(false);
     }, 500);
     return () => clearTimeout(timer);
-  }, [termo, visivel, cidade, uf]);
+  }, [cidade, uf, termo, visivel]);
 
   const escolher = (nome: string, cid: string, cnes?: string) => {
     onEscolher({ nome: nome.trim(), cidade: cid.trim(), cnes: cnes || undefined });
@@ -93,6 +93,8 @@ export function BuscaHospital({
   };
   const limpar = () => {
     setTermo("");
+    setCidade("");
+    setUf("");
     setResultados([]);
     setManualAberto(false);
     setManNome("");
@@ -114,26 +116,42 @@ export function BuscaHospital({
         </View>
 
         <View style={styles.buscaCampo}>
+          <Ionicons name="location-outline" size={18} color={C.textMuted} />
+          <TextInput
+            style={styles.buscaInput}
+            value={cidade}
+            onChangeText={setCidade}
+            placeholder="Cidade (ex.: Tubarão)"
+            placeholderTextColor={C.textMuted}
+            autoCorrect={false}
+          />
+          {carregando && <ActivityIndicator size="small" color={C.primary} />}
+        </View>
+        <View style={styles.buscaCampo}>
           <Ionicons name="search-outline" size={18} color={C.textMuted} />
           <TextInput
             style={styles.buscaInput}
             value={termo}
             onChangeText={setTermo}
-            placeholder="Buscar por nome ou cidade"
+            placeholder="Filtrar por nome (opcional)"
             placeholderTextColor={C.textMuted}
             autoCorrect={false}
           />
-          {carregando && <ActivityIndicator size="small" color={C.primary} />}
         </View>
 
         <ScrollView
           contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
           keyboardShouldPersistTaps="handled"
         >
-          {geoOk && !termo.trim() && cidade ? (
-            <Text style={styles.secaoLabel}>Hospitais próximos · {cidade}</Text>
+          {cidade.trim().length < 3 ? (
+            <Text style={styles.vazio}>
+              Digite a cidade para listar hospitais, UPAs e postos de saúde.
+            </Text>
           ) : resultados.length > 0 ? (
-            <Text style={styles.secaoLabel}>Resultados</Text>
+            <Text style={styles.secaoLabel}>
+              {geoOk ? "Próximos · " : ""}
+              {cidade.trim()}
+            </Text>
           ) : null}
 
           {resultados.map((h) => (
@@ -146,15 +164,14 @@ export function BuscaHospital({
               <View style={{ flex: 1 }}>
                 <Text style={styles.cardNome}>{h.nomeFantasia}</Text>
                 <Text style={styles.cardSub}>
-                  {[h.cidade, h.uf].filter(Boolean).join(" · ")}
-                  {h.tipo ? ` · ${h.tipo}` : ""}
+                  {[h.tipo, h.cidade, h.uf].filter(Boolean).join(" · ")}
                 </Text>
               </View>
             </TouchableOpacity>
           ))}
 
-          {!carregando && termo.trim().length >= 2 && resultados.length === 0 && (
-            <Text style={styles.vazio}>Nenhum hospital encontrado.</Text>
+          {!carregando && cidade.trim().length >= 3 && resultados.length === 0 && (
+            <Text style={styles.vazio}>Nenhum estabelecimento encontrado em {cidade.trim()}.</Text>
           )}
 
           {/* Entrada manual */}
