@@ -610,12 +610,16 @@ export default function Paciente() {
             onExtraido={(t) => atualizarSecao(id, item.id, { extraido: t })}
             extra={(editando) =>
               item.id === "examesLaboratoriais" ? (
-                <LabEvolucao
+                <LabsPorData
                   resultados={paciente?.resultadosLab ?? []}
-                  editando={editando}
                   onChange={(lista) =>
                     atualizarPaciente(id, { resultadosLab: lista })
                   }
+                  onAposSalvar={(novos) => {
+                    // Atualiza o snapshot do dia (alimenta sparklines/alertas).
+                    if (paciente)
+                      salvarSnapshotDiario({ ...paciente, resultadosLab: novos });
+                  }}
                 />
               ) : item.id === "prescricaoHospitalar" ? (
                 <PrescricaoSecao
@@ -2306,9 +2310,315 @@ function ResumoRapidoSecao({
   );
 }
 
+/** Campos laboratoriais comuns do formulário "Adicionar hoje". */
+const LAB_CAMPOS: { key: string; label: string; unidade: string; alias: RegExp }[] = [
+  { key: "Hb", label: "Hb", unidade: "g/dL", alias: /^(hb|hemoglob)/i },
+  { key: "Ht", label: "Ht", unidade: "%", alias: /^(ht|hemat[oó]cr)/i },
+  { key: "LT", label: "LT", unidade: "/mm³", alias: /^(lt|leuc)/i },
+  { key: "Plaq", label: "Plaq", unidade: "/mm³", alias: /^(plaq|plt)/i },
+  { key: "PCR", label: "PCR", unidade: "mg/L", alias: /^pcr/i },
+  { key: "Na", label: "Na", unidade: "mEq/L", alias: /^(na|s[oó]dio)/i },
+  { key: "K", label: "K", unidade: "mEq/L", alias: /^(k|pot[aá]ssio)/i },
+  { key: "Cr", label: "Cr", unidade: "mg/dL", alias: /^(cr|creat)/i },
+  { key: "Ureia", label: "Ureia", unidade: "mg/dL", alias: /^ur[eé]ia/i },
+  { key: "Glicemia", label: "Glicemia", unidade: "mg/dL", alias: /^(glic)/i },
+  { key: "TGO", label: "TGO", unidade: "U/L", alias: /^(tgo|ast)/i },
+  { key: "TGP", label: "TGP", unidade: "U/L", alias: /^(tgp|alt)/i },
+  { key: "BT", label: "BT", unidade: "mg/dL", alias: /^(bt|bilirr)/i },
+  { key: "INR", label: "INR", unidade: "", alias: /^(inr|rni)/i },
+];
+// Labs onde a queda é o "ruim" (para a cor da seta de tendência).
+const LAB_INVERTIDOS = /^(hb|ht|plaq)$/i;
+
+/** Une o valor numérico à unidade do campo, p/ armazenar no resultadosLab. */
+function valorComUnidade(campo: { unidade: string }, valor: string): string {
+  const v = valor.trim();
+  return campo.unidade ? `${v} ${campo.unidade}` : v;
+}
+
+/** Rótulo curto de data ISO → "20 jun". */
+function rotuloDiaMes(iso: string): string {
+  const m = iso.slice(0, 10).split("-").map(Number);
+  const MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+  return `${m[2]} ${MESES[m[1] - 1] ?? ""}`;
+}
+
 /**
- * Evolução laboratorial por data: formulário para inserir exame/data/valor e
- * exibição por exame com a série temporal e a tendência (↓ queda / ↑ alta / →).
+ * Exames laboratoriais com HISTÓRICO POR DATA. O store continua sendo
+ * resultadosLab (lista plana exame/data/valor) — compatível com timeline,
+ * alertas e snapshot —, mas a UI é organizada por dia: painel de hoje em
+ * destaque (com tendência vs. dia anterior) e dias anteriores colapsados.
+ */
+function LabsPorData({
+  resultados,
+  onChange,
+  onAposSalvar,
+}: {
+  resultados: ResultadoLab[];
+  onChange: (l: ResultadoLab[]) => void;
+  onAposSalvar?: (novos: ResultadoLab[]) => void;
+}) {
+  const hoje = hojeISO();
+  const [form, setForm] = useState<Record<string, string> | null>(null);
+  const [freeNome, setFreeNome] = useState("");
+  const [freeValor, setFreeValor] = useState("");
+  const [escaneando, setEscaneando] = useState(false);
+  const [verTodos, setVerTodos] = useState(false);
+
+  // Agrupa por data → mapa exame→valor (último valor do dia vence).
+  const porData = new Map<string, { exame: string; valor: string }[]>();
+  for (const r of resultados) {
+    const d = r.data.slice(0, 10);
+    const lista = porData.get(d) ?? [];
+    lista.push({ exame: r.exame, valor: r.valor });
+    porData.set(d, lista);
+  }
+  const datas = [...porData.keys()].sort((a, b) => b.localeCompare(a));
+  const temHoje = porData.has(hoje);
+  const datasAnteriores = datas.filter((d) => d !== hoje);
+
+  const valorDe = (data: string, exame: string) =>
+    porData.get(data)?.find((x) => x.exame.toLowerCase() === exame.toLowerCase())?.valor;
+
+  // Abre o formulário com os valores de hoje já preenchidos (editar) ou vazio.
+  const abrirForm = () => {
+    const f: Record<string, string> = {};
+    for (const c of LAB_CAMPOS) {
+      const v = valorDe(hoje, c.key);
+      f[c.key] = v != null ? String(valorNumerico(v) ?? v) : "";
+    }
+    setForm(f);
+    setFreeNome("");
+    setFreeValor("");
+  };
+
+  const salvar = () => {
+    if (!form) return;
+    const semHoje = resultados.filter((r) => r.data.slice(0, 10) !== hoje);
+    const novosHoje: ResultadoLab[] = [];
+    for (const c of LAB_CAMPOS) {
+      const v = (form[c.key] || "").trim();
+      if (v) {
+        novosHoje.push({
+          id: `${hoje}-${c.key}`,
+          exame: c.key,
+          data: hoje,
+          valor: valorComUnidade(c, v),
+        });
+      }
+    }
+    if (freeNome.trim() && freeValor.trim()) {
+      novosHoje.push({
+        id: `${hoje}-${freeNome.trim()}`,
+        exame: freeNome.trim(),
+        data: hoje,
+        valor: freeValor.trim(),
+      });
+    }
+    const novos = [...semHoje, ...novosHoje];
+    onChange(novos);
+    setForm(null);
+    onAposSalvar?.(novos);
+  };
+
+  // Escaneia o prontuário e pré-preenche os campos de lab reconhecidos.
+  const escanearLabs = async () => {
+    const permissao = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permissao.granted) return;
+    const r = await ImagePicker.launchCameraAsync({ quality: 0.5 });
+    if (r.canceled) return;
+    setEscaneando(true);
+    try {
+      const base64 = await converterParaJpegBase64(r.assets[0].uri);
+      const instrucao =
+        SECOES.find((s) => s.id === "examesLaboratoriais")?.instrucao ?? "";
+      const json = await extrairDadosImagem<{ blocos: Bloco[] }>(
+        base64,
+        `${instrucao} ${SUFIXO_JSON}`,
+        "examesLaboratoriais",
+      );
+      const itens = (json.blocos ?? []).flatMap((b) => b.itens || []);
+      setForm((prev) => {
+        const f = { ...(prev ?? {}) };
+        for (const it of itens) {
+          const [nomeRaw, ...resto] = String(it).split(":");
+          const valorTxt = resto.join(":") || nomeRaw;
+          const num = valorNumerico(valorTxt);
+          if (num == null) continue;
+          const campo = LAB_CAMPOS.find((c) => c.alias.test(nomeRaw.trim()));
+          if (campo) f[campo.key] = String(num);
+        }
+        return f;
+      });
+    } catch {
+      // best-effort
+    }
+    setEscaneando(false);
+  };
+
+  // Painel de hoje: entradas na ordem dos campos comuns + extras.
+  const entradasHoje = temHoje
+    ? [
+        ...LAB_CAMPOS.filter((c) => valorDe(hoje, c.key) != null).map((c) => ({
+          label: c.label,
+          key: c.key,
+          valor: valorDe(hoje, c.key)!,
+        })),
+        ...(porData.get(hoje) || [])
+          .filter((x) => !LAB_CAMPOS.some((c) => c.key.toLowerCase() === x.exame.toLowerCase()))
+          .map((x) => ({ label: x.exame, key: x.exame, valor: x.valor })),
+      ]
+    : [];
+
+  const dataAnteriorMaisRecente = datasAnteriores[0];
+
+  const seta = (key: string, valorHoje: string) => {
+    if (!dataAnteriorMaisRecente) return null;
+    const ant = valorDe(dataAnteriorMaisRecente, key);
+    const a = valorNumerico(valorHoje);
+    const p = ant != null ? valorNumerico(ant) : null;
+    if (a == null || p == null || a === p) return "→";
+    return a > p ? "↑" : "↓";
+  };
+
+  return (
+    <View style={styles.labBox}>
+      <View style={styles.labHistHeader}>
+        <Text style={styles.labHistTitulo}>Resultados por data</Text>
+        <TouchableOpacity style={styles.labHistBtn} onPress={abrirForm}>
+          <Ionicons
+            name={temHoje ? "create-outline" : "add"}
+            size={15}
+            color={ClinicalColors.primary}
+          />
+          <Text style={styles.labHistBtnTexto}>
+            {temHoje ? "Editar hoje" : "Adicionar hoje"}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Painel de hoje */}
+      {temHoje && (
+        <View style={styles.labHojeBox}>
+          <Text style={styles.labHojeData}>Hoje · {rotuloDiaMes(hoje)}</Text>
+          <View style={styles.labHojeWrap}>
+            {entradasHoje.map((e) => (
+              <View key={e.key} style={styles.labHojeChip}>
+                <Text style={styles.labHojeLabel}>{e.label} </Text>
+                <Text style={styles.labHojeValor}>
+                  {valorNumerico(e.valor) ?? e.valor}
+                </Text>
+                {!!seta(e.key, e.valor) && (
+                  <Text style={styles.labHojeSeta}> {seta(e.key, e.valor)}</Text>
+                )}
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
+
+      {/* Formulário Adicionar/Editar hoje */}
+      {form && (
+        <View style={styles.formInline}>
+          <View style={styles.labFormGrid}>
+            {LAB_CAMPOS.map((c) => (
+              <View key={c.key} style={styles.labFormCampo}>
+                <Text style={styles.labFormLabel}>
+                  {c.label}
+                  {c.unidade ? ` (${c.unidade})` : ""}
+                </Text>
+                <TextInput
+                  style={styles.campoInput}
+                  value={form[c.key]}
+                  onChangeText={(t) => setForm((f) => ({ ...(f ?? {}), [c.key]: t }))}
+                  keyboardType="numeric"
+                  placeholder="—"
+                  placeholderTextColor={ClinicalColors.textMuted}
+                />
+              </View>
+            ))}
+          </View>
+          <View style={styles.labFreeRow}>
+            <TextInput
+              style={[styles.campoInput, { flex: 1 }]}
+              value={freeNome}
+              onChangeText={setFreeNome}
+              placeholder="Outro exame"
+              placeholderTextColor={ClinicalColors.textMuted}
+            />
+            <TextInput
+              style={[styles.campoInput, { width: 90 }]}
+              value={freeValor}
+              onChangeText={setFreeValor}
+              placeholder="Valor"
+              placeholderTextColor={ClinicalColors.textMuted}
+            />
+          </View>
+
+          <TouchableOpacity
+            style={styles.labScanBtn}
+            onPress={escanearLabs}
+            disabled={escaneando}
+          >
+            <Ionicons name="scan-outline" size={15} color={ClinicalColors.primary} />
+            <Text style={styles.labHistBtnTexto}>
+              {escaneando ? "Lendo prontuário…" : "Escanear labs"}
+            </Text>
+          </TouchableOpacity>
+
+          <View style={styles.formAcoes}>
+            <TouchableOpacity
+              style={[styles.botaoAcao, styles.botaoSalvar]}
+              onPress={salvar}
+            >
+              <Text style={styles.botaoAcaoTexto}>Salvar hoje</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.botaoAcao, styles.botaoCancelar]}
+              onPress={() => setForm(null)}
+            >
+              <Text style={styles.botaoCancelarTexto}>Cancelar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {/* Dias anteriores (colapsados) */}
+      {datasAnteriores.length > 0 && (
+        <View style={styles.labPrevBox}>
+          {(verTodos ? datasAnteriores : datasAnteriores.slice(0, 4)).map((d) => {
+            const vals = (porData.get(d) || [])
+              .map((x) => `${x.exame} ${valorNumerico(x.valor) ?? x.valor}`)
+              .join(" · ");
+            return (
+              <View key={d} style={styles.labPrevLinha}>
+                <Text style={styles.labPrevData}>{rotuloDiaMes(d)}</Text>
+                <Text style={styles.labPrevValores} numberOfLines={2}>
+                  {vals}
+                </Text>
+              </View>
+            );
+          })}
+          {datasAnteriores.length > 4 && (
+            <TouchableOpacity onPress={() => setVerTodos((v) => !v)}>
+              <Text style={styles.labVerMais}>
+                {verTodos ? "ver menos ↑" : `ver mais ${datasAnteriores.length - 4} dias ↓`}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+
+      {datas.length === 0 && !form && (
+        <Text style={styles.vazioTexto}>Nenhum resultado ainda.</Text>
+      )}
+    </View>
+  );
+}
+
+/**
+ * (Legado) Evolução laboratorial por exame com série temporal e referência.
+ * Mantida para compatibilidade; a seção usa LabsPorData (histórico por data).
  */
 function LabEvolucao({
   resultados,
@@ -3413,6 +3723,52 @@ const styles = StyleSheet.create({
 
   // Evolução laboratorial
   labBox: { marginTop: 16, gap: 10 },
+  // Histórico de labs por data (LabsPorData).
+  labHistHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  labHistTitulo: { fontSize: 14, fontWeight: "700", color: ClinicalColors.text },
+  labHistBtn: { flexDirection: "row", alignItems: "center", gap: 5 },
+  labHistBtnTexto: { color: ClinicalColors.primary, fontSize: 14, fontWeight: "600" },
+  labHojeBox: {
+    backgroundColor: ClinicalColors.background,
+    borderRadius: Radius.card,
+    padding: 12,
+  },
+  labHojeData: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: ClinicalColors.textMuted,
+    marginBottom: 8,
+  },
+  labHojeWrap: { flexDirection: "row", flexWrap: "wrap", rowGap: 8, columnGap: 14 },
+  labHojeChip: { flexDirection: "row", alignItems: "baseline" },
+  labHojeLabel: { fontSize: 13, color: ClinicalColors.textMuted },
+  labHojeValor: { fontSize: 14, fontWeight: "700", color: ClinicalColors.text },
+  labHojeSeta: { fontSize: 13, color: ClinicalColors.textMuted },
+  labFormGrid: { flexDirection: "row", flexWrap: "wrap", columnGap: 10, rowGap: 8 },
+  labFormCampo: { width: "47%" },
+  labFormLabel: { fontSize: 12, color: ClinicalColors.textMuted, marginBottom: 4 },
+  labFreeRow: { flexDirection: "row", gap: 10, marginTop: 4 },
+  labScanBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    alignSelf: "flex-start",
+    marginTop: 4,
+  },
+  labPrevBox: { gap: 8 },
+  labPrevLinha: { flexDirection: "row", gap: 10 },
+  labPrevData: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: ClinicalColors.textMuted,
+    width: 56,
+  },
+  labPrevValores: { flex: 1, fontSize: 13, color: ClinicalColors.textSecondary, lineHeight: 19 },
+  labVerMais: { fontSize: 13, color: ClinicalColors.primary, fontWeight: "600", marginTop: 2 },
   labAddBtn: {
     backgroundColor: ClinicalColors.background,
     borderColor: ClinicalColors.primary,
