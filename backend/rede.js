@@ -595,7 +595,7 @@ router.put("/rede/passagem/:id/aceitar", async (req, res) => {
       [pg.id],
     );
     await pushParaUsuario(pg.remetente_id, "Passagem aceita",
-      `${req.usuario.nome_exibicao || req.usuario.nome} aceitou sua passagem de plantão.`,
+      `${req.usuario.nome_exibicao || req.usuario.nome} aceitou sua passagem de pacientes.`,
       { tipo: "passagem_aceita" });
     res.json({
       ok: true,
