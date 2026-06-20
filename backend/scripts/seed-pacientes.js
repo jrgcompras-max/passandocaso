@@ -417,7 +417,7 @@ function labsDoDia(p, i, N) {
 }
 
 /** Constrói o objeto Paciente (JSONB dados) + os snapshots diários. */
-function construir(p, medicoId) {
+function construir(p, hospitalId) {
   const N = p.dias;
   const datas = datasInternacao(N);
   const setor = /UTI/i.test(p.leito) ? "UTI" : "Clínica Médica";
@@ -471,7 +471,7 @@ function construir(p, medicoId) {
     dataEntrada: datas[0],
     numeroProntuario: p.pront,
     status: p.status,
-    hospitalId: HOSPITAL.id,
+    hospitalId,
     diagnosticoPrincipal: p.diag,
     motivoInternacao: p.diag,
     statusClinico: p.clinico,
@@ -558,7 +558,7 @@ async function main() {
   let totalPac = 0;
   let totalSnap = 0;
   for (const p of PAC) {
-    const { dados, snapshots } = construir(p, medicoId);
+    const { dados, snapshots } = construir(p, HOSPITAL.id);
     await db.query(
       `INSERT INTO pacientes (id, medico_id, hospital_id, data_criacao, dados, updated_at)
          VALUES ($1, $2, $3, $4, $5, NOW())
@@ -589,7 +589,13 @@ async function main() {
   await db.pool.end();
 }
 
-main().catch((e) => {
-  console.error("Falha no seed:", e);
-  process.exit(1);
-});
+// Dados e builders reutilizáveis por outros seeds (ex.: seed-pacientes-leticia.js).
+module.exports = { PAC, UNID, construir, datasInternacao, noDia };
+
+// Só executa o seed do Junior quando chamado diretamente (não ao ser importado).
+if (require.main === module) {
+  main().catch((e) => {
+    console.error("Falha no seed:", e);
+    process.exit(1);
+  });
+}
