@@ -4,7 +4,7 @@
  *
  * Diferenças em relação ao seed do Junior:
  *  - NÃO cria nem altera o usuário (usa a Letícia existente; não toca senha/nome).
- *  - Usa o hospital "Unimed" da Letícia (acha ou cria).
+ *  - Usa o hospital "Unimed" que a Letícia já cadastrou (acha pelo nome; não cria).
  *  - Usa prontuários distintos (099xxxx → 098xxxx) para não colidir com os do
  *    Junior (a PK de pacientes é o prontuário; IDs iguais seriam ignorados pelo
  *    ON CONFLICT DO NOTHING e ficariam vinculados ao Junior).
@@ -14,8 +14,6 @@
  */
 
 require("dotenv").config();
-const crypto = require("crypto");
-
 if (!process.env.DATABASE_URL) {
   console.error(
     "✗ DATABASE_URL ausente. Rode a partir da raiz do repo (node backend/scripts/" +
@@ -28,7 +26,6 @@ const db = require("../db");
 const { PAC, construir } = require("./seed-pacientes");
 
 const EMAIL_LETICIA = "lets_966@hotmail.com";
-const HOSPITAL = { nome: "Unimed", cidade: "Criciúma" };
 
 async function main() {
   // 1) Usuário da Letícia (existente — não cria, não altera credenciais).
@@ -44,25 +41,25 @@ async function main() {
   const medicoId = u.rows[0].id;
   console.log(`Usuário: ${u.rows[0].nome} (id: ${medicoId})`);
 
-  // 2) Hospital Unimed (acha ou cria) vinculado à Letícia.
-  let hospitalId;
-  const existente = await db.query(
-    "SELECT id FROM hospitais WHERE medico_id = $1 AND nome ILIKE 'Unimed' LIMIT 1",
+  // 2) Hospital Unimed da Letícia (já cadastrado por ela no app). Acha pelo nome
+  //    — NÃO cria, para não gerar um hospital duplicado/errado.
+  const hosp = await db.query(
+    "SELECT id, nome FROM hospitais WHERE medico_id = $1 AND nome ILIKE '%unimed%' ORDER BY nome LIMIT 1",
     [medicoId],
   );
-  if (existente.rows[0]) {
-    hospitalId = existente.rows[0].id;
-    console.log(`Hospital: ${HOSPITAL.nome} (id: ${hospitalId}) — já existia`);
-  } else {
-    hospitalId = crypto.randomUUID();
-    await db.query(
-      `INSERT INTO hospitais (id, medico_id, nome, cidade, updated_at)
-         VALUES ($1, $2, $3, $4, NOW())
-       ON CONFLICT (id) DO NOTHING`,
-      [hospitalId, medicoId, HOSPITAL.nome, HOSPITAL.cidade],
+  if (!hosp.rows[0]) {
+    console.error("✗ Hospital 'Unimed' não encontrado para a Letícia. Cadastre-o no app primeiro.");
+    const todos = await db.query(
+      "SELECT id, nome, cidade FROM hospitais WHERE medico_id = $1 ORDER BY nome",
+      [medicoId],
     );
-    console.log(`Hospital: ${HOSPITAL.nome} (id: ${hospitalId}) — criado`);
+    console.error("Hospitais da Letícia (debug):");
+    for (const h of todos.rows) console.error(`  - ${h.nome} | ${h.cidade || "—"} | id: ${h.id}`);
+    await db.pool.end();
+    process.exit(1);
   }
+  const hospitalId = hosp.rows[0].id;
+  console.log(`Hospital: ${hosp.rows[0].nome} (id: ${hospitalId})`);
 
   // 3) Pacientes + evolucoes_diarias, com prontuários distintos.
   let totalPac = 0;
@@ -73,7 +70,11 @@ async function main() {
     await db.query(
       `INSERT INTO pacientes (id, medico_id, hospital_id, data_criacao, dados, updated_at)
          VALUES ($1, $2, $3, $4, $5, NOW())
-       ON CONFLICT (id) DO NOTHING`,
+       ON CONFLICT (id) DO UPDATE
+         SET medico_id = EXCLUDED.medico_id,
+             hospital_id = EXCLUDED.hospital_id,
+             dados = EXCLUDED.dados,
+             updated_at = NOW()`,
       [dados.id, medicoId, hospitalId, dados.dataEntrada, dados],
     );
     totalPac++;
