@@ -2261,8 +2261,12 @@ function ModoRound({
   return (
     <Modal visible={visivel} animationType="slide" onRequestClose={onSair}>
       <View style={styles.roundContainer}>
-        <TouchableOpacity style={styles.roundSair} onPress={onSair}>
-          <Text style={styles.roundSairTexto}>← Sair do Modo Round</Text>
+        <TouchableOpacity
+          style={[styles.roundSair, { flexDirection: "row", alignItems: "center" }]}
+          onPress={onSair}
+        >
+          <Ionicons name="chevron-back" size={20} color={ClinicalColors.primary} />
+          <Text style={styles.roundSairTexto}>Sair do Modo Round</Text>
         </TouchableOpacity>
         <ScrollView contentContainerStyle={styles.roundConteudo}>
           <Text style={styles.roundNome}>
