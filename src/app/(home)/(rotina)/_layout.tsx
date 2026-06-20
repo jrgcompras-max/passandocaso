@@ -3,6 +3,8 @@ import { Stack } from "expo-router";
 /** Header nativo iOS (estilo Apple Saúde): só o chevron azul, sem título/sombra. */
 const headerNativo = {
   headerShown: true,
+  // Só o chevron, sem o título da tela anterior ("index") ao lado.
+  headerBackButtonDisplayMode: "minimal",
   headerBackTitle: "",
   headerTintColor: "#007AFF",
   headerStyle: { backgroundColor: "#F2F2F7" },
