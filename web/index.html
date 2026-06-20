@@ -1186,9 +1186,11 @@
           <h3>Passando o Caso — ${esc(formatarNome(p.nomeCompleto))}</h3>
           <textarea id="pc-texto">${esc(texto)}</textarea>
           <p class="vazio" style="margin:8px 0">Revise e ajuste antes de copiar. Você decide o conteúdo final.</p>
-          <div class="modal-acoes"><button class="btn-sec" onclick="fecharModal()">← Fechar</button><button class="btn-sec" id="pc-refinar" onclick="refinarCaso()">✨ Refinar com IA</button><button class="btn-ok verde" id="pc-copiar" onclick="copiarCaso()">📋 Copiar</button></div>
+          <div class="modal-acoes"><button class="btn-sec" onclick="fecharModal()">← Fechar</button><button class="btn-ok verde" id="pc-copiar" onclick="copiarCaso()">📋 Copiar</button></div>
           <div id="pc-status" class="vazio" style="margin-top:8px"></div>
         </div></div>`;
+        // Refina automaticamente ao abrir (preservando o original para reverter).
+        refinarCaso();
       }
 
       // Instrução RÍGIDA: melhora só a redação dentro de cada linha, sem mexer na
@@ -1205,24 +1207,20 @@
       let pcOriginal = "";
       async function refinarCaso() {
         const ta = document.getElementById("pc-texto");
-        const btn = document.getElementById("pc-refinar");
         const st = document.getElementById("pc-status");
         if (!ta) return;
         pcOriginal = ta.value;
-        btn.disabled = true; btn.textContent = "✨ Refinando…";
-        st.innerHTML = "";
+        st.innerHTML = '<span style="color:var(--muted)">✨ Refinando com IA…</span>';
         try {
           const r = await apiPost("/api/formatar", { texto: ta.value, instrucao: INSTRUCAO_ELEGANTE });
           if (r && r.texto && r.texto.trim()) {
             ta.value = r.texto;
             st.innerHTML = '<span style="color:var(--accent)">✓ Texto refinado</span> · <a href="#" onclick="reverterCaso();return false">Reverter ao original</a>';
           } else {
-            st.innerHTML = '<span class="erro">Não foi possível refinar.</span>';
+            st.innerHTML = '<span class="erro">Não foi possível refinar — mantido o texto original.</span>';
           }
         } catch (e) {
-          st.innerHTML = '<span class="erro">Falha ao refinar (' + esc(e.message || "") + ')</span>';
-        } finally {
-          btn.disabled = false; btn.textContent = "✨ Refinar com IA";
+          st.innerHTML = '<span class="erro">Falha ao refinar — mantido o texto original.</span>';
         }
       }
       function reverterCaso() {
