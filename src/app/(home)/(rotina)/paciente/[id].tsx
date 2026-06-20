@@ -49,11 +49,7 @@ import { formatarNome } from "@/lib/formatarNome";
 import { gerarResumoIA } from "@/lib/gerarResumoIA";
 import { converterParaJpegBase64 } from "@/lib/imagem";
 import { agruparPorExame, type ExameSerie, TENDENCIA_INFO } from "@/lib/lab";
-import {
-  COR_FAIXA,
-  type Escore,
-  escoresCalculaveis,
-} from "@/lib/escoresClinicos";
+import { EscoresClinicosSecao } from "@/components/EscoresClinicosSecao";
 import {
   buscarInteracoes,
   buscarPosologia,
@@ -605,7 +601,11 @@ export default function Paciente() {
                 problemas={paciente.problemas ?? []}
                 onChange={(lista) => atualizarProblemas(id, lista)}
               />
-              <EscoresSecao escores={escoresCalculaveis(paciente, hojeISO())} />
+              <EscoresClinicosSecao
+                paciente={paciente}
+                pacienteId={id}
+                hoje={hojeISO()}
+              />
               <PendenciasSecao
                 pendencias={paciente.pendencias ?? []}
                 onChange={(lista) => atualizarPendencias(id, lista)}
@@ -800,72 +800,6 @@ function AlertasTendenciaSecao({ alertas }: { alertas: AlertaTendencia[] }) {
       <Text style={styles.alertasRodape}>
         Indicadores gerados a partir dos dados inseridos. Avalie clinicamente.
       </Text>
-    </View>
-  );
-}
-
-/** Pontos ●/○ do escore (só para escalas curtas; escalas longas mostram só o nº). */
-function pontosVisuais(e: Escore): string {
-  if (e.maxPontos > 10) return "";
-  return "●".repeat(e.pontos) + "○".repeat(Math.max(0, e.maxPontos - e.pontos));
-}
-
-/**
- * Seção "Escores Clínicos" (Fase 3). Aparece somente quando há escores
- * calculáveis (dados suficientes). Mostra o número e a classificação DA ESCALA,
- * a fonte e os critérios positivos — sem interpretação clínica adicional.
- * Expansível, recolhida por padrão.
- */
-function EscoresSecao({ escores }: { escores: Escore[] }) {
-  const [aberto, setAberto] = useState(false);
-  if (!escores.length) return null;
-  return (
-    <View style={styles.secao}>
-      <View style={styles.secaoHeader}>
-        <TouchableOpacity
-          style={styles.secaoHeaderToque}
-          onPress={() => setAberto((v) => !v)}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.secaoHeaderTitulo}>Escores Clínicos ({escores.length})</Text>
-          <Ionicons name={aberto ? "chevron-up" : "chevron-down"} size={18} color={ClinicalColors.chevron} />
-        </TouchableOpacity>
-      </View>
-
-      {aberto && (
-        <View style={styles.secaoBody}>
-          {escores.map((e) => {
-            const cor = COR_FAIXA[e.faixa];
-            const dots = pontosVisuais(e);
-            const positivos = e.itens.filter((i) => i.marcado).map((i) => i.label);
-            return (
-              <View key={e.id} style={[styles.escoreCard, { borderLeftColor: cor }]}>
-                <View style={styles.escoreTopo}>
-                  <Text style={styles.escoreNome}>{e.nome}</Text>
-                  <View style={styles.escorePontosWrap}>
-                    <Text style={[styles.escorePontos, { color: cor }]}>
-                      {e.pontos}/{e.maxPontos}
-                    </Text>
-                    {!!dots && <Text style={[styles.escoreDots, { color: cor }]}>{dots}</Text>}
-                  </View>
-                </View>
-                <Text style={[styles.escoreClassif, { color: cor }]}>{e.classificacao}</Text>
-                {positivos.length > 0 && (
-                  <Text style={styles.escoreCriterios}>{positivos.join(" · ")}</Text>
-                )}
-                {e.faltam.length > 0 && (
-                  <Text style={styles.escoreFaltam}>Sem dado: {e.faltam.join(", ")}</Text>
-                )}
-                <Text style={styles.escoreFonte}>Fonte: {e.fonte}</Text>
-              </View>
-            );
-          })}
-          <Text style={styles.escoreDisclaimer}>
-            Escore calculado com base nos dados inseridos. Não substitui avaliação
-            clínica. O profissional de saúde é responsável pela decisão terapêutica.
-          </Text>
-        </View>
-      )}
     </View>
   );
 }
