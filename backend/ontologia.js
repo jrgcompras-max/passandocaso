@@ -157,9 +157,35 @@ async function validarComOntologia(blocos, secao) {
   return validacao;
 }
 
+/**
+ * Cache permanente de um diagnóstico vindo da CID-11 (OMS). Upsert em
+ * termos_clinicos com categoria='diagnostico'. O termo de busca e o título
+ * oficial entram como sinônimos para futuras buscas. Best-effort.
+ */
+async function salvarDiagnosticoCid11(termoBusca, resultado) {
+  const titulo = (resultado?.titulo || termoBusca || "").trim().slice(0, 200);
+  if (!titulo) return;
+  const norm = normalizar(titulo);
+  const sinonimos = [...new Set([titulo, String(termoBusca || "").trim()].filter(Boolean))];
+  try {
+    await db.query(
+      `INSERT INTO termos_clinicos
+         (termo, termo_normalizado, categoria, cid11, sinonimos, fonte, ativo)
+       VALUES ($1,$2,'diagnostico',$3,$4,'CID11', TRUE)
+       ON CONFLICT (termo_normalizado, categoria, COALESCE(valor_ref_contexto, '')) DO UPDATE
+         SET cid11 = COALESCE(EXCLUDED.cid11, termos_clinicos.cid11),
+             ativo = TRUE`,
+      [titulo, norm, resultado?.cid11 || null, sinonimos],
+    );
+  } catch (e) {
+    console.error("Cache CID-11 falhou:", e.message);
+  }
+}
+
 module.exports = {
   normalizar,
   buscarTermo,
   referenciaLab,
   validarComOntologia,
+  salvarDiagnosticoCid11,
 };

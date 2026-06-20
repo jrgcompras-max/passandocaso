@@ -10,6 +10,7 @@ const redeRouter = require("./rede");
 const farmacoRouter = require("./farmaco");
 const { analisarTendencias } = require("./alertasTendencia");
 const ontologia = require("./ontologia");
+const icd11 = require("./icd11");
 const { PROMPTS: PROMPTS_SECAO, deriveBlocos } = require("./promptsSecao");
 
 const app = express();
@@ -1020,17 +1021,61 @@ app.get("/api/ontologia/loinc/:termo", auth.autenticar, async (req, res) => {
 
 // CID por termo: serve do acervo local (CID-10 semeado). A API CID-11 da OMS
 // exige OAuth (ICD API) — integração externa fica para etapa posterior.
+// CID por termo: 1) busca no acervo local (CID-10/CID-11 semeado); 2) se não
+// houver CID-11, consulta a API da OMS (CID-11) em português; 3) faz cache
+// permanente em termos_clinicos (categoria='diagnostico'). Falhas da OMS caem
+// no que existir localmente (nunca derruba o cliente).
 app.get("/api/ontologia/cid/:termo", auth.autenticar, async (req, res) => {
+  const termo = req.params.termo;
   try {
-    const t = await ontologia.buscarTermo(req.params.termo, "comorbidade");
-    if (!t) return res.json({ encontrado: false });
-    res.json({
-      encontrado: true,
-      cid10: t.cid10,
-      cid11: t.cid11 || null,
-      titulo: t.termo,
-      fonte: t.fonte || "CID10",
-    });
+    // 1) Acervo local — diagnóstico (CID-11) ou comorbidade (CID-10).
+    const local =
+      (await ontologia.buscarTermo(termo, "diagnostico")) ||
+      (await ontologia.buscarTermo(termo, "comorbidade"));
+    if (local && local.cid11) {
+      return res.json({
+        encontrado: true,
+        cid11: local.cid11,
+        cid10: local.cid10 || null,
+        titulo: local.termo,
+        descricao: null,
+        fonte: local.fonte || "CID11",
+      });
+    }
+
+    // 2) API CID-11 da OMS (quando há credenciais).
+    if (icd11.temCredenciais()) {
+      try {
+        const r = await icd11.buscarCid11(termo);
+        if (r && (r.cid11 || r.titulo)) {
+          // 3) Cache permanente no banco.
+          await ontologia.salvarDiagnosticoCid11(termo, r);
+          return res.json({
+            encontrado: true,
+            cid11: r.cid11,
+            cid10: null,
+            titulo: r.titulo || termo,
+            descricao: r.descricao || null,
+            fonte: "CID11",
+          });
+        }
+      } catch (e) {
+        console.error("CID-11 (OMS) falhou:", e.message);
+      }
+    }
+
+    // Fallback: devolve o que houver localmente (ex.: só CID-10).
+    if (local) {
+      return res.json({
+        encontrado: true,
+        cid11: local.cid11 || null,
+        cid10: local.cid10 || null,
+        titulo: local.termo,
+        descricao: null,
+        fonte: local.fonte || "CID10",
+      });
+    }
+    res.json({ encontrado: false });
   } catch (e) {
     res.status(500).json({ erro: e.message });
   }
