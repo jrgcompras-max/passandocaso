@@ -321,31 +321,6 @@ export default function Index() {
     if (!result.canceled) processarImagem(result.assets[0].uri);
   };
 
-  const abrirGaleria = async () => {
-    const permissao = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permissao.granted) {
-      setErro(
-        "Permissão de galeria negada. Habilite o acesso às fotos nas configurações do dispositivo.",
-      );
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({ quality: 0.5 });
-    if (!result.canceled) processarImagem(result.assets[0].uri);
-  };
-
-  // Sub-escolha do fluxo de foto: câmera ou galeria.
-  const escolherCaptura = () => {
-    Alert.alert(
-      "Fotografar prontuário",
-      "Como você quer capturar o cabeçalho do prontuário?",
-      [
-        { text: "Câmera", onPress: abrirCamera },
-        { text: "Galeria / Arquivo", onPress: abrirGaleria },
-        { text: "Cancelar", style: "cancel" },
-      ],
-    );
-  };
-
   const abrirModal = () => {
     setModoModal("escolha");
     setModalVisivel(true);
@@ -362,10 +337,10 @@ export default function Index() {
     }
   }, [pedidoAdicionar]);
 
-  // Opção "Fotografar prontuário": fecha o modal e segue o fluxo de foto atual.
+  // Opção "Escanear prontuário": fecha o modal e abre a câmera direto.
   const escolherFoto = () => {
     setModalVisivel(false);
-    escolherCaptura();
+    abrirCamera();
   };
 
   const salvarManual = () => {
@@ -586,11 +561,11 @@ export default function Index() {
               <View style={styles.modalOpcoes}>
                 <TouchableOpacity style={styles.opcaoBtn} onPress={escolherFoto}>
                   <Ionicons
-                    name="camera-outline"
+                    name="scan-outline"
                     size={20}
                     color={ClinicalColors.textOnPrimary}
                   />
-                  <Text style={styles.opcaoBtnTexto}>Fotografar prontuário</Text>
+                  <Text style={styles.opcaoBtnTexto}>Escanear prontuário</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.opcaoBtn, styles.opcaoBtnSecundaria]}
@@ -994,7 +969,7 @@ const styles = StyleSheet.create({
   modalFechar: { fontSize: 18, color: ClinicalColors.textMuted },
   modalOpcoes: { gap: 12, paddingBottom: 8 },
   opcaoBtn: {
-    backgroundColor: ClinicalColors.buttonPrimary,
+    backgroundColor: "#4D94FF",
     borderRadius: Radius.card,
     paddingVertical: 16,
     flexDirection: "row",
@@ -1002,7 +977,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 8,
     borderWidth: BorderWidth.hairline,
-    borderColor: ClinicalColors.buttonPrimary,
+    borderColor: "#4D94FF",
   },
   opcaoBtnTexto: {
     color: ClinicalColors.textOnPrimary,

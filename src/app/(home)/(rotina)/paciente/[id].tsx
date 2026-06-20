@@ -968,18 +968,6 @@ function SecaoExpansivel({
     if (!result.canceled) processarUri(result.assets[0].uri);
   };
 
-  const escolherArquivo = async () => {
-    const permissao = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permissao.granted) {
-      setErro(
-        "Permissão de galeria negada. Habilite o acesso às fotos nas configurações do dispositivo.",
-      );
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({ quality: 0.5 });
-    if (!result.canceled) processarUri(result.assets[0].uri);
-  };
-
   return (
     <View style={styles.secao}>
       <TouchableOpacity
@@ -993,20 +981,10 @@ function SecaoExpansivel({
 
       {aberto && (
         <View style={styles.secaoBody}>
-          <View style={styles.capturaRow}>
-            <TouchableOpacity
-              style={[styles.botaoFoto, styles.botaoCaptura]}
-              onPress={fotografar}
-            >
-              <Ionicons name="camera-outline" size={18} color={ClinicalColors.textOnPrimary} />
-              <Text style={styles.botaoFotoTexto}>Fotografar</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.botaoFoto, styles.botaoCaptura]}
-              onPress={escolherArquivo}
-            >
-              <Ionicons name="images-outline" size={18} color={ClinicalColors.textOnPrimary} />
-              <Text style={styles.botaoFotoTexto}>Arquivo</Text>
+          <View style={styles.escanearRow}>
+            <TouchableOpacity style={styles.botaoEscanear} onPress={fotografar}>
+              <Ionicons name="scan-outline" size={16} color={ClinicalColors.primary} />
+              <Text style={styles.botaoEscanearTexto}>Escanear</Text>
             </TouchableOpacity>
           </View>
 
@@ -2553,6 +2531,17 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   capturaRow: { flexDirection: "row", gap: 12, marginBottom: 16 },
+  escanearRow: { flexDirection: "row", justifyContent: "flex-end", marginBottom: 12 },
+  botaoEscanear: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: ClinicalColors.background,
+    borderRadius: Radius.pill,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  botaoEscanearTexto: { color: ClinicalColors.primary, fontSize: 14, fontWeight: "600" },
   botaoCaptura: { flex: 1, marginBottom: 0 },
   extraindo: {
     color: ClinicalColors.textMuted,
