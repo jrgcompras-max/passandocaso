@@ -891,7 +891,7 @@ function SecaoExpansivel({
       );
       return;
     }
-    const result = await ImagePicker.launchCameraAsync({ quality: 0.8 });
+    const result = await ImagePicker.launchCameraAsync({ quality: 0.5 });
     if (!result.canceled) processarUri(result.assets[0].uri);
   };
 
@@ -903,7 +903,7 @@ function SecaoExpansivel({
       );
       return;
     }
-    const result = await ImagePicker.launchImageLibraryAsync({ quality: 0.8 });
+    const result = await ImagePicker.launchImageLibraryAsync({ quality: 0.5 });
     if (!result.canceled) processarUri(result.assets[0].uri);
   };
 

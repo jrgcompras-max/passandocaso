@@ -105,7 +105,20 @@ app.post("/api/extract", auth.autenticar, async (req, res) => {
     res.json(dados);
   } catch (e) {
     console.error("Erro em /api/extract:", e);
-    res.status(502).json({ erro: e.message || "Falha ao extrair dados." });
+    const status = e?.status || e?.statusCode;
+    const msg = String(e?.message || "");
+    // Imagem grande demais (limite do servidor ou da Anthropic).
+    if (status === 413 || /too large|maximum|payload|image.*size|tamanho/i.test(msg)) {
+      return res.status(413).json({
+        erro: "A imagem é muito grande. Tente novamente com uma foto menor ou mais próxima do cabeçalho.",
+      });
+    }
+    if (status === 429) {
+      return res
+        .status(429)
+        .json({ erro: "Muitas solicitações no momento. Tente novamente em instantes." });
+    }
+    res.status(502).json({ erro: msg || "Falha ao ler o prontuário." });
   }
 });
 
@@ -709,6 +722,18 @@ app.get("/api/evolucao/:data", auth.autenticar, async (req, res) => {
     console.error("Erro em GET /api/evolucao:", e);
     res.status(500).json({ erro: e.message || "Falha ao listar evoluções." });
   }
+});
+
+// Tratador de erros final: corpo acima do limite (express.json) vira 413 claro
+// em vez de erro genérico.
+app.use((err, _req, res, _next) => {
+  if (err && (err.type === "entity.too.large" || err.status === 413)) {
+    return res.status(413).json({
+      erro: "A imagem é muito grande para enviar. Tente novamente com uma foto menor.",
+    });
+  }
+  console.error("Erro não tratado:", err);
+  res.status(500).json({ erro: "Erro interno do servidor." });
 });
 
 // Sobe o servidor depois de garantir o schema do banco. Se o initDB falhar
