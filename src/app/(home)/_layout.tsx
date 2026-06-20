@@ -16,6 +16,7 @@ export default function HomeLayout() {
           >
             <Tabs.Screen name="(rotina)" options={{ title: "Rotina" }} />
             <Tabs.Screen name="hospitais" options={{ title: "Hospitais" }} />
+            <Tabs.Screen name="rede" options={{ title: "Rede" }} />
             <Tabs.Screen name="perfil" options={{ title: "Perfil" }} />
           </Tabs>
         </AcoesProvider>

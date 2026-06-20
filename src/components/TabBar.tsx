@@ -8,11 +8,13 @@ import { useAcoes } from "@/store/AcoesContext";
 const ICONES = {
   "(rotina)": "list-outline",
   hospitais: "business-outline",
+  rede: "people-outline",
   perfil: "person-outline",
 } as const;
 const LABELS = {
   "(rotina)": "Rotina",
   hospitais: "Hospitais",
+  rede: "Rede",
   perfil: "Perfil",
 } as const;
 type Aba = keyof typeof ICONES;
@@ -79,6 +81,7 @@ export function TabBar({ state, navigation }: TabBarProps) {
           <Ionicons name="add" size={28} color="#FFFFFF" />
         </Pressable>
       </View>
+      {item("rede")}
       {item("perfil")}
     </View>
   );
