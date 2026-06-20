@@ -62,16 +62,32 @@ function seta(exame: string, atual: string, anterior?: string) {
   return { icone: subiu ? "↑" : "↓", cor: ruim ? "#FF3B30" : "#34C759" };
 }
 
-function ssvvLinha(sv: RegistroDiario["sinais_vitais"]) {
-  if (!sv) return "";
-  const p = [
-    sv.paSist && sv.paDiast ? `PA ${sv.paSist}/${sv.paDiast}` : "",
-    sv.fc ? `FC ${sv.fc}` : "",
-    sv.fr ? `FR ${sv.fr}` : "",
-    sv.sato2 ? `SatO₂ ${sv.sato2}%` : "",
-    sv.temp ? `Tax ${sv.temp}` : "",
-  ].filter(Boolean);
-  return p.join(" · ");
+const O2_ROTULO: Record<string, string> = {
+  ar: "Ar ambiente",
+  cateter: "Cateter",
+  mascara: "Máscara",
+  vm: "VM",
+};
+
+/** Linhas variável→valor dos sinais vitais (com unidades; omite vazios). */
+function ssvvRows(sv: RegistroDiario["sinais_vitais"]): { label: string; valor: string }[] {
+  if (!sv) return [];
+  const v = (s?: string | null) => String(s ?? "").trim();
+  const linhas: { label: string; valor: string }[] = [];
+  if (v(sv.paSist) && v(sv.paDiast)) linhas.push({ label: "PA", valor: `${v(sv.paSist)}/${v(sv.paDiast)} mmHg` });
+  if (v(sv.fc)) linhas.push({ label: "FC", valor: `${v(sv.fc)} bpm` });
+  if (v(sv.fr)) linhas.push({ label: "FR", valor: `${v(sv.fr)} irpm` });
+  if (v(sv.sato2)) {
+    const modo = sv.o2 ? O2_ROTULO[String(sv.o2)] : "";
+    linhas.push({ label: "SatO₂", valor: `${v(sv.sato2)}%${modo ? ` (${modo})` : ""}` });
+  } else if (sv.o2 && O2_ROTULO[String(sv.o2)]) {
+    linhas.push({ label: "O₂", valor: O2_ROTULO[String(sv.o2)] });
+  }
+  if (v(sv.temp)) linhas.push({ label: "Tax", valor: `${v(sv.temp)}°C` });
+  if (v(sv.glasgow)) linhas.push({ label: "Glasgow", valor: v(sv.glasgow) });
+  if (v(sv.glicemia)) linhas.push({ label: "Glicemia", valor: `${v(sv.glicemia)} mg/dL` });
+  if (v(sv.diurese)) linhas.push({ label: "Diurese", valor: `${v(sv.diurese)} mL/24h` });
+  return linhas;
 }
 
 /** Mini sparkline com Views (sem dependência nativa). */
@@ -260,7 +276,7 @@ function CardDia({
   const labs = reg.exames_laboratoriais || {};
   const labsAnt = ant?.exames_laboratoriais || {};
   const labEntries = Object.entries(labs);
-  const ssvv = ssvvLinha(reg.sinais_vitais);
+  const ssvv = ssvvRows(reg.sinais_vitais);
 
   return (
     <TouchableOpacity style={styles.card} onPress={onToggle} activeOpacity={0.7}>
@@ -269,12 +285,19 @@ function CardDia({
         {dia != null ? ` · Dia ${dia} de internação` : ""}
       </Text>
 
-      {!!ssvv && (
+      {ssvv.length > 0 && (
         <>
           <View style={styles.sep} />
           <View style={styles.linhaLabel}>
             <Text style={styles.miniLabel}>SSVV</Text>
-            <Text style={styles.linhaTexto}>{ssvv}</Text>
+            <View style={styles.ssvvLista}>
+              {ssvv.map((l) => (
+                <View key={l.label} style={styles.ssvvRow}>
+                  <Text style={styles.ssvvRowLabel}>{l.label}</Text>
+                  <Text style={styles.ssvvRowValor}>{l.valor}</Text>
+                </View>
+              ))}
+            </View>
           </View>
         </>
       )}
@@ -371,6 +394,10 @@ const styles = StyleSheet.create({
     textTransform: "uppercase", letterSpacing: 0.5, paddingTop: 1,
   },
   linhaTexto: { flex: 1, fontSize: 14.5, color: C.textSecondary, lineHeight: 20 },
+  ssvvLista: { flex: 1, gap: 2 },
+  ssvvRow: { flexDirection: "row", alignItems: "baseline" },
+  ssvvRowLabel: { width: 72, fontSize: 13, color: C.textMuted },
+  ssvvRowValor: { flex: 1, fontSize: 14.5, fontWeight: "600", color: C.text },
   labsWrap: { flex: 1, flexDirection: "row", flexWrap: "wrap", gap: 10 },
   labItem: { fontSize: 14.5, color: C.textSecondary },
   vazioDia: {
