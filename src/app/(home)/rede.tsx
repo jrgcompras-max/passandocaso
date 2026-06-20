@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Clipboard from "expo-clipboard";
+import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -21,6 +22,7 @@ import * as rede from "@/lib/rede";
 import { useAcoes } from "@/store/AcoesContext";
 import { useAuth } from "@/store/AuthContext";
 import { useHospitais } from "@/store/HospitaisContext";
+import { usePacientes } from "@/store/PacientesContext";
 
 const KEY_REDE_ONBOARDING = "@passandocaso/rede_onboarding";
 
@@ -36,9 +38,11 @@ function iniciais(nome: string) {
 type ModalAtivo = null | "buscar" | "convidar" | "criarGrupo" | "entrarGrupo";
 
 export default function RedeScreen() {
-  const { hospitais, hospitalAtivo } = useHospitais();
+  const { hospitais, hospitalAtivo, selecionar } = useHospitais();
   const { usuario, atualizarUsuario } = useAuth();
-  const { setRedeBadge } = useAcoes();
+  const { setRedeBadge, marcarRecebidos } = useAcoes();
+  const { importarRecebidos } = usePacientes();
+  const router = useRouter();
   const hosp = hospitais.find((h) => h.id === hospitalAtivo);
 
   // Boas-vindas da Rede (uma vez).
@@ -108,16 +112,26 @@ export default function RedeScreen() {
   };
 
   const aceitarPassagem = (id: number) => {
+    // Os recebidos vão para o hospital onde o médico está trabalhando agora.
+    const destino = hospitalAtivo ?? "geral";
     rede
-      .aceitarPassagem(id)
-      .then((r: any) =>
-        Alert.alert(
-          "Passagem aceita",
-          `${r?.pacientes_importados ?? 0} paciente(s) importado(s). Eles aparecem na Rotina após a sincronização.`,
-        ),
-      )
-      .catch((e) => Alert.alert("Erro", e.message))
-      .finally(carregar);
+      .aceitarPassagem(id, destino)
+      .then((r) => {
+        const lista = Array.isArray(r?.pacientes) ? r.pacientes : [];
+        if (lista.length) {
+          importarRecebidos(lista);
+          // Garante que a Rotina já abre no hospital onde caíram os pacientes.
+          if (r.hospitalId) selecionar(r.hospitalId);
+          marcarRecebidos(lista.map((p) => p.id));
+        }
+        carregar();
+        // Vai para a Rotina; o destaque transitório confirma visualmente.
+        router.navigate("/(home)/(rotina)");
+      })
+      .catch((e) => {
+        Alert.alert("Erro", e.message);
+        carregar();
+      });
   };
   const recusarPassagem = (id: number) =>
     rede.recusarPassagem(id).catch((e) => Alert.alert("Erro", e.message)).finally(carregar);

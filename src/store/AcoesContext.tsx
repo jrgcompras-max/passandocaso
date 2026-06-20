@@ -18,6 +18,10 @@ type AcoesContextValor = {
   /** Nº de pendências na Rede (passagens + solicitações) para o badge da aba. */
   redeBadge: number;
   setRedeBadge: (n: number) => void;
+  /** Ids de pacientes recém-recebidos (passagem aceita) para destaque transitório na Rotina. */
+  recebidos: string[];
+  marcarRecebidos: (ids: string[]) => void;
+  limparRecebidos: () => void;
 };
 
 const AcoesContext = createContext<AcoesContextValor | null>(null);
@@ -26,9 +30,20 @@ export function AcoesProvider({ children }: { children: ReactNode }) {
   const [pedidoAdicionar, setPedido] = useState(0);
   const pedirAdicionar = useCallback(() => setPedido((n) => n + 1), []);
   const [redeBadge, setRedeBadge] = useState(0);
+  const [recebidos, setRecebidos] = useState<string[]>([]);
+  const marcarRecebidos = useCallback((ids: string[]) => setRecebidos(ids), []);
+  const limparRecebidos = useCallback(() => setRecebidos([]), []);
   const valor = useMemo(
-    () => ({ pedidoAdicionar, pedirAdicionar, redeBadge, setRedeBadge }),
-    [pedidoAdicionar, pedirAdicionar, redeBadge],
+    () => ({
+      pedidoAdicionar,
+      pedirAdicionar,
+      redeBadge,
+      setRedeBadge,
+      recebidos,
+      marcarRecebidos,
+      limparRecebidos,
+    }),
+    [pedidoAdicionar, pedirAdicionar, redeBadge, recebidos, marcarRecebidos, limparRecebidos],
   );
   return <AcoesContext.Provider value={valor}>{children}</AcoesContext.Provider>;
 }

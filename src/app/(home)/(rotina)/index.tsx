@@ -145,7 +145,25 @@ const INSTRUCAO_CABECALHO =
 
 export default function Index() {
   const router = useRouter();
-  const { pedidoAdicionar } = useAcoes();
+  const { pedidoAdicionar, recebidos, limparRecebidos } = useAcoes();
+
+  // Destaque transitório dos pacientes recém-recebidos por passagem de plantão:
+  // um leve realce que esmaece sozinho — confirma visualmente que "deu certo".
+  const destaqueAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!recebidos.length) return;
+    destaqueAnim.setValue(1);
+    const t = Animated.timing(destaqueAnim, {
+      toValue: 0,
+      duration: 2200,
+      delay: 600,
+      useNativeDriver: false,
+    });
+    t.start(({ finished }) => {
+      if (finished) limparRecebidos();
+    });
+    return () => t.stop();
+  }, [recebidos, destaqueAnim, limparRecebidos]);
   const {
     pacientes,
     carregado: pacCarregado,
@@ -626,6 +644,12 @@ export default function Index() {
                         />
                       </TouchableOpacity>
                     </ReanimatedSwipeable>
+                    {recebidos.includes(item.id) && (
+                      <Animated.View
+                        pointerEvents="none"
+                        style={[styles.recebidoDestaque, { opacity: destaqueAnim }]}
+                      />
+                    )}
                   </Reanimated.View>
                 );
                   })
@@ -1005,6 +1029,18 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "600",
     color: ClinicalColors.textMuted,
+  },
+  // Realce transitório de paciente recém-recebido (passagem aceita).
+  recebidoDestaque: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 12,
+    borderRadius: Radius.card,
+    backgroundColor: "rgba(10,132,255,0.10)",
+    borderWidth: 1.5,
+    borderColor: ClinicalColors.primary,
   },
   swipeExcluir: {
     backgroundColor: "#991B1B",

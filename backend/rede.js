@@ -541,9 +541,23 @@ router.put("/rede/passagem/:id/aceitar", async (req, res) => {
     const pg = r.rows[0];
     if (!pg) return res.status(404).json({ erro: "Passagem não encontrada ou expirada." });
 
-    // hospital do destinatário que casa com o da passagem (para o hospital_id local).
+    // Hospital de destino dos pacientes recebidos. Prioridade:
+    //  1) hospital ativo enviado pelo app (onde o médico está trabalhando agora),
+    //     validado como pertencente ao destinatário;
+    //  2) hospital do destinatário que casa por CNES com o da passagem;
+    //  3) "geral".
     let destinoHosp = "geral";
-    if (pg.hospital_cnes) {
+    const pedido = String((req.body || {}).hospitalId || "").trim();
+    if (pedido && pedido !== "geral") {
+      const h = await db.query(
+        "SELECT id FROM hospitais WHERE medico_id = $1 AND id = $2 LIMIT 1",
+        [req.usuario.id, pedido],
+      );
+      if (h.rows[0]) destinoHosp = h.rows[0].id;
+    } else if (pedido === "geral") {
+      destinoHosp = "geral";
+    }
+    if (destinoHosp === "geral" && pg.hospital_cnes) {
       const h = await db.query(
         "SELECT id FROM hospitais WHERE medico_id = $1 AND cnes = $2 LIMIT 1",
         [req.usuario.id, pg.hospital_cnes],
@@ -559,7 +573,7 @@ router.put("/rede/passagem/:id/aceitar", async (req, res) => {
 
     const lista = Array.isArray(pg.pacientes) ? pg.pacientes : [];
     const hoje = new Date().toISOString().slice(0, 10);
-    let n = 0;
+    const importados = [];
     for (const p of lista) {
       if (!p || !p.id) continue;
       const dados = {
@@ -574,7 +588,7 @@ router.put("/rede/passagem/:id/aceitar", async (req, res) => {
          ON CONFLICT (id) DO UPDATE SET medico_id = EXCLUDED.medico_id, hospital_id = EXCLUDED.hospital_id, dados = EXCLUDED.dados, updated_at = NOW()`,
         [p.id, req.usuario.id, destinoHosp, hoje, dados],
       );
-      n++;
+      importados.push(dados);
     }
     await db.query(
       "UPDATE passagens_plantao SET status = 'aceito', aceito_em = NOW() WHERE id = $1",
@@ -583,7 +597,12 @@ router.put("/rede/passagem/:id/aceitar", async (req, res) => {
     await pushParaUsuario(pg.remetente_id, "Passagem aceita",
       `${req.usuario.nome_exibicao || req.usuario.nome} aceitou sua passagem de plantão.`,
       { tipo: "passagem_aceita" });
-    res.json({ ok: true, pacientes_importados: n });
+    res.json({
+      ok: true,
+      pacientes_importados: importados.length,
+      hospitalId: destinoHosp,
+      pacientes: importados,
+    });
   } catch (e) {
     console.error("Erro passagem/aceitar:", e);
     res.status(500).json({ erro: e.message });

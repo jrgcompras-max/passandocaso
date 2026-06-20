@@ -1,3 +1,5 @@
+import { type Paciente } from "@/types/paciente";
+
 import { apiFetch } from "./sessao";
 
 /**
@@ -155,8 +157,18 @@ export async function listarPassagensRecebidas(): Promise<PassagemRecebida[]> {
 export function listarPassagensEnviadas() {
   return req<{ passagens: unknown[] }>("/api/rede/passagem/enviadas");
 }
-export function aceitarPassagem(id: number) {
-  return put(`/api/rede/passagem/${id}/aceitar`);
+export type AceitarPassagemResposta = {
+  ok: boolean;
+  pacientes_importados: number;
+  hospitalId: string;
+  pacientes: Paciente[];
+};
+/** Aceita a passagem; os pacientes vão para o hospital ativo informado. */
+export function aceitarPassagem(id: number, hospitalId?: string) {
+  return put(
+    `/api/rede/passagem/${id}/aceitar`,
+    hospitalId ? { hospitalId } : undefined,
+  ) as Promise<AceitarPassagemResposta>;
 }
 export function recusarPassagem(id: number) {
   return put(`/api/rede/passagem/${id}/recusar`);

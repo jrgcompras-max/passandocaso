@@ -73,6 +73,8 @@ type PacientesContextValue = {
   removerPaciente: (id: string) => void;
   /** Move todos os pacientes de um hospital para outro. Retorna quantos moveu. */
   migrarPacientesDeHospital: (origem: string, destino: string) => number;
+  /** Insere/atualiza pacientes recebidos por passagem de plantão (upsert por id). */
+  importarRecebidos: (lista: Paciente[]) => void;
 };
 
 /** Campos do paciente que podem ser editados manualmente. */
@@ -331,6 +333,15 @@ export function PacientesProvider({ children }: { children: ReactNode }) {
     );
   };
 
+  const importarRecebidos = (lista: Paciente[]) => {
+    if (!lista?.length) return;
+    setPacientes((prev) => {
+      const porId = new Map(prev.map((p) => [p.id, p]));
+      for (const p of lista) porId.set(p.id, p);
+      return Array.from(porId.values());
+    });
+  };
+
   return (
     <PacientesContext.Provider
       value={{
@@ -346,6 +357,7 @@ export function PacientesProvider({ children }: { children: ReactNode }) {
         atualizarEvolucao,
         removerPaciente,
         migrarPacientesDeHospital,
+        importarRecebidos,
       }}
     >
       {children}
