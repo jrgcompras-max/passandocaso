@@ -16,7 +16,7 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
-import { KeyboardAwareFlatList } from "react-native-keyboard-aware-scroll-view";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
@@ -566,89 +566,90 @@ export default function Paciente() {
         <Text style={styles.botaoVoltarTexto}>Voltar</Text>
       </TouchableOpacity>
     </View>
-    <KeyboardAwareFlatList
+    <KeyboardAwareScrollView
       style={styles.container}
       contentContainerStyle={styles.containerConteudo}
       keyboardShouldPersistTaps="handled"
       enableOnAndroid
       enableAutomaticScroll
       extraScrollHeight={20}
-      ListHeaderComponent={cabecalho}
-      data={mostrarSecoes ? SECOES : []}
-      keyExtractor={(item) => (item as (typeof SECOES)[number]).id}
-      renderItem={({ item }: { item: (typeof SECOES)[number] }) => (
-        <SecaoExpansivel
-          titulo={item.titulo}
-          instrucao={item.instrucao}
-          secaoId={item.id}
-          medicacao={item.medicacao}
-          anotacoes={normalizarAnotacoes(paciente?.secoes?.[item.id]?.anotacoes)}
-          extraido={
-            paciente?.secoes?.[item.id]?.extraido ||
-            extraidoLegado(dados, item.id)
-          }
-          onSalvarAnotacoes={(lista) =>
-            atualizarSecao(id, item.id, { anotacoes: lista })
-          }
-          onExtraido={(t) => atualizarSecao(id, item.id, { extraido: t })}
-          extra={
-            item.id === "examesLaboratoriais" ? (
-              <LabEvolucao
-                resultados={paciente?.resultadosLab ?? []}
-                onChange={(lista) =>
-                  atualizarPaciente(id, { resultadosLab: lista })
-                }
-              />
-            ) : item.id === "prescricaoHospitalar" ? (
-              <PrescricaoSecao
-                medicamentos={paciente?.medicamentos ?? []}
-                onChange={(l) => atualizarPaciente(id, { medicamentos: l })}
-              />
-            ) : item.id === "sinaisVitaisIntercorrencias" ? (
-              <SinaisVitaisSecao
-                sv={paciente?.sinaisVitais?.[hoje] ?? SV_VAZIO}
-                onChange={(v) =>
-                  atualizarPaciente(id, {
-                    sinaisVitais: { ...paciente?.sinaisVitais, [hoje]: v },
-                  })
-                }
-              />
-            ) : null
-          }
-        />
-      )}
-      ListFooterComponent={
-        mostrarSecoes ? (
-          <>
-            <EvolucaoBeiraLeitoSecao
-              key={hoje}
-              evolucao={paciente?.evolucoes?.[hoje] ?? EVOLUCAO_VAZIA}
-              onSalvar={(evo) => atualizarEvolucao(id, hoje, evo)}
-            />
-            <CondutaSecao
-              key={`conduta-${hoje}`}
-              evolucao={paciente?.evolucoes?.[hoje] ?? EVOLUCAO_VAZIA}
-              onSalvar={(evo) => atualizarEvolucao(id, hoje, evo)}
-            />
-            {mostrarChecklistAlta && (
-              <ChecklistAltaSecao
-                checklist={paciente?.checklistAlta ?? {}}
-                onChange={(c) => atualizarPaciente(id, { checklistAlta: c })}
-              />
+    >
+      {cabecalho}
+      {mostrarSecoes &&
+        SECOES.map((item) => (
+          <SecaoExpansivel
+            key={item.id}
+            titulo={item.titulo}
+            instrucao={item.instrucao}
+            secaoId={item.id}
+            medicacao={item.medicacao}
+            anotacoes={normalizarAnotacoes(
+              paciente?.secoes?.[item.id]?.anotacoes,
             )}
-            <TouchableOpacity
-              style={styles.botaoPassarCaso}
-              onPress={() => {
-                if (paciente) salvarSnapshotDiario(paciente);
-                router.push({ pathname: "/evolucao/[id]", params: { id } });
-              }}
-            >
-              <Text style={styles.botaoPassarCasoTexto}>Passar o Caso</Text>
-            </TouchableOpacity>
-          </>
-        ) : null
-      }
-    />
+            extraido={
+              paciente?.secoes?.[item.id]?.extraido ||
+              extraidoLegado(dados, item.id)
+            }
+            onSalvarAnotacoes={(lista) =>
+              atualizarSecao(id, item.id, { anotacoes: lista })
+            }
+            onExtraido={(t) => atualizarSecao(id, item.id, { extraido: t })}
+            extra={
+              item.id === "examesLaboratoriais" ? (
+                <LabEvolucao
+                  resultados={paciente?.resultadosLab ?? []}
+                  onChange={(lista) =>
+                    atualizarPaciente(id, { resultadosLab: lista })
+                  }
+                />
+              ) : item.id === "prescricaoHospitalar" ? (
+                <PrescricaoSecao
+                  medicamentos={paciente?.medicamentos ?? []}
+                  onChange={(l) => atualizarPaciente(id, { medicamentos: l })}
+                />
+              ) : item.id === "sinaisVitaisIntercorrencias" ? (
+                <SinaisVitaisSecao
+                  sv={paciente?.sinaisVitais?.[hoje] ?? SV_VAZIO}
+                  onChange={(v) =>
+                    atualizarPaciente(id, {
+                      sinaisVitais: { ...paciente?.sinaisVitais, [hoje]: v },
+                    })
+                  }
+                />
+              ) : null
+            }
+          />
+        ))}
+      {mostrarSecoes && (
+        <>
+          <EvolucaoBeiraLeitoSecao
+            key={hoje}
+            evolucao={paciente?.evolucoes?.[hoje] ?? EVOLUCAO_VAZIA}
+            onSalvar={(evo) => atualizarEvolucao(id, hoje, evo)}
+          />
+          <CondutaSecao
+            key={`conduta-${hoje}`}
+            evolucao={paciente?.evolucoes?.[hoje] ?? EVOLUCAO_VAZIA}
+            onSalvar={(evo) => atualizarEvolucao(id, hoje, evo)}
+          />
+          {mostrarChecklistAlta && (
+            <ChecklistAltaSecao
+              checklist={paciente?.checklistAlta ?? {}}
+              onChange={(c) => atualizarPaciente(id, { checklistAlta: c })}
+            />
+          )}
+          <TouchableOpacity
+            style={styles.botaoPassarCaso}
+            onPress={() => {
+              if (paciente) salvarSnapshotDiario(paciente);
+              router.push({ pathname: "/evolucao/[id]", params: { id } });
+            }}
+          >
+            <Text style={styles.botaoPassarCasoTexto}>Passar o Caso</Text>
+          </TouchableOpacity>
+        </>
+      )}
+    </KeyboardAwareScrollView>
     </>
   );
 }
