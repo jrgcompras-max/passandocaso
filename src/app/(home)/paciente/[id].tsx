@@ -1567,13 +1567,7 @@ function ProblemasSecao({
           {problemas.map((p) => {
             const cor = PrioridadeColors[p.prioridade];
             return (
-              <View
-                key={p.id}
-                style={[
-                  styles.problemaCard,
-                  { backgroundColor: cor.bg, borderLeftColor: cor.border },
-                ]}
-              >
+              <View key={p.id} style={styles.problemaCard}>
                 <View style={styles.problemaTopo}>
                   <Text style={styles.problemaTitulo}>{p.titulo}</Text>
                   <View style={styles.anotacaoAcoes}>
@@ -1589,7 +1583,7 @@ function ProblemasSecao({
                   <Text
                     style={[
                       styles.miniChip,
-                      { color: cor.text, borderColor: cor.text },
+                      { color: cor.text, backgroundColor: cor.bg },
                     ]}
                   >
                     {PROBLEMA_STATUS_LABEL[p.status]}
@@ -1597,7 +1591,7 @@ function ProblemasSecao({
                   <Text
                     style={[
                       styles.miniChip,
-                      { color: cor.text, borderColor: cor.text },
+                      { color: cor.text, backgroundColor: cor.bg },
                     ]}
                   >
                     Prioridade {cor.label.toLowerCase()}
@@ -2475,26 +2469,25 @@ const styles = StyleSheet.create({
   iconeBtn: { padding: 8 },
   identificacao: {
     backgroundColor: ClinicalColors.surface,
-    borderColor: ClinicalColors.border,
-    borderWidth: BorderWidth.hairline,
     borderRadius: Radius.card,
     padding: 16,
     marginBottom: 16,
   },
   identLinha: {
     color: ClinicalColors.textMuted,
-    fontSize: 14,
-    lineHeight: 22,
+    fontSize: 13,
+    lineHeight: 21,
   },
   campoIdent: { marginBottom: 10 },
   campoIdentLabel: {
     fontSize: 11,
     color: ClinicalColors.textMuted,
-    marginBottom: 2,
+    marginBottom: 3,
     fontWeight: "600",
     textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
-  campoIdentValor: { color: ClinicalColors.text, fontSize: 15 },
+  campoIdentValor: { color: ClinicalColors.text, fontSize: 17, fontWeight: "600" },
   campoIdentInputEditavel: {
     color: ClinicalColors.text,
     fontSize: 15,
@@ -2512,6 +2505,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     fontWeight: "600",
     textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
   campoInput: {
     backgroundColor: ClinicalColors.background,
@@ -2618,8 +2612,6 @@ const styles = StyleSheet.create({
   secao: {
     backgroundColor: ClinicalColors.surface,
     borderRadius: Radius.card,
-    borderWidth: BorderWidth.hairline,
-    borderColor: ClinicalColors.border,
     marginBottom: 12,
     overflow: "hidden",
   },
@@ -2631,8 +2623,8 @@ const styles = StyleSheet.create({
   },
   secaoHeaderTitulo: {
     flex: 1,
-    fontSize: 15,
-    fontWeight: "500",
+    fontSize: 17,
+    fontWeight: "600",
     color: ClinicalColors.text,
     paddingRight: 12,
   },
@@ -2672,10 +2664,8 @@ const styles = StyleSheet.create({
   anotacaoCard: {
     flexDirection: "row",
     alignItems: "flex-start",
-    backgroundColor: ClinicalColors.surface,
-    borderColor: ClinicalColors.border,
-    borderWidth: BorderWidth.hairline,
-    borderRadius: Radius.badge,
+    backgroundColor: ClinicalColors.background,
+    borderRadius: Radius.card,
     padding: 12,
     marginTop: 8,
   },
@@ -2686,9 +2676,9 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   anotacaoTexto: {
-    color: ClinicalColors.text,
-    fontSize: 14,
-    lineHeight: 20,
+    color: ClinicalColors.textSecondary,
+    fontSize: 15,
+    lineHeight: 21,
   },
   anotacaoCategoria: {
     alignSelf: "flex-start",
@@ -2711,7 +2701,7 @@ const styles = StyleSheet.create({
   anotacaoAcoes: { flexDirection: "row", gap: 12 },
   anotacaoIcone: { fontSize: 16 },
   campoLabelEspacado: { marginTop: 16 },
-  secaoConteudo: { color: ClinicalColors.text, fontSize: 15, lineHeight: 22 },
+  secaoConteudo: { color: ClinicalColors.textSecondary, fontSize: 15, lineHeight: 22 },
   conteudoBlocos: { gap: 12 },
   uniGrupo: { gap: 4, marginBottom: 8 },
   bloco: { gap: 4 },
@@ -2730,7 +2720,7 @@ const styles = StyleSheet.create({
   },
   itemTexto: {
     flex: 1,
-    color: ClinicalColors.text,
+    color: ClinicalColors.textSecondary,
     fontSize: 15,
     lineHeight: 22,
   },
@@ -2799,9 +2789,9 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
   },
   motivoInternacao: {
-    fontSize: 14,
+    fontSize: 13,
     color: ClinicalColors.textMuted,
-    lineHeight: 20,
+    lineHeight: 19,
     marginTop: 4,
   },
   statusClinicoRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
@@ -2839,9 +2829,9 @@ const styles = StyleSheet.create({
 
   // Problemas ativos
   problemaCard: {
-    borderLeftWidth: 4,
-    borderRadius: Radius.badge,
-    padding: 12,
+    backgroundColor: ClinicalColors.background,
+    borderRadius: Radius.card,
+    padding: 14,
     marginBottom: 10,
     gap: 6,
   },
@@ -2853,7 +2843,7 @@ const styles = StyleSheet.create({
   problemaTitulo: {
     flex: 1,
     fontSize: 15,
-    fontWeight: "700",
+    fontWeight: "600",
     color: ClinicalColors.text,
     paddingRight: 8,
   },
@@ -2861,15 +2851,14 @@ const styles = StyleSheet.create({
   miniChip: {
     fontSize: 11,
     fontWeight: "600",
-    borderWidth: 1,
     borderRadius: Radius.badge,
     paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingVertical: 3,
     overflow: "hidden",
   },
   problemaObs: {
     fontSize: 13,
-    color: ClinicalColors.text,
+    color: ClinicalColors.textMuted,
     lineHeight: 18,
   },
   problemaConduta: {
@@ -2895,7 +2884,7 @@ const styles = StyleSheet.create({
   checkbox: { fontSize: 20, color: ClinicalColors.primary },
   pendenciaTexto: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 15,
     color: ClinicalColors.text,
     lineHeight: 20,
   },
@@ -2929,10 +2918,8 @@ const styles = StyleSheet.create({
 
   // Resumo Rápido
   resumoCard: {
-    backgroundColor: "#F0F9FF",
-    borderColor: "#BAE6FD",
-    borderWidth: 1,
-    borderRadius: 12,
+    backgroundColor: ClinicalColors.surface,
+    borderRadius: Radius.card,
     padding: 16,
     marginBottom: 16,
   },
