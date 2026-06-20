@@ -26,6 +26,10 @@ const db = require("../db");
 const { PAC, construir } = require("./seed-pacientes");
 
 const EMAIL_LETICIA = "lets_966@hotmail.com";
+// Prefixo dos prontuários desta conta. Mantemos distinto do Junior (099) e do
+// primeiro seed da Letícia (098, que ficou "fantasma" no cache do app apontando
+// para um hospital deletado). 097 nunca foi visto pelo cache → entra como novo.
+const PRONT_PREFIX = "097";
 
 async function main() {
   // 1) Usuário da Letícia (existente — não cria, não altera credenciais).
@@ -65,7 +69,7 @@ async function main() {
   let totalPac = 0;
   let totalSnap = 0;
   for (const base of PAC) {
-    const p = { ...base, pront: base.pront.replace(/^099/, "098") };
+    const p = { ...base, pront: base.pront.replace(/^099/, PRONT_PREFIX) };
     const { dados, snapshots } = construir(p, hospitalId);
     await db.query(
       `INSERT INTO pacientes (id, medico_id, hospital_id, data_criacao, dados, updated_at)
