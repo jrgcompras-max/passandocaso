@@ -177,6 +177,11 @@
       /* Modais */
       .modal-bg { position: fixed; inset: 0; background: rgba(15,45,82,.45); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 20; }
       .modal { background: var(--surface); border-radius: 14px; width: 100%; max-width: 520px; max-height: 88vh; overflow-y: auto; padding: 20px; }
+      /* Modal "Passando o Caso": grande, com textarea ocupando a maior parte. */
+      .modal.modal-pc { max-width: 90vw; width: 90vw; height: 85vh; max-height: 85vh; display: flex; flex-direction: column; }
+      .modal.modal-pc h3 { flex: 0 0 auto; }
+      .modal.modal-pc .modal-acoes, .modal.modal-pc #pc-status, .modal.modal-pc .vazio { flex: 0 0 auto; }
+      #pc-texto { flex: 1 1 auto; min-height: 500px; white-space: pre-wrap; font-family: ui-monospace, Menlo, Consolas, "Courier New", monospace; font-size: 14px; line-height: 1.55; resize: none; }
       .modal h3 { margin: 0 0 14px; font-size: 18px; }
       .modal-acoes { display: flex; gap: 12px; margin-top: 14px; }
       .btn-sec { flex: 1; background: #fff; border: 1px solid var(--border); color: var(--muted); padding: 12px; }
@@ -1172,18 +1177,18 @@
       }
 
       // ---- Passar o Caso ----
-      async function abrirPassarCaso() {
+      function abrirPassarCaso() {
         const p = pa(); if (!p) return;
-        const bruto = gerarTextoEvolucao(p, hojeISO());
-        document.getElementById("modais").innerHTML = `<div class="modal-bg" onclick="if(event.target===this)fecharModal()"><div class="modal">
+        // Texto determinístico, sem passar por IA — preserva exatamente o formato
+        // e as quebras de linha geradas por gerarTextoEvolucao.
+        const texto = gerarTextoEvolucao(p, hojeISO());
+        document.getElementById("modais").innerHTML = `<div class="modal-bg" onclick="if(event.target===this)fecharModal()"><div class="modal modal-pc">
           <h3>Passando o Caso — ${esc(formatarNome(p.nomeCompleto))}</h3>
-          <textarea id="pc-texto" style="min-height:280px">${esc(bruto)}</textarea>
+          <textarea id="pc-texto">${esc(texto)}</textarea>
           <p class="vazio" style="margin:8px 0">Revise e ajuste antes de copiar. Você decide o conteúdo final.</p>
           <div class="modal-acoes"><button class="btn-sec" onclick="fecharModal()">← Fechar</button><button class="btn-ok verde" id="pc-copiar" onclick="copiarCaso()">📋 Copiar</button></div>
           <div id="pc-status" class="vazio" style="margin-top:8px"></div>
         </div></div>`;
-        // Padroniza via IA em segundo plano (com fallback ao texto bruto).
-        try { const r = await apiPost("/api/formatar", { texto: bruto }); const ta = document.getElementById("pc-texto"); if (ta && r.texto) ta.value = r.texto; } catch {}
       }
       async function copiarCaso() {
         const p = pa(); const ta = document.getElementById("pc-texto"); const texto = ta.value;
