@@ -162,7 +162,8 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: ClinicalColors.background,
     paddingHorizontal: 16,
-    paddingBottom: 32,
+    // Espaço para a bottom tab bar não sobrepor as ações/aviso no rodapé.
+    paddingBottom: 120,
   },
   voltar: { marginBottom: 12 },
   voltarTexto: { color: ClinicalColors.primary, fontSize: 17 },
