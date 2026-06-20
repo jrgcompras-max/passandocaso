@@ -68,10 +68,10 @@ const USUARIO = {
 };
 const HOSPITAL = {
   id: "hosp-hnsc",
-  nome: "Hospital Nossa Sra. Conceição",
+  nome: "HOSPITAL NOSSA SENHORA DA CONCEICAO",
   cidade: "Tubarão",
-  // CNES do estabelecimento — ajuste se necessário.
-  cnes: "2376825",
+  // CNES real do estabelecimento (DATASUS) — bate com o cadastro da Letícia.
+  cnes: "2491710",
 };
 
 // Unidades por exame (usadas para formatar o valor no banco).
