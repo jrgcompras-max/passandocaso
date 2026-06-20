@@ -10,6 +10,7 @@ export const SV_VAZIO: SinaisVitaisDia = {
   sato2: "",
   glicemia: "",
   diurese: "",
+  glasgow: "",
   o2: null,
   intercorrencias: "",
 };

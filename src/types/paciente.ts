@@ -132,6 +132,8 @@ export type SinaisVitaisDia = {
   sato2: string;
   glicemia: string;
   diurese: string;
+  /** Escala de coma de Glasgow (3–15), quando avaliada. */
+  glasgow?: string;
   o2: O2Modo | null;
   intercorrencias: string;
 };

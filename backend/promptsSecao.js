@@ -53,7 +53,7 @@ const PROMPTS = {
     REGRA,
   sinaisVitaisIntercorrencias:
     "Extraia APENAS os sinais vitais mais recentes. Use null quando ausente. " +
-    'Formato: {"data":"DD/MM ou null","hora":"HH:MM ou null","paSist":num,"paDiast":num,"fc":num,"fr":num,"sato2":num,"temp":num,"glicemia":num,"peso":num,"diurese":num}. ' +
+    'Formato: {"data":"DD/MM ou null","hora":"HH:MM ou null","paSist":num,"paDiast":num,"fc":num,"fr":num,"sato2":num,"temp":num,"glasgow":num,"glicemia":num,"peso":num,"diurese":num}. ' +
     REGRA,
 };
 
@@ -149,6 +149,7 @@ function deriveBlocos(secao, d) {
     if (naoVazio(d.fr)) itens.push(`FR ${d.fr}`);
     if (naoVazio(d.sato2)) itens.push(`SatO2 ${d.sato2}`);
     if (naoVazio(d.temp)) itens.push(`Tax ${d.temp}`);
+    if (naoVazio(d.glasgow)) itens.push(`Glasgow ${d.glasgow}`);
     if (naoVazio(d.glicemia)) itens.push(`HGT ${d.glicemia}`);
     if (naoVazio(d.diurese)) itens.push(`Diurese ${d.diurese}`);
     return bloco("Sinais vitais", itens);
