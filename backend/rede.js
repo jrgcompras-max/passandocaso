@@ -480,7 +480,7 @@ router.post("/rede/passagem", async (req, res) => {
       ],
     );
     if (b.destinatario_id) {
-      await pushParaUsuario(b.destinatario_id, "Passagem de plantão recebida",
+      await pushParaUsuario(b.destinatario_id, "Passagem de pacientes recebida",
         `${req.usuario.nome_exibicao || req.usuario.nome} quer te passar ${pacientes.length} paciente(s).`,
         { tipo: "passagem_recebida" });
     }
