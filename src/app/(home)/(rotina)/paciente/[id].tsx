@@ -861,8 +861,8 @@ function EscoresSecao({ escores }: { escores: Escore[] }) {
             );
           })}
           <Text style={styles.escoreDisclaimer}>
-            Escores calculados a partir dos dados inseridos. Avalie clinicamente. Não
-            substituem o julgamento médico.
+            Escore calculado com base nos dados inseridos. Não substitui avaliação
+            clínica. O profissional de saúde é responsável pela decisão terapêutica.
           </Text>
         </View>
       )}
