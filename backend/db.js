@@ -209,6 +209,54 @@ async function initDB() {
     "CREATE UNIQUE INDEX IF NOT EXISTS idx_termos_unico ON termos_clinicos(termo_normalizado, categoria, COALESCE(valor_ref_contexto, ''));",
   );
 
+  // === FASE 3 — Segurança farmacológica ===
+
+  // Posologia de referência (RENAME/bulas) — colunas opcionais em termos_clinicos.
+  // ALTER ... IF NOT EXISTS é idempotente; só preenchidas para categoria='medicacao'.
+  await pool.query(`
+    ALTER TABLE termos_clinicos
+      ADD COLUMN IF NOT EXISTS dose_min TEXT,
+      ADD COLUMN IF NOT EXISTS dose_max TEXT,
+      ADD COLUMN IF NOT EXISTS dose_usual TEXT,
+      ADD COLUMN IF NOT EXISTS vias_administracao TEXT[],
+      ADD COLUMN IF NOT EXISTS intervalo_usual TEXT,
+      ADD COLUMN IF NOT EXISTS observacoes_dose TEXT;
+  `);
+
+  // Interações medicamentosas (par A×B). Informativa — nunca bloqueia cadastro.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS interacoes_medicamentosas (
+      id SERIAL PRIMARY KEY,
+      medicamento_a TEXT NOT NULL,
+      medicamento_b TEXT NOT NULL,
+      severidade TEXT NOT NULL,
+      descricao TEXT NOT NULL,
+      mecanismo TEXT,
+      conduta_recomendada TEXT,
+      fonte TEXT DEFAULT 'ANVISA/Micromedex',
+      ativo BOOLEAN DEFAULT TRUE
+    );
+  `);
+  // Unicidade do par (normalizado a montante no seed) para upsert idempotente.
+  await pool.query(
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_interacoes_par ON interacoes_medicamentosas(medicamento_a, medicamento_b);",
+  );
+
+  // Ajuste de dose renal por TFG (faixas e recomendação descritiva).
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS ajuste_renal (
+      id SERIAL PRIMARY KEY,
+      medicamento TEXT NOT NULL,
+      tfg_min NUMERIC,
+      tfg_corte NUMERIC,
+      recomendacao TEXT,
+      fonte TEXT DEFAULT 'ANVISA/SBN'
+    );
+  `);
+  await pool.query(
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_ajuste_renal_med ON ajuste_renal(medicamento);",
+  );
+
   console.log("PostgreSQL — tabelas verificadas/criadas.");
 }
 

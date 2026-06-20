@@ -50,6 +50,21 @@ import { gerarResumoIA } from "@/lib/gerarResumoIA";
 import { converterParaJpegBase64 } from "@/lib/imagem";
 import { agruparPorExame, type ExameSerie, TENDENCIA_INFO } from "@/lib/lab";
 import {
+  COR_FAIXA,
+  type Escore,
+  escoresCalculaveis,
+} from "@/lib/escoresClinicos";
+import {
+  buscarInteracoes,
+  buscarPosologia,
+  calcularTFG,
+  type Interacao,
+  type Posologia,
+  type Severidade,
+  textoPosologia,
+  type TFG,
+} from "@/lib/farmaco";
+import {
   buscarReferencia,
   type ReferenciaLab,
   statusReferencia,
@@ -559,6 +574,7 @@ export default function Paciente() {
                 problemas={paciente.problemas ?? []}
                 onChange={(lista) => atualizarProblemas(id, lista)}
               />
+              <EscoresSecao escores={escoresCalculaveis(paciente, hojeISO())} />
               <PendenciasSecao
                 pendencias={paciente.pendencias ?? []}
                 onChange={(lista) => atualizarPendencias(id, lista)}
@@ -684,6 +700,7 @@ export default function Paciente() {
               ) : item.id === "prescricaoHospitalar" ? (
                 <PrescricaoSecao
                   medicamentos={paciente?.medicamentos ?? []}
+                  paciente={paciente}
                   editando={editando}
                   onChange={(l) => atualizarPaciente(id, { medicamentos: l })}
                 />
@@ -750,6 +767,72 @@ function AlertasTendenciaSecao({ alertas }: { alertas: AlertaTendencia[] }) {
       <Text style={styles.alertasRodape}>
         Indicadores gerados a partir dos dados inseridos. Avalie clinicamente.
       </Text>
+    </View>
+  );
+}
+
+/** Pontos ●/○ do escore (só para escalas curtas; escalas longas mostram só o nº). */
+function pontosVisuais(e: Escore): string {
+  if (e.maxPontos > 10) return "";
+  return "●".repeat(e.pontos) + "○".repeat(Math.max(0, e.maxPontos - e.pontos));
+}
+
+/**
+ * Seção "Escores Clínicos" (Fase 3). Aparece somente quando há escores
+ * calculáveis (dados suficientes). Mostra o número e a classificação DA ESCALA,
+ * a fonte e os critérios positivos — sem interpretação clínica adicional.
+ * Expansível, recolhida por padrão.
+ */
+function EscoresSecao({ escores }: { escores: Escore[] }) {
+  const [aberto, setAberto] = useState(false);
+  if (!escores.length) return null;
+  return (
+    <View style={styles.secao}>
+      <View style={styles.secaoHeader}>
+        <TouchableOpacity
+          style={styles.secaoHeaderToque}
+          onPress={() => setAberto((v) => !v)}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.secaoHeaderTitulo}>Escores Clínicos ({escores.length})</Text>
+          <Ionicons name={aberto ? "chevron-up" : "chevron-down"} size={18} color={ClinicalColors.chevron} />
+        </TouchableOpacity>
+      </View>
+
+      {aberto && (
+        <View style={styles.secaoBody}>
+          {escores.map((e) => {
+            const cor = COR_FAIXA[e.faixa];
+            const dots = pontosVisuais(e);
+            const positivos = e.itens.filter((i) => i.marcado).map((i) => i.label);
+            return (
+              <View key={e.id} style={[styles.escoreCard, { borderLeftColor: cor }]}>
+                <View style={styles.escoreTopo}>
+                  <Text style={styles.escoreNome}>{e.nome}</Text>
+                  <View style={styles.escorePontosWrap}>
+                    <Text style={[styles.escorePontos, { color: cor }]}>
+                      {e.pontos}/{e.maxPontos}
+                    </Text>
+                    {!!dots && <Text style={[styles.escoreDots, { color: cor }]}>{dots}</Text>}
+                  </View>
+                </View>
+                <Text style={[styles.escoreClassif, { color: cor }]}>{e.classificacao}</Text>
+                {positivos.length > 0 && (
+                  <Text style={styles.escoreCriterios}>{positivos.join(" · ")}</Text>
+                )}
+                {e.faltam.length > 0 && (
+                  <Text style={styles.escoreFaltam}>Sem dado: {e.faltam.join(", ")}</Text>
+                )}
+                <Text style={styles.escoreFonte}>Fonte: {e.fonte}</Text>
+              </View>
+            );
+          })}
+          <Text style={styles.escoreDisclaimer}>
+            Escores calculados a partir dos dados inseridos. Avalie clinicamente. Não
+            substituem o julgamento médico.
+          </Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -3115,18 +3198,105 @@ function corDaClasse(classe: string): string {
  * classifica a classe farmacológica (badge colorido, editável tocando nele).
  * Os classificados como antibiótico alimentam a ANTIBIOTICOTERAPIA do caso.
  */
+const ORDEM_SEVERIDADE: Record<Severidade, number> = { leve: 1, moderada: 2, grave: 3 };
+const COR_SEVERIDADE: Record<Severidade, string> = {
+  leve: "#FFCC00",
+  moderada: "#FF9500",
+  grave: "#FF3B30",
+};
+const rotuloSeveridade = (s: Severidade) => s.charAt(0).toUpperCase() + s.slice(1);
+
+const normFarm = (s: string) =>
+  String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
+/** Pior severidade de interação envolvendo este medicamento (match por substring). */
+function severidadeDoMed(texto: string, interacoes: Interacao[]): Severidade | null {
+  const t = normFarm(texto);
+  let pior: Severidade | null = null;
+  for (const it of interacoes) {
+    if (t.includes(normFarm(it.medicamentoA)) || t.includes(normFarm(it.medicamentoB))) {
+      if (!pior || ORDEM_SEVERIDADE[it.severidade] > ORDEM_SEVERIDADE[pior]) pior = it.severidade;
+    }
+  }
+  return pior;
+}
+
+/** Creatinina mais recente do paciente (número), para estimar a TFG. */
+function ultimaCreatinina(p?: PacienteModel | null): number | null {
+  if (!p?.resultadosLab) return null;
+  const alvos = ["creatinina", "creat", "cr"];
+  const cand = p.resultadosLab.filter((r) => {
+    const e = normFarm(r.exame);
+    return alvos.some((a) => e === a || e.startsWith(a));
+  });
+  if (!cand.length) return null;
+  cand.sort((a, b) => b.data.localeCompare(a.data));
+  const m = String(cand[0].valor).replace(",", ".").match(/-?\d+(\.\d+)?/);
+  return m ? parseFloat(m[0]) : null;
+}
+
 function PrescricaoSecao({
   medicamentos,
+  paciente,
   editando,
   onChange,
 }: {
   medicamentos: Medicamento[];
+  paciente?: PacienteModel | null;
   editando?: boolean;
   onChange: (l: Medicamento[]) => void;
 }) {
   const [texto, setTexto] = useState("");
   const [editClasseId, setEditClasseId] = useState<string | null>(null);
   const [classeDraft, setClasseDraft] = useState("");
+
+  // Segurança farmacológica (informativa). Falhas degradam em silêncio.
+  const [interacoes, setInteracoes] = useState<Interacao[]>([]);
+  const [posologias, setPosologias] = useState<Record<string, Posologia>>({});
+  const [tfg, setTfg] = useState<TFG | null>(null);
+  const medTextos = medicamentos.map((m) => m.texto).join("|");
+
+  useEffect(() => {
+    let vivo = true;
+    buscarInteracoes(medicamentos.map((m) => m.texto)).then((l) => {
+      if (vivo) setInteracoes(l);
+    });
+    return () => {
+      vivo = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [medTextos]);
+
+  useEffect(() => {
+    let vivo = true;
+    (async () => {
+      const entradas = await Promise.all(
+        medicamentos.map(async (m) => [m.id, await buscarPosologia(m.texto)] as const),
+      );
+      if (vivo) setPosologias(Object.fromEntries(entradas));
+    })();
+    return () => {
+      vivo = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [medTextos]);
+
+  const creatinina = ultimaCreatinina(paciente);
+  const idadePac = paciente?.idade ?? null;
+  const sexoPac = paciente?.sexo ?? null;
+  useEffect(() => {
+    let vivo = true;
+    const promessa =
+      creatinina != null && idadePac != null
+        ? calcularTFG({ creatinina, idade: idadePac, sexo: sexoPac ?? undefined })
+        : Promise.resolve(null);
+    promessa.then((t) => {
+      if (vivo) setTfg(t);
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [creatinina, idadePac, sexoPac]);
 
   const adicionar = async () => {
     const t = texto.trim();
@@ -3154,53 +3324,110 @@ function PrescricaoSecao({
       <Text style={[styles.campoLabel, styles.campoLabelEspacado]}>
         Medicamentos
       </Text>
-      {medicamentos.map((m) => (
-        <View key={m.id} style={styles.medRow}>
-          <View style={styles.medInfo}>
-            <Text style={styles.medTexto}>{m.texto}</Text>
-            {editando && editClasseId === m.id ? (
-              <TextInput
-                style={styles.medClasseInput}
-                value={classeDraft}
-                onChangeText={setClasseDraft}
-                onBlur={() => salvarClasse(m.id)}
-                autoFocus
-                placeholder="Classe"
-                placeholderTextColor={ClinicalColors.textMuted}
-              />
-            ) : (
-              <TouchableOpacity
-                disabled={!editando}
-                onPress={() => {
-                  setEditClasseId(m.id);
-                  setClasseDraft(m.classe);
-                }}
-              >
-                <Text
-                  style={[
-                    styles.medClasse,
-                    {
-                      backgroundColor: m.classe
-                        ? corDaClasse(m.classe)
-                        : ClinicalColors.textMuted,
-                    },
-                  ]}
+      {tfg && (
+        <Text style={styles.tfgNota}>
+          TFG estimada: {tfg.tfg} mL/min/1,73m² · {tfg.estadio} ({tfg.descricao}) · {tfg.fonte}
+        </Text>
+      )}
+      {medicamentos.map((m) => {
+        const sev = severidadeDoMed(m.texto, interacoes);
+        const pos = posologias[m.id];
+        const txtPos = pos ? textoPosologia(pos) : "";
+        const precisaAjuste = !!(
+          pos?.ajusteRenal &&
+          tfg &&
+          pos.ajusteRenal.tfgCorte != null &&
+          tfg.tfg < pos.ajusteRenal.tfgCorte
+        );
+        return (
+          <View key={m.id} style={styles.medRow}>
+            <View style={styles.medInfo}>
+              <View style={styles.medTituloLinha}>
+                <Text style={styles.medTexto}>{m.texto}</Text>
+                {sev && sev !== "leve" && (
+                  <View style={[styles.badgeInteracao, { backgroundColor: COR_SEVERIDADE[sev] }]}>
+                    <Ionicons name="warning" size={11} color="#FFFFFF" />
+                    <Text style={styles.badgeInteracaoTexto}>{rotuloSeveridade(sev)}</Text>
+                  </View>
+                )}
+                {precisaAjuste && (
+                  <Text style={styles.badgeAjuste}>⚠️ Ajuste renal</Text>
+                )}
+              </View>
+              {editando && editClasseId === m.id ? (
+                <TextInput
+                  style={styles.medClasseInput}
+                  value={classeDraft}
+                  onChangeText={setClasseDraft}
+                  onBlur={() => salvarClasse(m.id)}
+                  autoFocus
+                  placeholder="Classe"
+                  placeholderTextColor={ClinicalColors.textMuted}
+                />
+              ) : (
+                <TouchableOpacity
+                  disabled={!editando}
+                  onPress={() => {
+                    setEditClasseId(m.id);
+                    setClasseDraft(m.classe);
+                  }}
                 >
-                  {m.classe || "classificando…"}
+                  <Text
+                    style={[
+                      styles.medClasse,
+                      {
+                        backgroundColor: m.classe
+                          ? corDaClasse(m.classe)
+                          : ClinicalColors.textMuted,
+                      },
+                    ]}
+                  >
+                    {m.classe || "classificando…"}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              {!!txtPos && (
+                <Text style={styles.medPosologia}>
+                  {txtPos}
+                  {pos?.fonte ? ` · Fonte: ${pos.fonte}` : ""}
                 </Text>
+              )}
+              {precisaAjuste && pos?.ajusteRenal?.recomendacao && (
+                <Text style={styles.medAjusteObs}>{pos.ajusteRenal.recomendacao}</Text>
+              )}
+            </View>
+            {editando && (
+              <TouchableOpacity
+                onPress={() => onChange(medicamentos.filter((x) => x.id !== m.id))}
+                hitSlop={8}
+              >
+                <Ionicons name="trash-outline" size={16} color={ClinicalColors.danger} />
               </TouchableOpacity>
             )}
           </View>
-          {editando && (
-            <TouchableOpacity
-              onPress={() => onChange(medicamentos.filter((x) => x.id !== m.id))}
-              hitSlop={8}
-            >
-              <Ionicons name="trash-outline" size={16} color={ClinicalColors.danger} />
-            </TouchableOpacity>
-          )}
+        );
+      })}
+
+      {interacoes.length > 0 && (
+        <View style={styles.interacoesCard}>
+          <Text style={styles.interacoesTitulo}>Interações identificadas</Text>
+          {interacoes.map((it, i) => (
+            <View key={`${it.medicamentoA}-${it.medicamentoB}-${i}`} style={styles.interacaoItem}>
+              <Text style={styles.interacaoNomes}>
+                {it.medicamentoA} + {it.medicamentoB} —{" "}
+                <Text style={{ color: COR_SEVERIDADE[it.severidade] }}>
+                  {rotuloSeveridade(it.severidade)}
+                </Text>
+              </Text>
+              <Text style={styles.interacaoDesc}>{it.descricao}</Text>
+            </View>
+          ))}
+          <Text style={styles.interacoesRodape}>
+            Baseado em dados inseridos · Avalie clinicamente · Fonte: ANVISA/Micromedex
+          </Text>
         </View>
-      ))}
+      )}
+
       {editando && (
         <>
           <TextInput
@@ -3275,6 +3502,66 @@ const styles = StyleSheet.create({
   alertasRodape: {
     fontSize: 12,
     color: ClinicalColors.textMuted,
+    fontStyle: "italic",
+    marginTop: 2,
+  },
+  // Escores clínicos (Fase 3)
+  escoreCard: {
+    backgroundColor: ClinicalColors.background,
+    borderLeftWidth: 3,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+  },
+  escoreTopo: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  escoreNome: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: ClinicalColors.text,
+    flex: 1,
+    paddingRight: 8,
+  },
+  escorePontosWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  escorePontos: {
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  escoreDots: {
+    fontSize: 12,
+    marginLeft: 6,
+    letterSpacing: 1,
+  },
+  escoreClassif: {
+    fontSize: 13,
+    fontWeight: "600",
+    marginTop: 3,
+  },
+  escoreCriterios: {
+    fontSize: 12,
+    color: ClinicalColors.textMuted,
+    marginTop: 4,
+  },
+  escoreFaltam: {
+    fontSize: 11,
+    color: ClinicalColors.textMuted,
+    fontStyle: "italic",
+    marginTop: 2,
+  },
+  escoreFonte: {
+    fontSize: 11,
+    color: "#8E8E93",
+    marginTop: 4,
+  },
+  escoreDisclaimer: {
+    fontSize: 11,
+    color: "#8E8E93",
     fontStyle: "italic",
     marginTop: 2,
   },
@@ -4069,7 +4356,54 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   medInfo: { flex: 1, gap: 4 },
+  medTituloLinha: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 6,
+  },
   medTexto: { fontSize: 14, color: ClinicalColors.text },
+  badgeInteracao: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    borderRadius: Radius.badge,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+  },
+  badgeInteracaoTexto: { color: "#FFFFFF", fontSize: 10, fontWeight: "700" },
+  badgeAjuste: {
+    color: "#FF9500",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  medPosologia: { fontSize: 11, color: "#8E8E93" },
+  medAjusteObs: { fontSize: 11, color: "#FF9500", fontStyle: "italic" },
+  tfgNota: { fontSize: 11, color: "#8E8E93", marginBottom: 8 },
+  interacoesCard: {
+    backgroundColor: "#FFF8E7",
+    borderLeftWidth: 3,
+    borderLeftColor: "#FF9500",
+    borderRadius: Radius.card,
+    padding: 12,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  interacoesTitulo: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: ClinicalColors.text,
+    marginBottom: 8,
+  },
+  interacaoItem: { marginBottom: 8 },
+  interacaoNomes: { fontSize: 13, fontWeight: "600", color: ClinicalColors.text },
+  interacaoDesc: { fontSize: 12, color: ClinicalColors.textMuted, marginTop: 1 },
+  interacoesRodape: {
+    fontSize: 11,
+    color: "#8E8E93",
+    fontStyle: "italic",
+    marginTop: 2,
+  },
   medClasse: {
     alignSelf: "flex-start",
     color: "#FFFFFF",

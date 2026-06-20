@@ -9,6 +9,7 @@ import {
   type SecaoId,
 } from "@/types/paciente";
 
+import { escoresCalculaveis } from "./escoresClinicos";
 import { agruparPorExame } from "./lab";
 
 type Bloco = { titulo: string; itens: string[] };
@@ -195,6 +196,18 @@ export function montarTextoEvolucao(paciente: Paciente, hoje: string): string {
   const a = ativos.length ? `*A: ${ativos.join("\n")}` : null;
   const plano = evo?.condutaDoDia?.trim() ? `*P: ${evo.condutaDoDia.trim()}` : null;
 
+  // — Escores clínicos (entre A e P) — apenas os calculáveis, formato compacto.
+  //   O número e a classificação são da própria escala (sem interpretação extra).
+  const escores = escoresCalculaveis(paciente, hoje);
+  const escoresTxt = escores.length
+    ? `*Escores:\n${escores
+        .map(
+          (e) =>
+            `${e.sigla}: ${e.pontos}/${e.maxPontos} (${e.classificacao.split(" · ")[0].toLowerCase()})`,
+        )
+        .join("\n")}`
+    : null;
+
   return [
     "                    Evolução Médica",
     blocoAtual,
@@ -207,6 +220,7 @@ export function montarTextoEvolucao(paciente: Paciente, hoje: string): string {
     exames,
     imagem,
     a,
+    escoresTxt,
     plano,
   ]
     .filter(Boolean)

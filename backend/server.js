@@ -7,6 +7,7 @@ const Anthropic = require("@anthropic-ai/sdk");
 const db = require("./db");
 const auth = require("./auth");
 const redeRouter = require("./rede");
+const farmacoRouter = require("./farmaco");
 const { analisarTendencias } = require("./alertasTendencia");
 const ontologia = require("./ontologia");
 const { PROMPTS: PROMPTS_SECAO, deriveBlocos } = require("./promptsSecao");
@@ -1037,6 +1038,9 @@ app.get("/api/ontologia/cid/:termo", auth.autenticar, async (req, res) => {
 
 // Fase 2 — rede clínica colaborativa (perfil, conexões, grupos, passagens).
 app.use("/api", redeRouter);
+
+// Fase 3 — segurança farmacológica (interações, posologia, ajuste renal/TFG).
+app.use("/api", farmacoRouter);
 
 // Tratador de erros final: corpo acima do limite (express.json) vira 413 claro
 // em vez de erro genérico.
