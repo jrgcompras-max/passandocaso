@@ -34,6 +34,10 @@ yarn-error.*
 .env
 .env*.local
 
+# bases de dados locais (não versionar — importadas via script)
+Loinc_2.82/
+*.csv
+
 # typescript
 *.tsbuildinfo
 
