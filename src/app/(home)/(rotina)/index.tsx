@@ -11,6 +11,7 @@ import {
   Animated,
   LayoutAnimation,
   Modal,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -27,6 +28,11 @@ import {
   StatusColors,
   type StatusType,
 } from "@/constants/clinicalTheme";
+import {
+  type AlertaTendencia,
+  buscarAlertas,
+  setaAlerta,
+} from "@/lib/alertasTendencia";
 import { diaDeInternacao } from "@/lib/datas";
 import { extrairDadosImagem } from "@/lib/extrairDadosImagem";
 import { formatarNome } from "@/lib/formatarNome";
@@ -209,6 +215,51 @@ export default function Index() {
   const pacientesHosp = pacientes.filter(
     (p) => (p.hospitalId ?? "geral") === hospitalAtivo,
   );
+
+  // Alertas de tendência laboratorial por paciente. Busca em paralelo (não
+  // bloqueia a lista); falha silenciosa quando o backend está indisponível.
+  const [alertas, setAlertas] = useState<Record<string, AlertaTendencia[]>>({});
+  const [atualizando, setAtualizando] = useState(false);
+  const idsHosp = pacientesHosp.map((p) => p.id).join(",");
+
+  const carregarAlertas = async (forcar = false) => {
+    const ids = idsHosp ? idsHosp.split(",") : [];
+    if (ids.length === 0) {
+      setAlertas({});
+      return;
+    }
+    const pares = await Promise.all(
+      ids.map(async (pid) => [pid, await buscarAlertas(pid, forcar)] as const),
+    );
+    setAlertas(Object.fromEntries(pares));
+  };
+
+  useEffect(() => {
+    let vivo = true;
+    (async () => {
+      const ids = idsHosp ? idsHosp.split(",") : [];
+      if (ids.length === 0) {
+        if (vivo) setAlertas({});
+        return;
+      }
+      const pares = await Promise.all(
+        ids.map(async (pid) => [pid, await buscarAlertas(pid)] as const),
+      );
+      if (vivo) setAlertas(Object.fromEntries(pares));
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, [idsHosp]);
+
+  const aoAtualizar = async () => {
+    setAtualizando(true);
+    try {
+      await carregarAlertas(true);
+    } finally {
+      setAtualizando(false);
+    }
+  };
 
   // Agrupa por status na ordem de prioridade; só inclui grupos não-vazios.
   const secoes = ORDEM_STATUS.map((status) => ({
@@ -421,6 +472,9 @@ export default function Index() {
           pacientesHosp.length === 0 ? styles.vazioContainer : styles.listaConteudo
         }
         keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl refreshing={atualizando} onRefresh={aoAtualizar} />
+        }
       >
         {pacientesHosp.length === 0
           ? !processando && (
@@ -521,6 +575,47 @@ export default function Index() {
                               <Text style={styles.pendenciasIndicador}>
                                 {pendenciasAbertas}{" "}
                                 {pendenciasAbertas === 1 ? "pendência" : "pendências"}
+                              </Text>
+                            )}
+                            {(alertas[item.id] ?? [])
+                              .slice(0, 2)
+                              .map((a) => (
+                                <View
+                                  key={a.lab}
+                                  style={[
+                                    styles.badgeAlertaPill,
+                                    a.severidade === "alerta"
+                                      ? styles.badgeAlerta
+                                      : styles.badgeAtencao,
+                                  ]}
+                                >
+                                  <Ionicons
+                                    name={
+                                      a.severidade === "alerta"
+                                        ? "alert-circle-outline"
+                                        : "warning-outline"
+                                    }
+                                    size={12}
+                                    color={
+                                      a.severidade === "alerta"
+                                        ? "#FF3B30"
+                                        : "#FF9500"
+                                    }
+                                  />
+                                  <Text
+                                    style={
+                                      a.severidade === "alerta"
+                                        ? styles.badgeAlertaTexto
+                                        : styles.badgeAtencaoTexto
+                                    }
+                                  >
+                                    {a.label} {setaAlerta(a)}
+                                  </Text>
+                                </View>
+                              ))}
+                            {(alertas[item.id]?.length ?? 0) > 2 && (
+                              <Text style={styles.badgeMais}>
+                                +{(alertas[item.id]?.length ?? 0) - 2}
                               </Text>
                             )}
                           </View>
@@ -893,6 +988,24 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   badgeTexto: { fontSize: 12, fontWeight: "600" },
+  // Badges de alerta de tendência laboratorial.
+  badgeAlertaPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    borderRadius: Radius.badge,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+  },
+  badgeAtencao: { backgroundColor: "#FFF3E0" },
+  badgeAtencaoTexto: { fontSize: 11, fontWeight: "700", color: "#FF9500" },
+  badgeAlerta: { backgroundColor: "#FFE5E5" },
+  badgeAlertaTexto: { fontSize: 11, fontWeight: "700", color: "#FF3B30" },
+  badgeMais: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: ClinicalColors.textMuted,
+  },
   swipeExcluir: {
     backgroundColor: "#991B1B",
     justifyContent: "center",

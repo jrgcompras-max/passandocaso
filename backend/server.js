@@ -7,6 +7,7 @@ const Anthropic = require("@anthropic-ai/sdk");
 const db = require("./db");
 const auth = require("./auth");
 const redeRouter = require("./rede");
+const { analisarTendencias } = require("./alertasTendencia");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -938,6 +939,26 @@ app.get("/api/evolucao-diaria/:pacienteId/:data", auth.autenticar, async (req, r
     res.json({ registro: r.rows[0] || null });
   } catch (e) {
     res.status(500).json({ erro: e.message || "Falha ao buscar registro." });
+  }
+});
+
+// Alertas de tendência laboratorial (Fase 3 — módulo 3). Analisa os últimos
+// 7 snapshots diários do paciente e devolve alertas descritivos (sem conduta).
+app.get("/api/alertas/:pacienteId", auth.autenticar, async (req, res) => {
+  const { pacienteId } = req.params;
+  try {
+    const r = await db.query(
+      `SELECT data, exames_laboratoriais
+         FROM evolucoes_diarias
+        WHERE paciente_id = $1 AND medico_id = $2
+          AND data >= CURRENT_DATE - 6
+        ORDER BY data ASC`,
+      [pacienteId, req.usuario.id],
+    );
+    res.json({ alertas: analisarTendencias(r.rows) });
+  } catch (e) {
+    console.error("Erro em GET /api/alertas:", e);
+    res.status(500).json({ erro: e.message || "Falha ao calcular alertas." });
   }
 });
 

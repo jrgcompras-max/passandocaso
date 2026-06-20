@@ -51,6 +51,12 @@ import { gerarResumoIA } from "@/lib/gerarResumoIA";
 import { converterParaJpegBase64 } from "@/lib/imagem";
 import { agruparPorExame, TENDENCIA_INFO } from "@/lib/lab";
 import { montarDadosParaResumo } from "@/lib/resumoPaciente";
+import {
+  type AlertaTendencia,
+  buscarAlertas,
+  descreverAlerta,
+  serieFormatada,
+} from "@/lib/alertasTendencia";
 import { listarEvolucaoDiaria, salvarSnapshotDiario } from "@/lib/salvarEvolucaoDiaria";
 import { fraseSinaisVitais, O2_OPCOES, SV_VAZIO } from "@/lib/sinaisVitais";
 import { usePacientes } from "@/store/PacientesContext";
@@ -208,6 +214,18 @@ export default function Paciente() {
     let vivo = true;
     listarEvolucaoDiaria(id, 60).then((r) => {
       if (vivo) setRegistrosCount(r.length);
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [id]);
+
+  // Alertas de tendência laboratorial (descritivos — conformidade ANVISA).
+  const [alertas, setAlertas] = useState<AlertaTendencia[]>([]);
+  useEffect(() => {
+    let vivo = true;
+    buscarAlertas(id, true).then((a) => {
+      if (vivo) setAlertas(a);
     });
     return () => {
       vivo = false;
@@ -530,6 +548,8 @@ export default function Paciente() {
                 onGerar={gerarResumo}
               />
 
+              {alertas.length > 0 && <AlertasTendenciaSecao alertas={alertas} />}
+
               <ProblemasSecao
                 problemas={paciente.problemas ?? []}
                 onChange={(lista) => atualizarProblemas(id, lista)}
@@ -651,6 +671,27 @@ export default function Paciente() {
       )}
     </KeyboardAwareScrollView>
     </>
+  );
+}
+
+/**
+ * Card de tendências laboratoriais. Puramente DESCRITIVO (conformidade ANVISA):
+ * descreve o movimento dos exames inseridos, sem qualquer sugestão de conduta.
+ */
+function AlertasTendenciaSecao({ alertas }: { alertas: AlertaTendencia[] }) {
+  return (
+    <View style={styles.alertasCard}>
+      <Text style={styles.alertasTitulo}>Tendências laboratoriais</Text>
+      {alertas.map((a) => (
+        <View key={a.lab} style={styles.alertaItem}>
+          <Text style={styles.alertaDescricao}>{descreverAlerta(a)}</Text>
+          <Text style={styles.alertaSerie}>{serieFormatada(a)}</Text>
+        </View>
+      ))}
+      <Text style={styles.alertasRodape}>
+        Indicadores gerados a partir dos dados inseridos. Avalie clinicamente.
+      </Text>
+    </View>
   );
 }
 
@@ -2392,6 +2433,38 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   aviso: { color: ClinicalColors.textMuted, fontSize: 15, marginTop: 24 },
+  // Card de tendências laboratoriais (descritivo — ANVISA).
+  alertasCard: {
+    backgroundColor: "#FFF8E7",
+    borderLeftWidth: 3,
+    borderLeftColor: "#FF9500",
+    borderRadius: Radius.card,
+    padding: 14,
+    marginBottom: 12,
+  },
+  alertasTitulo: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: ClinicalColors.text,
+    marginBottom: 10,
+  },
+  alertaItem: { marginBottom: 10 },
+  alertaDescricao: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: ClinicalColors.text,
+  },
+  alertaSerie: {
+    fontSize: 13,
+    color: ClinicalColors.textSecondary,
+    marginTop: 2,
+  },
+  alertasRodape: {
+    fontSize: 12,
+    color: ClinicalColors.textMuted,
+    fontStyle: "italic",
+    marginTop: 2,
+  },
   cabecalho: {
     flexDirection: "row",
     alignItems: "center",
