@@ -47,6 +47,11 @@ export async function apiFetch(
   if (tokenEmMemoria) headers.set("Authorization", `Bearer ${tokenEmMemoria}`);
 
   const resp = await fetch(`${API_URL}${rota}`, { ...opcoes, headers });
-  if (resp.status === 401) throw new ErroAutenticacao("Sessão expirada.");
+  // Só é "sessão expirada" quando havia token (requisição autenticada). No login/
+  // cadastro não há token: deixa o 401 passar para o chamador mostrar o erro real
+  // (ex.: "E-mail ou senha incorretos.").
+  if (resp.status === 401 && tokenEmMemoria) {
+    throw new ErroAutenticacao("Sessão expirada.");
+  }
   return resp;
 }

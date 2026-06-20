@@ -5,8 +5,13 @@
  * com evolucoes_diarias ricas (séries de sinais vitais e exames laboratoriais)
  * para exercitar a evolução temporal e os alertas de tendência.
  *
- * Rodar:
- *   cd backend && node scripts/seed-pacientes.js
+ * Rodar (aponte para o banco do Railway — use a connection string PÚBLICA, a
+ * interna *.railway.internal só funciona dentro do Railway):
+ *   cd backend
+ *   DATABASE_URL="postgresql://...proxy.rlwy.net:PORTA/railway" node scripts/seed-pacientes.js
+ *
+ * A URL pública está no Railway → serviço Postgres → aba Variables
+ * (DATABASE_PUBLIC_URL) ou em Connect → Public Network.
  *
  * Idempotente: usuário e hospital fazem upsert (cria ou atualiza); pacientes e
  * evolucoes_diarias usam ON CONFLICT DO NOTHING (não duplicam). Para reseedar do
@@ -16,6 +21,16 @@
 require("dotenv").config();
 const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
+
+if (!process.env.DATABASE_URL) {
+  console.error(
+    "✗ DATABASE_URL ausente. Rode apontando para o Postgres do Railway:\n" +
+      '  DATABASE_URL="postgresql://...proxy.rlwy.net:PORTA/railway" node scripts/seed-pacientes.js\n' +
+      "  (URL pública em Railway → Postgres → Variables → DATABASE_PUBLIC_URL)",
+  );
+  process.exit(1);
+}
+
 const db = require("../db");
 
 // ── Configuração do usuário/hospital de teste ───────────────────────────────
@@ -25,7 +40,6 @@ const USUARIO = {
   senha: "Safracore@2024",
   categoria: "medico",
   especialidade: "clinica_medica",
-  trialDias: 90,
 };
 const HOSPITAL = {
   id: "hosp-hnsc",
@@ -487,18 +501,19 @@ async function main() {
       `UPDATE usuarios
           SET nome = $1, senha_hash = $2, categoria = $3, especialidade = $4,
               nome_exibicao = $1, plano = 'trial',
-              trial_fim = NOW() + ($5::int || ' days')::interval
-        WHERE id = $6`,
-      [USUARIO.nome, senhaHash, USUARIO.categoria, USUARIO.especialidade, USUARIO.trialDias, medicoId],
+              trial_inicio = NOW(),
+              trial_fim = NOW() + INTERVAL '90 days'
+        WHERE id = $5`,
+      [USUARIO.nome, senhaHash, USUARIO.categoria, USUARIO.especialidade, medicoId],
     );
     console.log(`Usuário atualizado: ${USUARIO.email} (${medicoId})`);
   } else {
     medicoId = crypto.randomUUID();
     await db.query(
       `INSERT INTO usuarios
-         (id, nome, email, senha_hash, categoria, especialidade, nome_exibicao, plano, trial_fim)
-       VALUES ($1, $2, $3, $4, $5, $6, $2, 'trial', NOW() + ($7::int || ' days')::interval)`,
-      [medicoId, USUARIO.nome, USUARIO.email, senhaHash, USUARIO.categoria, USUARIO.especialidade, USUARIO.trialDias],
+         (id, nome, email, senha_hash, categoria, especialidade, nome_exibicao, plano, trial_inicio, trial_fim)
+       VALUES ($1, $2, $3, $4, $5, $6, $2, 'trial', NOW(), NOW() + INTERVAL '90 days')`,
+      [medicoId, USUARIO.nome, USUARIO.email, senhaHash, USUARIO.categoria, USUARIO.especialidade],
     );
     console.log(`Usuário criado: ${USUARIO.email} (${medicoId})`);
   }

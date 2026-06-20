@@ -5,12 +5,25 @@
  * do JSONB dados (o app filtra a lista por dados.hospitalId — atualizar só a
  * coluna não moveria os pacientes na tela).
  *
- * Rodar:
- *   cd backend && node scripts/migrar-hospital.js
+ * Rodar (aponte para o banco do Railway — connection string PÚBLICA):
+ *   cd backend
+ *   DATABASE_URL="postgresql://...proxy.rlwy.net:PORTA/railway" node scripts/migrar-hospital.js
+ *
+ * A URL pública está no Railway → serviço Postgres → Variables (DATABASE_PUBLIC_URL).
  */
 
 require("dotenv").config();
 const crypto = require("crypto");
+
+if (!process.env.DATABASE_URL) {
+  console.error(
+    "✗ DATABASE_URL ausente. Rode apontando para o Postgres do Railway:\n" +
+      '  DATABASE_URL="postgresql://...proxy.rlwy.net:PORTA/railway" node scripts/migrar-hospital.js\n' +
+      "  (URL pública em Railway → Postgres → Variables → DATABASE_PUBLIC_URL)",
+  );
+  process.exit(1);
+}
+
 const db = require("../db");
 
 const EMAIL_LETICIA = "leticiasoares655@gmail.com";
