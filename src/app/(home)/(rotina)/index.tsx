@@ -32,6 +32,8 @@ import { extrairDadosImagem } from "@/lib/extrairDadosImagem";
 import { formatarNome } from "@/lib/formatarNome";
 import { converterParaJpegBase64 } from "@/lib/imagem";
 import { ModalMigracao } from "@/components/ModalMigracao";
+import { PassarPlantaoModal } from "@/components/PassarPlantaoModal";
+import * as rede from "@/lib/rede";
 import { useAcoes } from "@/store/AcoesContext";
 import { KEY_MIGRACAO_GERAL, useHospitais } from "@/store/HospitaisContext";
 import { usePacientes } from "@/store/PacientesContext";
@@ -178,6 +180,16 @@ export default function Index() {
     setMigracaoVisivel(false);
     if (sucesso) AsyncStorage.setItem(KEY_MIGRACAO_GERAL, "1").catch(() => {});
   };
+
+  // Botão "Passar plantão" só aparece se houver conexões ou grupos.
+  const [passarVisivel, setPassarVisivel] = useState(false);
+  const [temRede, setTemRede] = useState(false);
+  useEffect(() => {
+    Promise.all([
+      rede.listarConexoes().catch(() => []),
+      rede.listarGrupos().catch(() => []),
+    ]).then(([cx, gr]) => setTemRede(cx.length + gr.length > 0));
+  }, []);
   const [processando, setProcessando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [modalVisivel, setModalVisivel] = useState(false);
@@ -402,6 +414,16 @@ export default function Index() {
             <Ionicons name="chevron-forward" size={14} color={ClinicalColors.primary} />
           </TouchableOpacity>
           <Text style={styles.subtitulo}>{dataPorExtenso()}</Text>
+          {temRede && (
+            <TouchableOpacity
+              style={styles.passarBtn}
+              onPress={() => setPassarVisivel(true)}
+              hitSlop={6}
+            >
+              <Ionicons name="arrow-redo-outline" size={15} color={ClinicalColors.primary} />
+              <Text style={styles.passarTxt}>Passar plantão</Text>
+            </TouchableOpacity>
+          )}
         </View>
         {processando && <ActivityIndicator color={ClinicalColors.primary} />}
       </View>
@@ -509,6 +531,11 @@ export default function Index() {
                           {!!item.diagnosticoPrincipal && (
                             <Text style={styles.diagnostico} numberOfLines={2}>
                               {item.diagnosticoPrincipal}
+                            </Text>
+                          )}
+                          {!!item.recebidoDe && (
+                            <Text style={styles.recebidoTag}>
+                              ↓ {item.recebidoDe.nome}
                             </Text>
                           )}
                           <View style={styles.metaRow}>
@@ -644,6 +671,7 @@ export default function Index() {
       </Modal>
 
       <ModalMigracao visivel={migracaoVisivel} onConcluir={concluirMigracao} />
+      <PassarPlantaoModal visivel={passarVisivel} onFechar={() => setPassarVisivel(false)} />
     </View>
   );
 }
@@ -760,6 +788,14 @@ const styles = StyleSheet.create({
   },
   subtitulo: {
     fontSize: 14,
+    color: ClinicalColors.textMuted,
+    marginTop: 2,
+  },
+  passarBtn: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 8 },
+  passarTxt: { color: ClinicalColors.primary, fontSize: 15, fontWeight: "600" },
+  recebidoTag: {
+    fontSize: 11,
+    fontStyle: "italic",
     color: ClinicalColors.textMuted,
     marginTop: 2,
   },

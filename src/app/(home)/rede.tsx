@@ -14,6 +14,7 @@ import {
   View,
 } from "react-native";
 
+import { PassarPlantaoModal } from "@/components/PassarPlantaoModal";
 import { ClinicalColors as C, Radius } from "@/constants/clinicalTheme";
 import * as rede from "@/lib/rede";
 import { useHospitais } from "@/store/HospitaisContext";
@@ -41,6 +42,7 @@ export default function RedeScreen() {
   const [atualizando, setAtualizando] = useState(false);
   const [expandida, setExpandida] = useState<number | null>(null);
   const [modal, setModal] = useState<ModalAtivo>(null);
+  const [passarPara, setPassarPara] = useState<{ id: string; nome: string } | null>(null);
 
   const carregar = useCallback(async () => {
     const [pg, gr, cx, sl] = await Promise.all([
@@ -209,6 +211,12 @@ export default function RedeScreen() {
                 {[c.especialidade, c.categoria].filter(Boolean).join(" · ")}
               </Text>
             </View>
+            <TouchableOpacity
+              style={styles.passarBtn}
+              onPress={() => setPassarPara({ id: c.id, nome: c.nome_exibicao })}
+            >
+              <Text style={styles.passarBtnTxt}>Passar →</Text>
+            </TouchableOpacity>
           </View>
         ))}
         <View style={styles.linhaBotoes}>
@@ -285,6 +293,11 @@ export default function RedeScreen() {
         hospitalCnes={hosp?.cnes}
         onFechar={() => setModal(null)}
         onConectou={carregar}
+      />
+      <PassarPlantaoModal
+        visivel={!!passarPara}
+        destinatarioPre={passarPara ?? undefined}
+        onFechar={() => setPassarPara(null)}
       />
     </View>
   );
@@ -520,6 +533,8 @@ const styles = StyleSheet.create({
   // Conectar (busca)
   btnConectar: { backgroundColor: C.primary, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 },
   btnConectarTxt: { color: "#fff", fontSize: 14, fontWeight: "600" },
+  passarBtn: { backgroundColor: C.background, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
+  passarBtnTxt: { color: C.primary, fontSize: 13, fontWeight: "600" },
   enviado: { color: C.textMuted, fontSize: 14, fontWeight: "600" },
 
   // Modais

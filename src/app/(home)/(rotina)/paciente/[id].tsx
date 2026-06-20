@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useEffect, useState } from "react";
 import {
     ActivityIndicator,
@@ -174,6 +175,29 @@ export default function Paciente() {
   const paciente = getPaciente(id);
   const diaInternacao = paciente ? diaDeInternacao(paciente.dataEntrada) : null;
 
+  // Banner "recebido de" (só até ser fechado uma vez; persistido por paciente).
+  const KEY_RECEBIDO_VISTO = "@passandocaso/recebidoVisto";
+  const [bannerRecebido, setBannerRecebido] = useState(false);
+  useEffect(() => {
+    if (!paciente?.recebidoDe) {
+      setBannerRecebido(false);
+      return;
+    }
+    AsyncStorage.getItem(KEY_RECEBIDO_VISTO).then((raw) => {
+      const vistos: string[] = raw ? JSON.parse(raw) : [];
+      setBannerRecebido(!vistos.includes(id));
+    });
+  }, [paciente?.recebidoDe, id]);
+  const fecharBannerRecebido = () => {
+    setBannerRecebido(false);
+    AsyncStorage.getItem(KEY_RECEBIDO_VISTO).then((raw) => {
+      const vistos: string[] = raw ? JSON.parse(raw) : [];
+      if (!vistos.includes(id)) {
+        AsyncStorage.setItem(KEY_RECEBIDO_VISTO, JSON.stringify([...vistos, id])).catch(() => {});
+      }
+    });
+  };
+
   // Edição
   const [editando, setEditando] = useState(false);
   const [nomeForm, setNomeForm] = useState("");
@@ -254,6 +278,17 @@ export default function Paciente() {
           <Text style={styles.botaoVoltarTexto}>Voltar</Text>
         </TouchableOpacity>
       </View>
+
+      {bannerRecebido && paciente?.recebidoDe && (
+        <View style={styles.bannerRecebido}>
+          <Text style={styles.bannerRecebidoTexto}>
+            Paciente recebido de {paciente.recebidoDe.nome} — revise as informações
+          </Text>
+          <TouchableOpacity onPress={fecharBannerRecebido} hitSlop={8}>
+            <Ionicons name="close" size={18} color={ClinicalColors.warning} />
+          </TouchableOpacity>
+        </View>
+      )}
 
       {!paciente ? (
         <Text style={styles.aviso}>
@@ -2318,6 +2353,22 @@ const styles = StyleSheet.create({
   },
   botaoVoltar: { flexDirection: "row", alignItems: "center" },
   botaoVoltarTexto: { color: ClinicalColors.primary, fontSize: 17 },
+  bannerRecebido: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: ClinicalColors.warningBg,
+    borderRadius: Radius.card,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 12,
+  },
+  bannerRecebidoTexto: {
+    flex: 1,
+    color: ClinicalColors.warning,
+    fontSize: 13,
+    lineHeight: 18,
+  },
   aviso: { color: ClinicalColors.textMuted, fontSize: 15, marginTop: 24 },
   cabecalho: {
     flexDirection: "row",

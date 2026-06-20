@@ -174,6 +174,8 @@ export type Paciente = CabecalhoProntuario & {
   status: StatusType;
   /** Hospital ao qual o paciente pertence (default "geral" para registros antigos). */
   hospitalId?: string;
+  /** Origem quando recebido por passagem de plantão (tag "recebido de"). */
+  recebidoDe?: { id: string; nome: string };
   /** Diagnóstico principal (texto livre, editável). */
   diagnosticoPrincipal?: string;
   /** Motivo da internação (texto livre, editável). */

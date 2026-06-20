@@ -533,12 +533,24 @@ router.put("/rede/passagem/:id/aceitar", async (req, res) => {
       );
       if (h.rows[0]) destinoHosp = h.rows[0].id;
     }
+    // Nome do remetente para a tag "recebido de".
+    const rem = await db.query(
+      "SELECT nome, nome_exibicao FROM usuarios WHERE id = $1",
+      [pg.remetente_id],
+    );
+    const remNome = rem.rows[0]?.nome_exibicao || rem.rows[0]?.nome || "colega";
+
     const lista = Array.isArray(pg.pacientes) ? pg.pacientes : [];
     const hoje = new Date().toISOString().slice(0, 10);
     let n = 0;
     for (const p of lista) {
       if (!p || !p.id) continue;
-      const dados = { ...p, hospitalId: destinoHosp, status: "naoVisitado", recebidoDe: pg.remetente_id };
+      const dados = {
+        ...p,
+        hospitalId: destinoHosp,
+        status: "naoVisitado",
+        recebidoDe: { id: pg.remetente_id, nome: remNome },
+      };
       await db.query(
         `INSERT INTO pacientes (id, medico_id, hospital_id, data_criacao, dados, updated_at)
          VALUES ($1,$2,$3,$4,$5,NOW())
