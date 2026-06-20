@@ -8,6 +8,7 @@ const db = require("./db");
 const auth = require("./auth");
 const redeRouter = require("./rede");
 const farmacoRouter = require("./farmaco");
+const escores = require("./escores");
 const { analisarTendencias } = require("./alertasTendencia");
 const ontologia = require("./ontologia");
 const icd11 = require("./icd11");
@@ -617,6 +618,8 @@ app.post("/api/pacientes/sync", auth.autenticar, async (req, res) => {
                updated_at = NOW()`,
         [p.id, req.usuario.id, p.hospitalId || "geral", dataCriacao, p],
       );
+      // Trigger Fase 3: recalcula e persiste os escores em background (não bloqueia).
+      escores.recalcularEmBackground(p.id, p, req.usuario.id);
     }
     res.json({ status: "ok", total: pacientes.length });
   } catch (e) {
@@ -1086,6 +1089,9 @@ app.use("/api", redeRouter);
 
 // Fase 3 — segurança farmacológica (interações, posologia, ajuste renal/TFG).
 app.use("/api", farmacoRouter);
+
+// Fase 3 — escores clínicos automáticos (cálculo + persistência + histórico).
+app.use("/api", escores.router);
 
 // Tratador de erros final: corpo acima do limite (express.json) vira 413 claro
 // em vez de erro genérico.

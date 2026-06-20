@@ -257,6 +257,30 @@ async function initDB() {
     "CREATE UNIQUE INDEX IF NOT EXISTS idx_ajuste_renal_med ON ajuste_renal(medicamento);",
   );
 
+  // === FASE 3 — Escores clínicos automáticos (persistência + histórico) ===
+  // Observação: pacientes.id e usuarios.id são TEXT neste schema, então
+  // paciente_id/calculado_por são TEXT (mantendo as FKs). O PK usa UUID via
+  // pgcrypto (gen_random_uuid).
+  await pool.query("CREATE EXTENSION IF NOT EXISTS pgcrypto;");
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS escores_clinicos (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      paciente_id TEXT NOT NULL REFERENCES pacientes(id) ON DELETE CASCADE,
+      tipo VARCHAR(30) NOT NULL,
+      valor_total INTEGER NOT NULL,
+      classificacao VARCHAR(80),
+      detalhes JSONB NOT NULL,
+      fonte VARCHAR(20) DEFAULT 'auto',
+      campos_faltantes TEXT[],
+      calculado_em TIMESTAMPTZ DEFAULT NOW(),
+      calculado_por TEXT REFERENCES usuarios(id),
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+  `);
+  await pool.query(
+    "CREATE INDEX IF NOT EXISTS idx_escores_paciente ON escores_clinicos(paciente_id, tipo, calculado_em DESC);",
+  );
+
   console.log("PostgreSQL — tabelas verificadas/criadas.");
 }
 
