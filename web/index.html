@@ -1186,9 +1186,49 @@
           <h3>Passando o Caso — ${esc(formatarNome(p.nomeCompleto))}</h3>
           <textarea id="pc-texto">${esc(texto)}</textarea>
           <p class="vazio" style="margin:8px 0">Revise e ajuste antes de copiar. Você decide o conteúdo final.</p>
-          <div class="modal-acoes"><button class="btn-sec" onclick="fecharModal()">← Fechar</button><button class="btn-ok verde" id="pc-copiar" onclick="copiarCaso()">📋 Copiar</button></div>
+          <div class="modal-acoes"><button class="btn-sec" onclick="fecharModal()">← Fechar</button><button class="btn-sec" id="pc-refinar" onclick="refinarCaso()">✨ Refinar com IA</button><button class="btn-ok verde" id="pc-copiar" onclick="copiarCaso()">📋 Copiar</button></div>
           <div id="pc-status" class="vazio" style="margin-top:8px"></div>
         </div></div>`;
+      }
+
+      // Instrução RÍGIDA: melhora só a redação dentro de cada linha, sem mexer na
+      // estrutura, nos marcadores nem nas quebras de linha do formato clínico.
+      const INSTRUCAO_ELEGANTE =
+        "Você recebe uma EVOLUÇÃO MÉDICA já estruturada. Melhore APENAS a elegância da redação DENTRO de cada linha: " +
+        "corrija ortografia, acentuação, pontuação, espaçamento e capitalização. " +
+        "REGRAS ABSOLUTAS: " +
+        "1) Preserve EXATAMENTE a estrutura: as mesmas linhas, na mesma ordem, com as MESMAS quebras de linha. " +
+        "2) NUNCA altere, traduza, mova ou remova os marcadores/títulos: 'Evolução Médica', '- Atual:', '- Antibióticos:', '- Culturais:', '* Comorbidades:', '* MUC:', '* Alergias:', '*HDA:', '*S:', 'SSVV:', '*O:', 'Exames laboratoriais:', 'Exames de imagem:', '*A:', '*P:'. " +
+        "3) NÃO junte linhas nem crie linhas novas; cada item permanece na sua própria linha. " +
+        "4) NÃO adicione, infira, interprete, diagnostique nem sugira conduta; não invente valores; não expanda nem traduza siglas clínicas (ex.: REG, BEG, MEG, PIRF, RR 2T BNF, MV+, RHA+, TEC). " +
+        "Responda SOMENTE com o texto final, sem comentários nem marcações de código.";
+      let pcOriginal = "";
+      async function refinarCaso() {
+        const ta = document.getElementById("pc-texto");
+        const btn = document.getElementById("pc-refinar");
+        const st = document.getElementById("pc-status");
+        if (!ta) return;
+        pcOriginal = ta.value;
+        btn.disabled = true; btn.textContent = "✨ Refinando…";
+        st.innerHTML = "";
+        try {
+          const r = await apiPost("/api/formatar", { texto: ta.value, instrucao: INSTRUCAO_ELEGANTE });
+          if (r && r.texto && r.texto.trim()) {
+            ta.value = r.texto;
+            st.innerHTML = '<span style="color:var(--accent)">✓ Texto refinado</span> · <a href="#" onclick="reverterCaso();return false">Reverter ao original</a>';
+          } else {
+            st.innerHTML = '<span class="erro">Não foi possível refinar.</span>';
+          }
+        } catch (e) {
+          st.innerHTML = '<span class="erro">Falha ao refinar (' + esc(e.message || "") + ')</span>';
+        } finally {
+          btn.disabled = false; btn.textContent = "✨ Refinar com IA";
+        }
+      }
+      function reverterCaso() {
+        const ta = document.getElementById("pc-texto");
+        if (ta && pcOriginal) ta.value = pcOriginal;
+        document.getElementById("pc-status").innerHTML = "";
       }
       async function copiarCaso() {
         const p = pa(); const ta = document.getElementById("pc-texto"); const texto = ta.value;
