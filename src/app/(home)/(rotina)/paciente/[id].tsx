@@ -48,7 +48,14 @@ import { extrairDadosImagem } from "@/lib/extrairDadosImagem";
 import { formatarNome } from "@/lib/formatarNome";
 import { gerarResumoIA } from "@/lib/gerarResumoIA";
 import { converterParaJpegBase64 } from "@/lib/imagem";
-import { agruparPorExame, TENDENCIA_INFO } from "@/lib/lab";
+import { agruparPorExame, type ExameSerie, TENDENCIA_INFO } from "@/lib/lab";
+import {
+  buscarReferencia,
+  type ReferenciaLab,
+  statusReferencia,
+  textoReferencia,
+  valorNumerico,
+} from "@/lib/ontologia";
 import { montarDadosParaResumo } from "@/lib/resumoPaciente";
 import {
   type AlertaTendencia,
@@ -1225,6 +1232,7 @@ function SecaoExpansivel({
       const json = await extrairDadosImagem<{ blocos: Bloco[] }>(
         base64,
         `${instrucao} ${SUFIXO_JSON}`,
+        secaoId,
       );
       onExtraido(JSON.stringify(json.blocos ?? []));
     } catch (e) {
@@ -2401,36 +2409,88 @@ function LabEvolucao({
           <Text style={styles.vazioTexto}>Nenhum resultado por data ainda.</Text>
         ) : null
       ) : (
-        series.map((s) => {
-          const info = s.tendencia ? TENDENCIA_INFO[s.tendencia] : null;
-          return (
-            <View key={s.exame} style={styles.labLinha}>
-              <View style={styles.labLinhaTopo}>
-                <Text style={styles.labExame}>{s.exame}</Text>
-                <View style={styles.labLinhaDir}>
-                  {info && (
-                    <Text style={[styles.labTend, { color: info.cor }]}>
-                      {info.icone} {info.rotulo}
-                    </Text>
-                  )}
-                  {editando && (
-                    <TouchableOpacity
-                      onPress={() => removerExame(s.exame)}
-                      hitSlop={8}
-                    >
-                      <Ionicons name="trash-outline" size={16} color={ClinicalColors.danger} />
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
-              <Text style={styles.labSerie}>
-                {s.pontos
-                  .map((p) => `${p.valor} (${formatarDataBR(p.data).slice(0, 5)})`)
-                  .join("  →  ")}
-              </Text>
-            </View>
-          );
-        })
+        series.map((s) => (
+          <LabSerieLinha
+            key={s.exame}
+            serie={s}
+            editando={editando}
+            onRemover={() => removerExame(s.exame)}
+          />
+        ))
+      )}
+    </View>
+  );
+}
+
+/**
+ * Uma linha de exame na evolução laboratorial: série de valores, tendência e —
+ * via ontologia — a faixa de referência oficial (LOINC) com badge discreto se o
+ * último valor estiver fora. O app só EXIBE a referência; avaliação é clínica.
+ */
+function LabSerieLinha({
+  serie,
+  editando,
+  onRemover,
+}: {
+  serie: ExameSerie;
+  editando?: boolean;
+  onRemover: () => void;
+}) {
+  const [ref, setRef] = useState<ReferenciaLab | null>(null);
+  useEffect(() => {
+    let vivo = true;
+    buscarReferencia(serie.exame).then((r) => {
+      if (vivo) setRef(r);
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [serie.exame]);
+
+  const info = serie.tendencia ? TENDENCIA_INFO[serie.tendencia] : null;
+  const ultimo = serie.pontos[serie.pontos.length - 1]?.valor;
+  const status = ref ? statusReferencia(valorNumerico(ultimo), ref) : "normal";
+  const textoRef = ref ? textoReferencia(ref) : "";
+
+  return (
+    <View style={styles.labLinha}>
+      <View style={styles.labLinhaTopo}>
+        <Text style={styles.labExame}>{serie.exame}</Text>
+        <View style={styles.labLinhaDir}>
+          {info && (
+            <Text style={[styles.labTend, { color: info.cor }]}>
+              {info.icone} {info.rotulo}
+            </Text>
+          )}
+          {editando && (
+            <TouchableOpacity onPress={onRemover} hitSlop={8}>
+              <Ionicons name="trash-outline" size={16} color={ClinicalColors.danger} />
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+      <Text style={styles.labSerie}>
+        {serie.pontos
+          .map((p) => `${p.valor} (${formatarDataBR(p.data).slice(0, 5)})`)
+          .join("  →  ")}
+      </Text>
+      {ref?.encontrado && !!textoRef && (
+        <View style={styles.labRefRow}>
+          <Text style={styles.labRefTexto}>({textoRef})</Text>
+          {status === "fora" && (
+            <Text style={[styles.labRefBadge, styles.labRefBadgeFora]}>
+              Fora do ref.
+            </Text>
+          )}
+          {status === "atencao" && (
+            <Text style={[styles.labRefBadge, styles.labRefBadgeAtencao]}>
+              Atenção
+            </Text>
+          )}
+          {!!ref.fonte && (
+            <Text style={styles.labRefFonte}>Fonte: {ref.fonte}</Text>
+          )}
+        </View>
       )}
     </View>
   );
@@ -3381,6 +3441,26 @@ const styles = StyleSheet.create({
   labExame: { fontSize: 14, fontWeight: "700", color: ClinicalColors.text },
   labTend: { fontSize: 13, fontWeight: "600" },
   labSerie: { fontSize: 14, color: ClinicalColors.text, lineHeight: 20 },
+  // Referência laboratorial oficial (ontologia/LOINC).
+  labRefRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 4,
+  },
+  labRefTexto: { fontSize: 12, color: ClinicalColors.textMuted },
+  labRefBadge: {
+    fontSize: 11,
+    fontWeight: "700",
+    borderRadius: Radius.badge,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    overflow: "hidden",
+  },
+  labRefBadgeFora: { backgroundColor: "#FFF8E7", color: "#C77700" },
+  labRefBadgeAtencao: { backgroundColor: "#FFE0B2", color: "#E65100" },
+  labRefFonte: { fontSize: 10, color: ClinicalColors.textMuted },
 
   // Sinais vitais estruturados
   svBox: { marginTop: 8 },

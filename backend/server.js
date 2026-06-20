@@ -8,6 +8,7 @@ const db = require("./db");
 const auth = require("./auth");
 const redeRouter = require("./rede");
 const { analisarTendencias } = require("./alertasTendencia");
+const ontologia = require("./ontologia");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -67,7 +68,7 @@ app.get("/health", (_req, res) => {
  * Body: { imagemBase64: string, instrucao: string }
  */
 app.post("/api/extract", auth.autenticar, async (req, res) => {
-  const { imagemBase64, instrucao } = req.body || {};
+  const { imagemBase64, instrucao, secao } = req.body || {};
   if (!imagemBase64 || !instrucao) {
     return res
       .status(400)
@@ -104,6 +105,15 @@ app.post("/api/extract", auth.autenticar, async (req, res) => {
     const bloco = msg.content.find((c) => c.type === "text");
     const texto = bloco ? bloco.text : "";
     const dados = JSON.parse(extrairBlocoJson(texto));
+    // Camada de ontologia: valida/enriquece (não-destrutivo) e alimenta o
+    // feedback loop com termos não reconhecidos. Best-effort: nunca quebra.
+    if (dados && Array.isArray(dados.blocos) && secao) {
+      try {
+        dados.validacao = await ontologia.validarComOntologia(dados.blocos, secao);
+      } catch (e) {
+        console.error("Ontologia (validação) falhou:", e.message);
+      }
+    }
     res.json(dados);
   } catch (e) {
     console.error("Erro em /api/extract:", e);
@@ -959,6 +969,58 @@ app.get("/api/alertas/:pacienteId", auth.autenticar, async (req, res) => {
   } catch (e) {
     console.error("Erro em GET /api/alertas:", e);
     res.status(500).json({ erro: e.message || "Falha ao calcular alertas." });
+  }
+});
+
+// === FASE 3 — Ontologia clínica ===
+// Referência laboratorial oficial (LOINC) por nome do exame, ajustada por sexo.
+app.get("/api/ontologia/referencia/:lab", auth.autenticar, async (req, res) => {
+  try {
+    const ref = await ontologia.referenciaLab(req.params.lab, req.query.sexo);
+    if (!ref) return res.json({ encontrado: false });
+    res.json({ encontrado: true, ...ref });
+  } catch (e) {
+    console.error("Erro em /api/ontologia/referencia:", e);
+    res.status(500).json({ erro: e.message || "Falha ao buscar referência." });
+  }
+});
+
+// LOINC por termo: serve do acervo local (semeado). Fallback externo é
+// best-effort — a base do LOINC não tem API pública JSON aberta, então o
+// acervo local é a fonte primária.
+app.get("/api/ontologia/loinc/:termo", auth.autenticar, async (req, res) => {
+  try {
+    const t = await ontologia.buscarTermo(req.params.termo, "exame_lab");
+    if (!t) return res.json({ encontrado: false });
+    res.json({
+      encontrado: true,
+      loinc: t.loinc,
+      nome: t.termo,
+      unidade: t.unidade,
+      refMin: t.valor_ref_min != null ? Number(t.valor_ref_min) : null,
+      refMax: t.valor_ref_max != null ? Number(t.valor_ref_max) : null,
+      fonte: t.fonte || "LOINC",
+    });
+  } catch (e) {
+    res.status(500).json({ erro: e.message });
+  }
+});
+
+// CID por termo: serve do acervo local (CID-10 semeado). A API CID-11 da OMS
+// exige OAuth (ICD API) — integração externa fica para etapa posterior.
+app.get("/api/ontologia/cid/:termo", auth.autenticar, async (req, res) => {
+  try {
+    const t = await ontologia.buscarTermo(req.params.termo, "comorbidade");
+    if (!t) return res.json({ encontrado: false });
+    res.json({
+      encontrado: true,
+      cid10: t.cid10,
+      cid11: t.cid11 || null,
+      titulo: t.termo,
+      fonte: t.fonte || "CID10",
+    });
+  } catch (e) {
+    res.status(500).json({ erro: e.message });
   }
 });
 

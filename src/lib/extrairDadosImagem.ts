@@ -13,10 +13,11 @@ import { apiFetch } from "./sessao";
 export async function extrairDadosImagem<T>(
   base64: string,
   instrucao: string,
+  secao?: string,
 ): Promise<T> {
   const response = await apiFetch("/api/extract", {
     method: "POST",
-    body: JSON.stringify({ imagemBase64: base64, instrucao }),
+    body: JSON.stringify({ imagemBase64: base64, instrucao, secao }),
   });
 
   const respostaTexto = await response.text();

@@ -176,6 +176,39 @@ async function initDB() {
     "CREATE INDEX IF NOT EXISTS idx_evolucoes_paciente ON evolucoes_diarias(paciente_id, data DESC);",
   );
 
+  // === FASE 3 — Ontologia clínica (termos normalizados + referências) ===
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS termos_clinicos (
+      id SERIAL PRIMARY KEY,
+      termo TEXT NOT NULL,
+      termo_normalizado TEXT NOT NULL,
+      categoria TEXT NOT NULL,
+      subcategoria TEXT,
+      classe_farmacologica TEXT,
+      unidade TEXT,
+      valor_ref_min NUMERIC,
+      valor_ref_max NUMERIC,
+      valor_ref_contexto TEXT,
+      cid10 TEXT,
+      cid11 TEXT,
+      loinc TEXT,
+      sinonimos TEXT[],
+      fonte TEXT,
+      ativo BOOLEAN DEFAULT TRUE,
+      criado_em TIMESTAMP DEFAULT NOW()
+    );
+  `);
+  await pool.query(
+    "CREATE INDEX IF NOT EXISTS idx_termos_termo ON termos_clinicos USING gin(sinonimos);",
+  );
+  await pool.query(
+    "CREATE INDEX IF NOT EXISTS idx_termos_categoria ON termos_clinicos(categoria);",
+  );
+  // Unicidade para upsert idempotente do seed e do feedback loop.
+  await pool.query(
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_termos_unico ON termos_clinicos(termo_normalizado, categoria, COALESCE(valor_ref_contexto, ''));",
+  );
+
   console.log("PostgreSQL — tabelas verificadas/criadas.");
 }
 
