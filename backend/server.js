@@ -9,6 +9,7 @@ const auth = require("./auth");
 const redeRouter = require("./rede");
 const farmacoRouter = require("./farmaco");
 const escores = require("./escores");
+const interacoesFda = require("./interacoesFda");
 const { analisarTendencias } = require("./alertasTendencia");
 const ontologia = require("./ontologia");
 const icd11 = require("./icd11");
@@ -620,6 +621,10 @@ app.post("/api/pacientes/sync", auth.autenticar, async (req, res) => {
       );
       // Trigger Fase 3: recalcula e persiste os escores em background (não bloqueia).
       escores.recalcularEmBackground(p.id, p, req.usuario.id);
+      // Trigger Fase 3: enriquece o cache de interações (OpenFDA+IA) em background.
+      if (Array.isArray(p.medicamentos) && p.medicamentos.length > 1) {
+        interacoesFda.verificarEmBackground(p.medicamentos.map((m) => m.texto));
+      }
     }
     res.json({ status: "ok", total: pacientes.length });
   } catch (e) {

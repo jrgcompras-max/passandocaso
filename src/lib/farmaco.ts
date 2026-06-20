@@ -7,7 +7,7 @@ import { apiFetch } from "./sessao";
  * (retornam vazio) para não atrapalhar o fluxo clínico.
  */
 
-export type Severidade = "leve" | "moderada" | "grave";
+export type Severidade = "leve" | "moderada" | "grave" | "desconhecida";
 
 export type Interacao = {
   medicamentoA: string;

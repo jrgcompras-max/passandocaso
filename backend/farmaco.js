@@ -14,6 +14,7 @@ const express = require("express");
 const auth = require("./auth");
 const db = require("./db");
 const ontologia = require("./ontologia");
+const interacoesFda = require("./interacoesFda");
 
 const router = express.Router();
 router.use(auth.autenticar); // exige login
@@ -87,6 +88,9 @@ router.post("/farmaco/interacoes", async (req, res) => {
       fonte: row.fonte || "ANVISA/Micromedex",
     }));
     res.json({ interacoes });
+    // Enriquecimento progressivo: pares ainda não cacheados são consultados na
+    // OpenFDA+IA em background; aparecem na próxima leitura (não bloqueia esta).
+    interacoesFda.verificarEmBackground(lista);
   } catch (e) {
     console.error("Erro em POST /api/farmaco/interacoes:", e);
     res.status(500).json({ erro: e.message || "Falha ao analisar interações." });
@@ -183,6 +187,73 @@ router.post("/farmaco/tfg", async (req, res) => {
   tfg = Math.round(tfg);
   const { estadio, descricao } = estadioTFG(tfg);
   res.json({ tfg, estadio, descricao, fonte: "CKD-EPI 2021 · KDIGO" });
+});
+
+/**
+ * POST /api/pacientes/:id/interacoes
+ * Verificação completa (cache → OpenFDA → IA) das interações entre uma lista de
+ * medicamentos. Body: { medicamentos: [...] } (ou usa os da ficha se omitido).
+ */
+router.post("/pacientes/:id/interacoes", async (req, res) => {
+  try {
+    const dono = await db.query(
+      "SELECT dados FROM pacientes WHERE id = $1 AND medico_id = $2",
+      [req.params.id, req.usuario.id],
+    );
+    if (!dono.rows[0]) return res.status(404).json({ erro: "Paciente não encontrado." });
+    const body = req.body || {};
+    const meds = Array.isArray(body.medicamentos)
+      ? body.medicamentos
+      : (dono.rows[0].dados.medicamentos || []).map((m) => m.texto);
+    const interacoes = await interacoesFda.verificarInteracoes(meds);
+    res.json({ interacoes });
+  } catch (e) {
+    console.error("Erro em POST /api/pacientes/:id/interacoes:", e);
+    res.status(500).json({ erro: e.message || "Falha ao verificar interações." });
+  }
+});
+
+/** GET /api/pacientes/:id/interacoes — interações já cacheadas para os meds atuais. */
+router.get("/pacientes/:id/interacoes", async (req, res) => {
+  try {
+    const dono = await db.query(
+      "SELECT dados FROM pacientes WHERE id = $1 AND medico_id = $2",
+      [req.params.id, req.usuario.id],
+    );
+    if (!dono.rows[0]) return res.status(404).json({ erro: "Paciente não encontrado." });
+    const meds = (dono.rows[0].dados.medicamentos || []).map((m) => m.texto);
+    // Resolve os INNs e busca SÓ no cache (sem disparar OpenFDA aqui).
+    const inns = [];
+    const vistos = new Set();
+    for (const nome of meds) {
+      const r = await interacoesFda.resolverINN(nome);
+      if (r.pt && !vistos.has(r.pt)) {
+        vistos.add(r.pt);
+        inns.push(r.pt);
+      }
+    }
+    if (inns.length < 2) return res.json({ interacoes: [] });
+    const r = await db.query(
+      `SELECT medicamento_a, medicamento_b, severidade, descricao, mecanismo, conduta_recomendada, fonte
+         FROM interacoes_medicamentosas
+        WHERE ativo AND lower(medicamento_a) = ANY($1) AND lower(medicamento_b) = ANY($1)`,
+      [inns],
+    );
+    res.json({
+      interacoes: r.rows.map((row) => ({
+        medicamentoA: row.medicamento_a,
+        medicamentoB: row.medicamento_b,
+        severidade: row.severidade,
+        descricao: row.descricao,
+        mecanismo: row.mecanismo || null,
+        conduta: row.conduta_recomendada || null,
+        fonte: row.fonte || "openfda",
+      })),
+    });
+  } catch (e) {
+    console.error("Erro em GET /api/pacientes/:id/interacoes:", e);
+    res.status(500).json({ erro: e.message || "Falha ao listar interações." });
+  }
 });
 
 module.exports = router;

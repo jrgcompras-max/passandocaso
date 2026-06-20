@@ -3220,9 +3220,10 @@ function corDaClasse(classe: string): string {
  * classifica a classe farmacológica (badge colorido, editável tocando nele).
  * Os classificados como antibiótico alimentam a ANTIBIOTICOTERAPIA do caso.
  */
-const ORDEM_SEVERIDADE: Record<Severidade, number> = { leve: 1, moderada: 2, grave: 3 };
+const ORDEM_SEVERIDADE: Record<Severidade, number> = { desconhecida: 0, leve: 1, moderada: 2, grave: 3 };
 const COR_SEVERIDADE: Record<Severidade, string> = {
-  leve: "#FFCC00",
+  desconhecida: "#8E8E93",
+  leve: "#34C759",
   moderada: "#FF9500",
   grave: "#FF3B30",
 };
@@ -3366,7 +3367,7 @@ function PrescricaoSecao({
             <View style={styles.medInfo}>
               <View style={styles.medTituloLinha}>
                 <Text style={styles.medTexto}>{m.texto}</Text>
-                {sev && sev !== "leve" && (
+                {sev && (sev === "moderada" || sev === "grave") && (
                   <View style={[styles.badgeInteracao, { backgroundColor: COR_SEVERIDADE[sev] }]}>
                     <Ionicons name="warning" size={11} color="#FFFFFF" />
                     <Text style={styles.badgeInteracaoTexto}>{rotuloSeveridade(sev)}</Text>
@@ -3432,7 +3433,7 @@ function PrescricaoSecao({
 
       {interacoes.length > 0 && (
         <View style={styles.interacoesCard}>
-          <Text style={styles.interacoesTitulo}>Interações identificadas</Text>
+          <Text style={styles.interacoesTitulo}>Interações identificadas ({interacoes.length})</Text>
           {interacoes.map((it, i) => (
             <View key={`${it.medicamentoA}-${it.medicamentoB}-${i}`} style={styles.interacaoItem}>
               <Text style={styles.interacaoNomes}>
@@ -3441,11 +3442,16 @@ function PrescricaoSecao({
                   {rotuloSeveridade(it.severidade)}
                 </Text>
               </Text>
-              <Text style={styles.interacaoDesc}>{it.descricao}</Text>
+              {!!it.descricao && <Text style={styles.interacaoDesc}>{it.descricao}</Text>}
+              {!!it.condutaRecomendada && (
+                <Text style={styles.interacaoConduta}>{it.condutaRecomendada}</Text>
+              )}
             </View>
           ))}
           <Text style={styles.interacoesRodape}>
-            Baseado em dados inseridos · Avalie clinicamente · Fonte: ANVISA/Micromedex
+            Interações identificadas com base em bulas FDA (openFDA) e fontes ANVISA. Não
+            substitui avaliação clínica. O profissional de saúde é responsável pela decisão
+            terapêutica.
           </Text>
         </View>
       )}
@@ -4427,6 +4433,7 @@ const styles = StyleSheet.create({
   interacaoItem: { marginBottom: 8 },
   interacaoNomes: { fontSize: 13, fontWeight: "600", color: ClinicalColors.text },
   interacaoDesc: { fontSize: 12, color: ClinicalColors.textMuted, marginTop: 1 },
+  interacaoConduta: { fontSize: 12, color: ClinicalColors.text, marginTop: 2, fontStyle: "italic" },
   interacoesRodape: {
     fontSize: 11,
     color: "#8E8E93",

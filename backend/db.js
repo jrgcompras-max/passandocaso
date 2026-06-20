@@ -241,6 +241,14 @@ async function initDB() {
   await pool.query(
     "CREATE UNIQUE INDEX IF NOT EXISTS idx_interacoes_par ON interacoes_medicamentosas(medicamento_a, medicamento_b);",
   );
+  // Camada OpenFDA+IA: texto bruto da FDA (auditoria) + carimbo de revisão.
+  // descricao passa a ser nullable (cache negativo de pares sem interação).
+  await pool.query(`
+    ALTER TABLE interacoes_medicamentosas
+      ADD COLUMN IF NOT EXISTS texto_bruto_fda TEXT,
+      ADD COLUMN IF NOT EXISTS revisado_em TIMESTAMPTZ DEFAULT NOW(),
+      ALTER COLUMN descricao DROP NOT NULL;
+  `);
 
   // Ajuste de dose renal por TFG (faixas e recomendação descritiva).
   await pool.query(`
