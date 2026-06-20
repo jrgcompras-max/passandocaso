@@ -10,12 +10,10 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { useColorScheme, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
+import { ClinicalColors } from '@/constants/clinicalTheme';
 import { AuthProvider, useAuth } from '@/store/AuthContext';
-
-const STATUS_BAR_BG = '#0F2D52';
 
 export default function RootLayout() {
   return (
@@ -29,7 +27,6 @@ export default function RootLayout() {
 
 function RootContent() {
   const colorScheme = useColorScheme();
-  const insets = useSafeAreaInsets();
   const { usuario, carregando } = useAuth();
   const segments = useSegments();
   const router = useRouter();
@@ -46,26 +43,14 @@ function RootContent() {
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      {/* SDK 56 é edge-to-edge: não há backgroundColor de status bar.
-          Desenhamos uma faixa azul escura na altura do inset superior e
-          usamos ícones claros (style="light") por cima dela. */}
-      <StatusBar style="light" />
-      <View
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          height: insets.top,
-          backgroundColor: STATUS_BAR_BG,
-          zIndex: 100,
-        }}
-      />
+      {/* Status bar clara com ícones escuros — o fundo #F2F2F7 das telas vai até
+          o topo (edge-to-edge), sem faixa colorida. */}
+      <StatusBar style="dark" />
       <AnimatedSplashOverlay />
       {/* Enquanto carrega a sessão, mantém só o fundo — evita montar a home
           (e suas requisições) antes do token estar disponível. */}
       {carregando ? (
-        <View style={{ flex: 1, backgroundColor: STATUS_BAR_BG }} />
+        <View style={{ flex: 1, backgroundColor: ClinicalColors.background }} />
       ) : (
         <Stack screenOptions={{ headerShown: false }} />
       )}

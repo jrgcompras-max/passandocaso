@@ -181,7 +181,7 @@
       .modal.modal-pc { max-width: 90vw; width: 90vw; height: 85vh; max-height: 85vh; display: flex; flex-direction: column; }
       .modal.modal-pc h3 { flex: 0 0 auto; }
       .modal.modal-pc .modal-acoes, .modal.modal-pc #pc-status, .modal.modal-pc .vazio { flex: 0 0 auto; }
-      #pc-texto { flex: 1 1 auto; min-height: 500px; white-space: pre-wrap; font-family: ui-monospace, Menlo, Consolas, "Courier New", monospace; font-size: 14px; line-height: 1.55; resize: none; }
+      #pc-texto { flex: 1 1 auto; min-height: 500px; white-space: pre-wrap; font-family: "Courier New", monospace; font-size: 14px; line-height: 1.6; color: #000; resize: none; }
       .modal h3 { margin: 0 0 14px; font-size: 18px; }
       .modal-acoes { display: flex; gap: 12px; margin-top: 14px; }
       .btn-sec { flex: 1; background: #fff; border: 1px solid var(--border); color: var(--muted); padding: 12px; }
@@ -535,7 +535,7 @@
         ].join("\n");
 
         const hda = secaoLinhas(p, "historia");
-        const hma = hda.length ? `*HDA: ${hda.join(" ")}` : null;
+        const hma = hda.length ? `*HMA: ${hda.join(" ")}` : null;
         const sConsc = [
           e && e.nivelConsciencia ? rotulo("consciencia", e.nivelConsciencia).toLowerCase() : null,
           e && e.orientacao ? rotulo("orientacao", e.orientacao).toLowerCase() : null,
@@ -1200,7 +1200,7 @@
         "corrija ortografia, acentuação, pontuação, espaçamento e capitalização. " +
         "REGRAS ABSOLUTAS: " +
         "1) Preserve EXATAMENTE a estrutura: as mesmas linhas, na mesma ordem, com as MESMAS quebras de linha. " +
-        "2) NUNCA altere, traduza, mova ou remova os marcadores/títulos: 'Evolução Médica', '- Atual:', '- Antibióticos:', '- Culturais:', '* Comorbidades:', '* MUC:', '* Alergias:', '*HDA:', '*S:', 'SSVV:', '*O:', 'Exames laboratoriais:', 'Exames de imagem:', '*A:', '*P:'. " +
+        "2) NUNCA altere, traduza, mova ou remova os marcadores/títulos: 'Evolução Médica', '- Atual:', '- Antibióticos:', '- Culturais:', '* Comorbidades:', '* MUC:', '* Alergias:', '*HMA:', '*S:', 'SSVV:', '*O:', 'Exames laboratoriais:', 'Exames de imagem:', '*A:', '*P:'. " +
         "3) NÃO junte linhas nem crie linhas novas; cada item permanece na sua própria linha. " +
         "4) NÃO adicione, infira, interprete, diagnostique nem sugira conduta; não invente valores; não expanda nem traduza siglas clínicas (ex.: REG, BEG, MEG, PIRF, RR 2T BNF, MV+, RHA+, TEC). " +
         "Responda SOMENTE com o texto final, sem comentários nem marcações de código.";

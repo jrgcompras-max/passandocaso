@@ -119,7 +119,7 @@ export function montarTextoEvolucao(paciente: Paciente, hoje: string): string {
 
   // — HMA —
   const hda = secaoLinhas(paciente, "historia");
-  const hma = hda.length ? `*HDA: ${hda.join(" ")}` : null;
+  const hma = hda.length ? `*HMA: ${hda.join(" ")}` : null;
 
   // — Subjetivo: consciência/orientação (minúsculas) + queixas (estadoGeral) —
   const sConsc = [

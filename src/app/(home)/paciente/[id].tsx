@@ -187,7 +187,6 @@ export default function Paciente() {
   const [motivoForm, setMotivoForm] = useState("");
 
   // Modo Round (apresentação) e geração de resumo por IA.
-  const [modoRound, setModoRound] = useState(false);
   const [gerandoResumo, setGerandoResumo] = useState(false);
 
   const iniciarEdicao = () => {
@@ -251,17 +250,9 @@ export default function Paciente() {
           style={styles.botaoVoltar}
           hitSlop={8}
         >
-          <Ionicons name="chevron-back" size={22} color={ClinicalColors.primary} />
+          <Ionicons name="chevron-back" size={20} color={ClinicalColors.primary} />
           <Text style={styles.botaoVoltarTexto}>Voltar</Text>
         </TouchableOpacity>
-        {!!paciente && !editando && (
-          <TouchableOpacity
-            style={styles.botaoRound}
-            onPress={() => setModoRound(true)}
-          >
-            <Text style={styles.botaoRoundTexto}>🎯 Modo Round</Text>
-          </TouchableOpacity>
-        )}
       </View>
 
       {!paciente ? (
@@ -449,8 +440,9 @@ export default function Paciente() {
                         style={[
                           styles.statusClinicoChip,
                           {
-                            borderColor: cor.text,
-                            backgroundColor: ativo ? cor.bg : "transparent",
+                            backgroundColor: ativo
+                              ? cor.bg
+                              : ClinicalColors.background,
                           },
                         ]}
                       >
@@ -584,15 +576,6 @@ export default function Paciente() {
         ) : null
       }
     />
-    {paciente && (
-      <ModoRound
-        visivel={modoRound}
-        paciente={paciente}
-        dia={diaInternacao}
-        hoje={hoje}
-        onSair={() => setModoRound(false)}
-      />
-    )}
     </>
   );
 }
@@ -1567,7 +1550,7 @@ function ProblemasSecao({
           {problemas.map((p) => {
             const cor = PrioridadeColors[p.prioridade];
             return (
-              <View key={p.id} style={styles.problemaCard}>
+              <View key={p.id} style={[styles.problemaCard, { borderLeftColor: cor.text }]}>
                 <View style={styles.problemaTopo}>
                   <Text style={styles.problemaTitulo}>{p.titulo}</Text>
                   <View style={styles.anotacaoAcoes}>
@@ -1583,7 +1566,10 @@ function ProblemasSecao({
                   <Text
                     style={[
                       styles.miniChip,
-                      { color: cor.text, backgroundColor: cor.bg },
+                      {
+                        color: ClinicalColors.textMuted,
+                        backgroundColor: ClinicalColors.background,
+                      },
                     ]}
                   >
                     {PROBLEMA_STATUS_LABEL[p.status]}
@@ -2205,125 +2191,6 @@ function ChecklistAltaSecao({
   );
 }
 
-/** Um bloco rotulado dentro do Modo Round (fontes maiores). */
-function RoundBloco({
-  titulo,
-  children,
-}: {
-  titulo: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <View style={styles.roundBloco}>
-      <Text style={styles.roundSecaoTitulo}>{titulo}</Text>
-      {children}
-    </View>
-  );
-}
-
-/**
- * Modo Round: tela fullscreen, visual limpo e fontes maiores, para apresentar o
- * caso segurando o celular. Mostra o essencial em ordem de apresentação.
- */
-function ModoRound({
-  visivel,
-  paciente,
-  dia,
-  hoje,
-  onSair,
-}: {
-  visivel: boolean;
-  paciente: PacienteModel;
-  dia: number | null;
-  hoje: string;
-  onSair: () => void;
-}) {
-  const problemas = (paciente.problemas ?? []).filter(
-    (p) => p.status !== "resolvido",
-  );
-  const evo = paciente.evolucoes?.[hoje];
-  const frase = fraseSinaisVitais(paciente.sinaisVitais?.[hoje]);
-  const series = agruparPorExame(paciente.resultadosLab ?? []);
-  const statusClinicoLabel = paciente.statusClinico
-    ? StatusClinicoColors[paciente.statusClinico].label
-    : null;
-  const linhaTopo = [
-    paciente.idade != null ? `${paciente.idade} anos` : null,
-    dia != null ? `D${dia} de internação` : null,
-  ]
-    .filter(Boolean)
-    .join("  ·  ");
-
-  return (
-    <Modal visible={visivel} animationType="slide" onRequestClose={onSair}>
-      <View style={styles.roundContainer}>
-        <TouchableOpacity
-          style={[styles.roundSair, { flexDirection: "row", alignItems: "center" }]}
-          onPress={onSair}
-        >
-          <Ionicons name="chevron-back" size={20} color={ClinicalColors.primary} />
-          <Text style={styles.roundSairTexto}>Sair do Modo Round</Text>
-        </TouchableOpacity>
-        <ScrollView contentContainerStyle={styles.roundConteudo}>
-          <Text style={styles.roundNome}>
-            {paciente.nomeCompleto || "Sem nome"}
-          </Text>
-          {!!linhaTopo && <Text style={styles.roundLinhaTopo}>{linhaTopo}</Text>}
-
-          {!!paciente.diagnosticoPrincipal && (
-            <RoundBloco titulo="Diagnóstico principal">
-              <Text style={styles.roundTexto}>
-                {paciente.diagnosticoPrincipal}
-              </Text>
-            </RoundBloco>
-          )}
-          {!!statusClinicoLabel && (
-            <RoundBloco titulo="Status clínico">
-              <Text style={styles.roundTexto}>{statusClinicoLabel}</Text>
-            </RoundBloco>
-          )}
-          {problemas.length > 0 && (
-            <RoundBloco titulo="Problemas ativos">
-              {problemas.map((p) => (
-                <Text key={p.id} style={styles.roundItem}>
-                  • {p.titulo}
-                  {p.conduta?.trim() ? ` — ${p.conduta.trim()}` : ""}
-                </Text>
-              ))}
-            </RoundBloco>
-          )}
-          {(!!frase || !!evo?.estadoGeral?.trim()) && (
-            <RoundBloco titulo="Últimas 24h">
-              {!!evo?.estadoGeral?.trim() && (
-                <Text style={styles.roundTexto}>{evo.estadoGeral.trim()}</Text>
-              )}
-              {!!frase && <Text style={styles.roundTexto}>{frase}</Text>}
-            </RoundBloco>
-          )}
-          {series.length > 0 && (
-            <RoundBloco titulo="Exames relevantes">
-              {series.map((s) => {
-                const info = s.tendencia ? TENDENCIA_INFO[s.tendencia] : null;
-                return (
-                  <Text key={s.exame} style={styles.roundItem}>
-                    • {s.exame}: {s.pontos.map((p) => p.valor).join(" → ")}
-                    {info ? ` ${info.icone}` : ""}
-                  </Text>
-                );
-              })}
-            </RoundBloco>
-          )}
-          {!!evo?.condutaDoDia?.trim() && (
-            <RoundBloco titulo="Conduta do dia">
-              <Text style={styles.roundTexto}>{evo.condutaDoDia.trim()}</Text>
-            </RoundBloco>
-          )}
-        </ScrollView>
-      </View>
-    </Modal>
-  );
-}
-
 /** Cores de destaque por classe farmacológica (default para classes diversas). */
 const CLASSE_COR: Record<string, string> = {
   atb: "#991B1B",
@@ -2796,9 +2663,8 @@ const styles = StyleSheet.create({
   },
   statusClinicoRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   statusClinicoChip: {
-    borderWidth: 1,
-    borderRadius: Radius.badge,
-    paddingHorizontal: 12,
+    borderRadius: Radius.pill,
+    paddingHorizontal: 14,
     paddingVertical: 8,
   },
   statusClinicoChipTexto: { fontSize: 13, fontWeight: "600" },
@@ -2829,8 +2695,9 @@ const styles = StyleSheet.create({
 
   // Problemas ativos
   problemaCard: {
-    backgroundColor: ClinicalColors.background,
+    backgroundColor: ClinicalColors.surface,
     borderRadius: Radius.card,
+    borderLeftWidth: 3,
     padding: 14,
     marginBottom: 10,
     gap: 6,
@@ -2851,7 +2718,7 @@ const styles = StyleSheet.create({
   miniChip: {
     fontSize: 11,
     fontWeight: "600",
-    borderRadius: Radius.badge,
+    borderRadius: Radius.pill,
     paddingHorizontal: 8,
     paddingVertical: 3,
     overflow: "hidden",
