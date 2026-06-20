@@ -176,6 +176,7 @@ function extraidoLegado(
   if (!dados) return "";
   switch (secao) {
     case "comorbidadesMedicacoes":
+    case "comorbidades":
       return dados.comorbidades;
     case "historia":
       return dados.motivoInternacao;
@@ -188,6 +189,36 @@ function extraidoLegado(
     default:
       return "";
   }
+}
+
+/** Blocos crus do JSON extraído (sem dividir itens — para migração/leitura). */
+function blocosBrutos(texto: string | undefined): Bloco[] {
+  const t = (texto || "").trim();
+  if (!t.startsWith("[")) return [];
+  try {
+    const v = JSON.parse(t);
+    return Array.isArray(v) ? (v as Bloco[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Compatibilidade: deriva o conteúdo das seções separadas (comorbidades /
+ * medicacoesUsoContinuo) a partir da seção combinada antiga (comorbidadesMedicacoes),
+ * filtrando os blocos pelo título. Assim registros antigos seguem visíveis.
+ */
+function extraidoDerivadoCombinado(
+  secoes: Partial<Record<SecaoId, { extraido?: string }>> | undefined,
+  secaoId: SecaoId,
+): string {
+  const combinado = secoes?.comorbidadesMedicacoes?.extraido;
+  if (!combinado) return "";
+  const querMuc = secaoId === "medicacoesUsoContinuo";
+  const filtrados = blocosBrutos(combinado).filter(
+    (b) => /medica|muc/i.test(b.titulo ?? "") === querMuc,
+  );
+  return filtrados.length ? JSON.stringify(filtrados) : "";
 }
 
 export default function Paciente() {
@@ -616,8 +647,10 @@ export default function Paciente() {
             anotacoes={normalizarAnotacoes(
               paciente?.secoes?.[item.id]?.anotacoes,
             )}
+            prosa={item.prosa}
             extraido={
               paciente?.secoes?.[item.id]?.extraido ||
+              extraidoDerivadoCombinado(paciente?.secoes, item.id) ||
               extraidoLegado(dados, item.id)
             }
             onSalvarAnotacoes={(lista) =>
@@ -905,14 +938,37 @@ function parseBlocos(texto: string): Bloco[] | null {
  * linhas com bullet (•), os demais como chips em linha com quebra. Texto legado
  * (sem blocos) é tratado como um único bloco sem título.
  */
+/** Junta o conteúdo extraído em um único parágrafo (para seções dissertativas). */
+function textoProsa(texto: string): string {
+  const t = (texto || "").trim();
+  if (t.startsWith("[")) {
+    try {
+      const v = JSON.parse(t);
+      if (Array.isArray(v)) {
+        return (v as Bloco[])
+          .map((b) => (b.itens || []).join(" ").trim())
+          .filter(Boolean)
+          .join("\n\n")
+          .trim();
+      }
+    } catch {
+      // texto comum
+    }
+  }
+  return t;
+}
+
 function ConteudoExtraido({
   texto,
   medicacao,
+  prosa,
   editando,
   onChange,
 }: {
   texto: string;
   medicacao?: boolean;
+  /** Renderiza como TEXTO dissertativo (parágrafo), sem chips/bullets (ex.: HDA). */
+  prosa?: boolean;
   /** Modo de revisão: itens viram editáveis (tocar para corrigir) + remover. */
   editando?: boolean;
   onChange?: (texto: string) => void;
@@ -920,6 +976,35 @@ function ConteudoExtraido({
   // Item em edição inline: "bi-ii". rascunho mantém o texto sendo corrigido.
   const [editId, setEditId] = useState<string | null>(null);
   const [rascunho, setRascunho] = useState("");
+  // Rascunho do parágrafo (modo prosa).
+  const [rascunhoProsa, setRascunhoProsa] = useState<string | null>(null);
+
+  // Seção dissertativa (HDA): parágrafo corrido, sem dividir por vírgula.
+  if (prosa) {
+    const corpo = textoProsa(texto);
+    if (editando && onChange) {
+      const valor = rascunhoProsa ?? corpo;
+      const salvar = () => {
+        const v = valor.trim();
+        onChange(
+          v ? JSON.stringify([{ titulo: "História da doença atual", itens: [v] }]) : "",
+        );
+        setRascunhoProsa(null);
+      };
+      return (
+        <TextInput
+          style={[styles.campoInput, styles.prosaInput]}
+          value={valor}
+          onChangeText={setRascunhoProsa}
+          onBlur={salvar}
+          multiline
+          placeholder="História da doença atual (texto dissertativo)…"
+          placeholderTextColor={ClinicalColors.textMuted}
+        />
+      );
+    }
+    return <Text style={styles.prosaTexto}>{corpo || "—"}</Text>;
+  }
 
   if (!texto) return <Text style={styles.secaoConteudo}>—</Text>;
 
@@ -1269,6 +1354,7 @@ function SecaoExpansivel({
   anotacoes,
   extraido,
   medicacao,
+  prosa,
   extra,
   onSalvarAnotacoes,
   onExtraido,
@@ -1280,6 +1366,7 @@ function SecaoExpansivel({
   anotacoes: Anotacao[];
   extraido: string;
   medicacao?: boolean;
+  prosa?: boolean;
   /**
    * Conteúdo estruturado extra no fim do corpo da seção. Pode ser um render-prop
    * que recebe o estado de edição (para gating de ações de editar/remover).
@@ -1570,6 +1657,7 @@ function SecaoExpansivel({
               <ConteudoExtraido
                 texto={extraido}
                 medicacao={medicacao}
+                prosa={prosa}
                 editando={editando}
                 onChange={onExtraido}
               />
@@ -3840,6 +3928,13 @@ const styles = StyleSheet.create({
   anotacaoIcone: { fontSize: 16 },
   campoLabelEspacado: { marginTop: 16 },
   secaoConteudo: { color: ClinicalColors.textSecondary, fontSize: 15, lineHeight: 22 },
+  prosaTexto: {
+    color: ClinicalColors.text,
+    fontSize: 15,
+    lineHeight: 23,
+    textAlign: "justify",
+  },
+  prosaInput: { minHeight: 120, textAlignVertical: "top", lineHeight: 22 },
   // Seção Imagem: card por exame.
   imgCard: {
     backgroundColor: ClinicalColors.background,

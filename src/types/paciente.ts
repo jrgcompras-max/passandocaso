@@ -40,7 +40,11 @@ export type DadosClinicos = {
 export type SecaoId =
   | "identificacao"
   | "comorbidadesHistoria"
+  // Combinada (legado): mantida só para leitura de registros antigos. As novas
+  // extrações usam as seções separadas `comorbidades` e `medicacoesUsoContinuo`.
   | "comorbidadesMedicacoes"
+  | "comorbidades"
+  | "medicacoesUsoContinuo"
   | "historia"
   | "examesLaboratoriais"
   | "prescricaoHospitalar"

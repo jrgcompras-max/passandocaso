@@ -74,23 +74,30 @@ function labMaisRecente(p: Paciente, sinonimos: string[]): number | null {
   return num(candidatos[0].valor);
 }
 
-/** Texto agregado de comorbidades (seções + dados legados + problemas). */
+/** Lê os itens de comorbidade do `extraido` (JSON de blocos), ignorando MUC. */
+function comorbDosBlocos(extraido: string | undefined, todos: boolean): string[] {
+  if (!extraido) return [];
+  try {
+    const blocos = JSON.parse(extraido) as { titulo?: string; itens?: string[] }[];
+    if (!Array.isArray(blocos)) return [extraido];
+    const out: string[] = [];
+    for (const b of blocos) {
+      if (todos || !/medica|muc/i.test(b.titulo || "")) out.push(...(b.itens || []));
+    }
+    return out;
+  } catch {
+    return [extraido];
+  }
+}
+
+/** Texto agregado de comorbidades (seção nova + combinada legada + dados + problemas). */
 function textoComorbidades(p: Paciente): string {
   const partes: string[] = [];
   if (p.dadosClinicos?.comorbidades) partes.push(p.dadosClinicos.comorbidades);
-  const sec = p.secoes?.comorbidadesMedicacoes?.extraido;
-  if (sec) {
-    try {
-      const blocos = JSON.parse(sec) as { titulo?: string; itens?: string[] }[];
-      if (Array.isArray(blocos)) {
-        for (const b of blocos) {
-          if (!/medica|muc/i.test(b.titulo || "")) partes.push(...(b.itens || []));
-        }
-      }
-    } catch {
-      partes.push(sec);
-    }
-  }
+  // Seção separada (novo formato): todos os itens são comorbidades.
+  partes.push(...comorbDosBlocos(p.secoes?.comorbidades?.extraido, true));
+  // Seção combinada antiga: filtra os blocos de MUC.
+  partes.push(...comorbDosBlocos(p.secoes?.comorbidadesMedicacoes?.extraido, false));
   for (const pr of p.problemas || []) partes.push(pr.titulo);
   return normalizar(partes.join(" | "));
 }
@@ -138,7 +145,7 @@ function calcularCurb65(p: Paciente, hoje: string): Escore {
 
   const itens: ItemEscore[] = [
     { label: "Confusão mental", pontos: confusao ? 1 : 0, max: 1, marcado: confusao, ausente: !temConsc },
-    { label: "Ureia > 50 mg/dL", pontos: ureia != null && ureia > 50 ? 1 : 0, max: 1, marcado: ureia != null && ureia > 50, ausente: ureia == null },
+    { label: "Ureia > 43 mg/dL", pontos: ureia != null && ureia > 43 ? 1 : 0, max: 1, marcado: ureia != null && ureia > 43, ausente: ureia == null },
     { label: "FR ≥ 30 irpm", pontos: fr != null && fr >= 30 ? 1 : 0, max: 1, marcado: fr != null && fr >= 30, ausente: fr == null },
     {
       label: "PAS < 90 ou PAD ≤ 60 mmHg",

@@ -68,17 +68,37 @@ function imagemLinhas(p: Paciente): string[] {
   return [...linhas, ...anots];
 }
 
-/** Comorbidades e medicações de uso contínuo (foto + anotações classificadas). */
+/** Comorbidades e medicações de uso contínuo (seções separadas + fallback combinado). */
 function comorbidadesMUC(p: Paciente): { comorb: string[]; muc: string[] } {
-  const sec = p.secoes?.comorbidadesMedicacoes;
   const comorb: string[] = [];
   const muc: string[] = [];
-  for (const b of parseBlocos(sec?.extraido)) {
-    (/medica|muc/i.test(b.titulo) ? muc : comorb).push(...b.itens);
-  }
-  for (const a of (sec?.anotacoes as Anotacao[]) || []) {
+
+  // Seções separadas (formato novo).
+  const secComorb = p.secoes?.comorbidades;
+  for (const b of parseBlocos(secComorb?.extraido)) comorb.push(...b.itens);
+  for (const a of (secComorb?.anotacoes as Anotacao[]) || []) {
     const t = (a.texto || "").trim();
-    if (t) (a.categoria === "medicacao" ? muc : comorb).push(t);
+    if (t) comorb.push(t);
+  }
+  const secMuc = p.secoes?.medicacoesUsoContinuo;
+  for (const b of parseBlocos(secMuc?.extraido)) {
+    if (!/alergia/i.test(b.titulo)) muc.push(...b.itens);
+  }
+  for (const a of (secMuc?.anotacoes as Anotacao[]) || []) {
+    const t = (a.texto || "").trim();
+    if (t) muc.push(t);
+  }
+
+  // Fallback: seção combinada antiga (comorbidadesMedicacoes).
+  const sec = p.secoes?.comorbidadesMedicacoes;
+  if (sec && !comorb.length && !muc.length) {
+    for (const b of parseBlocos(sec.extraido)) {
+      (/medica|muc/i.test(b.titulo) ? muc : comorb).push(...b.itens);
+    }
+    for (const a of (sec.anotacoes as Anotacao[]) || []) {
+      const t = (a.texto || "").trim();
+      if (t) (a.categoria === "medicacao" ? muc : comorb).push(t);
+    }
   }
   return { comorb, muc };
 }

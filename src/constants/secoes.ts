@@ -7,6 +7,8 @@ export type SecaoConfig = {
   instrucao: string;
   /** Exibir conteúdo como linhas com bullet (medicações) em vez de chips. */
   medicacao?: boolean;
+  /** Exibir conteúdo como TEXTO dissertativo (parágrafo), sem chips/bullets. */
+  prosa?: boolean;
 };
 
 /**
@@ -26,23 +28,35 @@ type SecaoDef = {
   escopo: string;
   especifico: string;
   medicacao?: boolean;
+  prosa?: boolean;
 };
 
 const DEFS: SecaoDef[] = [
   {
-    id: "comorbidadesMedicacoes",
-    titulo: "Comorbidades e MUC",
-    escopo: "as comorbidades/doenças de base e as medicações de uso contínuo (MUC) prévias à internação",
+    id: "comorbidades",
+    titulo: "Comorbidades",
+    escopo: "as comorbidades/doenças crônicas de base do paciente, prévias à internação",
     especifico:
-      "Use dois blocos: 'Comorbidades' (uma doença crônica por item) e 'Medicações de uso contínuo' (uma medicação com dose/posologia por item). " +
-      "NÃO inclua o motivo/história da internação atual, nem medicamentos iniciados nesta internação (esses são prescrição hospitalar).",
+      "Liste UMA comorbidade/doença crônica por item (ex.: HAS, DM2, DPOC, DRC). " +
+      "NÃO inclua medicações (de uso contínuo ou hospitalares), motivo/história da internação atual, exames nem prescrição.",
+  },
+  {
+    id: "medicacoesUsoContinuo",
+    titulo: "Medicações de Uso Contínuo (MUC)",
+    medicacao: true,
+    escopo: "as medicações de uso contínuo (MUC) que o paciente já usava em casa antes da internação",
+    especifico:
+      "Liste UMA medicação com sua dose/posologia por item (ex.: 'Losartana 50 mg/dia'). " +
+      "NÃO inclua medicamentos iniciados nesta internação (prescrição hospitalar), comorbidades, história nem exames.",
   },
   {
     id: "historia",
     titulo: "História da Doença Atual",
-    escopo: "a história clínica: motivo da internação, história da doença atual (HDA) e antecedentes do quadro",
+    prosa: true,
+    escopo: "a história da doença atual (HDA/HMA): o relato do quadro que motivou a internação",
     especifico:
-      "Use blocos como 'Motivo da internação', 'História da doença atual' e 'Antecedentes', cada fato relevante como um item. " +
+      "Devolva a HDA como UM TEXTO DISSERTATIVO em parágrafo corrido (não em tópicos/itens isolados). " +
+      "Aplique apenas correção de gramática, concordância e pontuação; preserve o conteúdo. " +
       "NÃO inclua listas de comorbidades crônicas, medicações de uso contínuo, exames, exame físico nem prescrição.",
   },
   {
@@ -103,5 +117,6 @@ export const SECOES: SecaoConfig[] = DEFS.map((d) => ({
   id: d.id,
   titulo: d.titulo,
   medicacao: d.medicacao,
+  prosa: d.prosa,
   instrucao: montarInstrucao(d),
 }));

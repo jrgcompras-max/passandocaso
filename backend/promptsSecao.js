@@ -11,14 +11,31 @@
 const REGRA = "Responda SOMENTE com JSON válido (aspas duplas), sem nenhum texto fora do JSON.";
 
 const PROMPTS = {
+  // Combinada (legado): mantida para compatibilidade. As novas extrações usam
+  // as seções separadas `comorbidades` e `medicacoesUsoContinuo`.
   comorbidadesMedicacoes:
     "Extraia APENAS comorbidades e medicações de uso contínuo deste prontuário. " +
     "Ignore: história atual, exames, sinais vitais, prescrição hospitalar. " +
     'Formato: {"comorbidades":["HAS","DM2"],"medicacoesUsoContinuo":[{"nome":"Metformina","dose":"500mg","frequencia":"2x/dia"}],"alergias":["Dipirona"]}. ' +
     REGRA,
+  comorbidades:
+    "Extraia APENAS as comorbidades/doenças crônicas de base do paciente. " +
+    "Ignore COMPLETAMENTE: medicações (de uso contínuo ou hospitalares), história atual, " +
+    "exames, sinais vitais, prescrição. " +
+    'Formato: {"comorbidades":["HAS","DM2","DPOC"]}. ' +
+    REGRA,
+  medicacoesUsoContinuo:
+    "Extraia APENAS as medicações de uso contínuo (MUC) que o paciente já usava em casa. " +
+    "Ignore COMPLETAMENTE: comorbidades, medicamentos iniciados nesta internação " +
+    "(prescrição hospitalar), história atual, exames. " +
+    'Formato: {"medicacoesUsoContinuo":[{"nome":"Metformina","dose":"500mg","frequencia":"2x/dia"}],"alergias":["Dipirona"]}. ' +
+    REGRA,
   historia:
-    "Extraia APENAS a história da doença atual (HDA/HMA). " +
+    "Extraia APENAS a história da doença atual (HDA/HMA), como TEXTO DISSERTATIVO. " +
     "Ignore: comorbidades, medicações, exames, dados de identificação. " +
+    "O campo 'hda' deve ser UM PARÁGRAFO CORRIDO (texto dissertado), NUNCA uma lista " +
+    "de tópicos. Aplique apenas correção de gramática, concordância e pontuação, " +
+    "preservando o conteúdo. " +
     'Formato: {"hda":"texto corrido em parágrafo único","motivoInternacao":"diagnóstico de entrada ou null","sintomaPrincipal":"sintoma principal ou null"}. ' +
     REGRA,
   examesLaboratoriais:
@@ -67,11 +84,26 @@ function deriveBlocos(secao, d) {
       ...bloco("Alergias", (d.alergias || []).filter(naoVazio)),
     ];
   }
+  if (secao === "comorbidades") {
+    return bloco("Comorbidades", (d.comorbidades || []).filter(naoVazio));
+  }
+  if (secao === "medicacoesUsoContinuo") {
+    const meds = (d.medicacoesUsoContinuo || []).map((m) =>
+      [m.nome, m.dose, m.frequencia].filter(naoVazio).join(" "),
+    );
+    return [
+      ...bloco("Medicações de uso contínuo", meds.filter(naoVazio)),
+      ...bloco("Alergias", (d.alergias || []).filter(naoVazio)),
+    ];
+  }
   if (secao === "historia") {
-    const itens = [];
-    if (naoVazio(d.motivoInternacao)) itens.push(`Motivo: ${d.motivoInternacao}`);
-    if (naoVazio(d.hda)) itens.push(d.hda);
-    return bloco("História da doença atual", itens);
+    // HDA em prosa: um único item com o parágrafo (sem prefixos/tópicos).
+    const hda = naoVazio(d.hda)
+      ? String(d.hda)
+      : naoVazio(d.motivoInternacao)
+        ? String(d.motivoInternacao)
+        : "";
+    return bloco("História da doença atual", hda ? [hda] : []);
   }
   if (secao === "examesLaboratoriais") {
     const itens = [];

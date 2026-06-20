@@ -133,12 +133,21 @@ function construir(p, medicoId) {
     }
   });
 
-  // Seções (foto-extraídas) em blocos JSON, como o app armazena.
+  // Seções (foto-extraídas) em blocos JSON, como o app armazena. Comorbidades e
+  // MUC são seções SEPARADAS; a HDA é um parágrafo dissertativo (item único).
   const secoes = {};
-  const blocosCM = [];
-  if (p.comorb?.length) blocosCM.push({ titulo: "Comorbidades", itens: p.comorb });
-  if (p.muc?.length) blocosCM.push({ titulo: "Medicações de uso contínuo", itens: p.muc });
-  if (blocosCM.length) secoes.comorbidadesMedicacoes = { anotacoes: [], extraido: JSON.stringify(blocosCM) };
+  if (p.comorb?.length) {
+    secoes.comorbidades = {
+      anotacoes: [],
+      extraido: JSON.stringify([{ titulo: "Comorbidades", itens: p.comorb }]),
+    };
+  }
+  if (p.muc?.length) {
+    secoes.medicacoesUsoContinuo = {
+      anotacoes: [],
+      extraido: JSON.stringify([{ titulo: "Medicações de uso contínuo", itens: p.muc }]),
+    };
+  }
   if (p.hda) secoes.historia = { anotacoes: [], extraido: JSON.stringify([{ titulo: "História da doença atual", itens: [p.hda] }]) };
   if (p.imagem) secoes.imagem = { anotacoes: [], extraido: JSON.stringify([{ titulo: p.imagem.nome, itens: [p.imagem.laudo] }]) };
 
