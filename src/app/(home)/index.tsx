@@ -247,8 +247,8 @@ export default function Index() {
       "Fotografar prontuário",
       "Como você quer capturar o cabeçalho do prontuário?",
       [
-        { text: "📷 Câmera", onPress: abrirCamera },
-        { text: "🖼️ Galeria / Arquivo", onPress: abrirGaleria },
+        { text: "Câmera", onPress: abrirCamera },
+        { text: "Galeria / Arquivo", onPress: abrirGaleria },
         { text: "Cancelar", style: "cancel" },
       ],
     );
@@ -320,13 +320,13 @@ export default function Index() {
 
       {processando && (
         <Text style={styles.processando}>
-          ⏳ Lendo cabeçalho do prontuário...
+          Lendo cabeçalho do prontuário...
         </Text>
       )}
 
       {erro && (
         <View style={styles.erroBox}>
-          <Text style={styles.erroTexto}>⚠️ {erro}</Text>
+          <Text style={styles.erroTexto}>{erro}</Text>
         </View>
       )}
 
@@ -352,7 +352,7 @@ export default function Index() {
                 layout={LinearTransition.duration(450)}
               >
                 <Text style={styles.separador}>
-                  — {s.titulo} ({s.data.length}) —
+                  {s.titulo} ({s.data.length})
                 </Text>
               </Reanimated.View>,
               ...s.data.map((item) => {
@@ -458,7 +458,7 @@ export default function Index() {
               <View style={styles.modalOpcoes}>
                 <TouchableOpacity style={styles.opcaoBtn} onPress={escolherFoto}>
                   <Text style={styles.opcaoBtnTexto}>
-                    📷 Fotografar prontuário
+                    Fotografar prontuário
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -468,7 +468,7 @@ export default function Index() {
                   <Text
                     style={[styles.opcaoBtnTexto, styles.opcaoBtnTextoSecundaria]}
                   >
-                    ✏️ Preencher manualmente
+                    Preencher manualmente
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -635,8 +635,9 @@ const styles = StyleSheet.create({
   headerTextos: { flex: 1 },
   titulo: {
     fontSize: 28,
-    fontWeight: "bold",
+    fontWeight: "700",
     color: ClinicalColors.text,
+    letterSpacing: -0.5,
     marginBottom: 4,
   },
   subtitulo: {
@@ -675,14 +676,14 @@ const styles = StyleSheet.create({
   vazioContainer: { flexGrow: 1, justifyContent: "center" },
   listaConteudo: { paddingBottom: 24 },
   separador: {
-    color: ClinicalColors.chevron,
+    color: ClinicalColors.textMuted,
     fontSize: 11,
     fontWeight: "600",
     textTransform: "uppercase",
     letterSpacing: 0.5,
-    textAlign: "center",
-    marginTop: 8,
-    marginBottom: 12,
+    marginTop: 16,
+    marginBottom: 8,
+    marginLeft: 4,
   },
   vazio: { alignItems: "center", paddingHorizontal: 24 },
   vazioTitulo: {

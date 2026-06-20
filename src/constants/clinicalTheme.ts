@@ -1,21 +1,23 @@
 /**
- * Design system — Tema claro clínico.
- * Tokens compartilhados pelas telas do app (lista de pacientes e detalhe).
+ * Design system — estilo iOS / Apple Health.
+ * Tokens compartilhados pelas telas e componentes do app.
  */
 
 export const ClinicalColors = {
-  background: "#F8FAFB",
-  surface: "#FFFFFF",
-  border: "#E2E8F0",
-  primary: "#1A6B8A", // azul clínico — botões/ações/links/destaques
-  buttonPrimary: "#1A6B8A",
-  accent: "#0E7A5A", // verde esmeralda — Passar o Caso / destaques
-  text: "#0F2D52", // azul escuro — títulos e texto principal
-  textMuted: "#64748B",
-  textOnPrimary: "#FFFFFF", // texto sobre superfícies coloridas (botões/badges)
-  chevron: "#94A3B8", // chevron das seções e separadores da lista
-  warning: "#B45309", // âmbar — indicador de pendências
-  warningBg: "#FEF3C7",
+  background: "#F2F2F7", // cinza de fundo do iOS (não branco puro)
+  surface: "#FFFFFF", // cards e superfícies
+  border: "#E5E5EA", // separadores 0.5px
+  primary: "#007AFF", // azul iOS — botões/links/ativo
+  buttonPrimary: "#007AFF",
+  accent: "#34C759", // verde iOS — sucesso/evoluído
+  text: "#000000", // texto primário
+  textSecondary: "#3C3C43", // corpo/detalhe
+  textMuted: "#8E8E93", // terciário/placeholder/label
+  textOnPrimary: "#FFFFFF",
+  chevron: "#C7C7CC", // chevrons e detalhes inativos
+  danger: "#FF3B30", // vermelho iOS — excluir/alerta
+  warning: "#FF9500", // laranja iOS — atenção/pendências
+  warningBg: "#FFF3E0",
 } as const;
 
 /** Status de fluxo do round (ordem de prioridade = ordem de exibição). */
@@ -31,12 +33,12 @@ export const StatusColors: Record<
   StatusType,
   { label: string; bg: string; text: string }
 > = {
-  naoVisitado: { label: "Não visitado", bg: "#FEE2E2", text: "#991B1B" },
-  visitado: { label: "Visitado", bg: "#FEF9C3", text: "#854D0E" },
-  revisar: { label: "Revisar", bg: "#FFEDD5", text: "#9A3412" },
-  pendente: { label: "Pendente", bg: "#EDE9FE", text: "#6B21A8" },
-  altaProvavel: { label: "Alta provável", bg: "#DCFCE7", text: "#166534" },
-  altaRealizada: { label: "Alta realizada", bg: "#F1F5F9", text: "#475569" },
+  naoVisitado: { label: "Não visitado", bg: "#FFE5E5", text: "#FF3B30" },
+  visitado: { label: "Visitado", bg: "#FFF3E0", text: "#FF9500" },
+  revisar: { label: "Revisar", bg: "#F3E5FF", text: "#AF52DE" },
+  pendente: { label: "Pendente", bg: "#F3E5FF", text: "#AF52DE" },
+  altaProvavel: { label: "Alta provável", bg: "#E5F7EE", text: "#34C759" },
+  altaRealizada: { label: "Alta realizada", bg: "#F2F2F7", text: "#8E8E93" },
 };
 
 /** Avaliação subjetiva do estado clínico atual do paciente. */
@@ -46,10 +48,10 @@ export const StatusClinicoColors: Record<
   StatusClinico,
   { label: string; bg: string; text: string }
 > = {
-  melhora: { label: "Melhora clínica", bg: "#DCFCE7", text: "#166534" },
-  estavel: { label: "Estável", bg: "#DBEAFE", text: "#1E40AF" },
-  piora: { label: "Em piora", bg: "#FFEDD5", text: "#9A3412" },
-  critico: { label: "Crítico", bg: "#FEE2E2", text: "#991B1B" },
+  melhora: { label: "Melhora clínica", bg: "#E5F7EE", text: "#34C759" },
+  estavel: { label: "Estável", bg: "#E5F0FF", text: "#007AFF" },
+  piora: { label: "Em piora", bg: "#FFF3E0", text: "#FF9500" },
+  critico: { label: "Crítico", bg: "#FFE5E5", text: "#FF3B30" },
 };
 
 /** Prioridade compartilhada por problemas ativos e pendências. */
@@ -59,14 +61,15 @@ export const PrioridadeColors: Record<
   Prioridade,
   { label: string; bg: string; text: string; border: string }
 > = {
-  alta: { label: "Alta", bg: "#FEE2E2", text: "#991B1B", border: "#FCA5A5" },
-  media: { label: "Média", bg: "#FEF9C3", text: "#854D0E", border: "#FDE047" },
-  baixa: { label: "Baixa", bg: "#DCFCE7", text: "#166534", border: "#86EFAC" },
+  alta: { label: "Alta", bg: "#FFE5E5", text: "#FF3B30", border: "#FFD0CE" },
+  media: { label: "Média", bg: "#FFF3E0", text: "#FF9500", border: "#FFE2BF" },
+  baixa: { label: "Baixa", bg: "#E5F7EE", text: "#34C759", border: "#C9EFD8" },
 };
 
 export const Radius = {
-  card: 12,
+  card: 16,
   badge: 8,
+  pill: 20,
 } as const;
 
 export const BorderWidth = {

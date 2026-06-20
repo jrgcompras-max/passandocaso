@@ -246,8 +246,13 @@ export default function Paciente() {
   const cabecalho = (
     <>
       <View style={styles.topoBar}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text style={styles.botaoVoltarTexto}>← Voltar</Text>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.botaoVoltar}
+          hitSlop={8}
+        >
+          <Ionicons name="chevron-back" size={22} color={ClinicalColors.primary} />
+          <Text style={styles.botaoVoltarTexto}>Voltar</Text>
         </TouchableOpacity>
         {!!paciente && !editando && (
           <TouchableOpacity
@@ -573,7 +578,7 @@ export default function Paciente() {
                 router.push({ pathname: "/evolucao/[id]", params: { id } })
               }
             >
-              <Text style={styles.botaoPassarCasoTexto}>📋 Passar o Caso</Text>
+              <Text style={styles.botaoPassarCasoTexto}>Passar o Caso</Text>
             </TouchableOpacity>
           </>
         ) : null
@@ -744,7 +749,7 @@ function ComorbidadesUnificado({
             <Text style={styles.itemBullet}>•</Text>
             <Text style={styles.itemTexto}>{a.texto}</Text>
             <TouchableOpacity onPress={() => onExcluir(a)} hitSlop={8}>
-              <Text style={styles.anotacaoIcone}>🗑️</Text>
+              <Ionicons name="trash-outline" size={16} color={ClinicalColors.danger} />
             </TouchableOpacity>
           </View>
         ))}
@@ -927,7 +932,7 @@ function SecaoExpansivel({
         activeOpacity={0.7}
       >
         <Text style={styles.secaoHeaderTitulo}>{titulo}</Text>
-        <Text style={styles.secaoChevron}>{aberto ? "▲" : "▼"}</Text>
+        <Ionicons name={aberto ? "chevron-up" : "chevron-down"} size={18} color={ClinicalColors.chevron} />
       </TouchableOpacity>
 
       {aberto && (
@@ -937,23 +942,23 @@ function SecaoExpansivel({
               style={[styles.botaoFoto, styles.botaoCaptura]}
               onPress={fotografar}
             >
-              <Text style={styles.botaoFotoTexto}>📷 Fotografar</Text>
+              <Text style={styles.botaoFotoTexto}>Fotografar</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.botaoFoto, styles.botaoCaptura]}
               onPress={escolherArquivo}
             >
-              <Text style={styles.botaoFotoTexto}>🖼️ Arquivo</Text>
+              <Text style={styles.botaoFotoTexto}>Arquivo</Text>
             </TouchableOpacity>
           </View>
 
           {extraindo && (
-            <Text style={styles.extraindo}>⏳ Extraindo dados...</Text>
+            <Text style={styles.extraindo}>Extraindo dados...</Text>
           )}
 
           {erro && (
             <View style={styles.erroBox}>
-              <Text style={styles.erroTitulo}>⚠️ Erro ao extrair dados</Text>
+              <Text style={styles.erroTitulo}>Erro ao extrair dados</Text>
               <Text style={styles.erroTexto}>{erro}</Text>
             </View>
           )}
@@ -1021,10 +1026,10 @@ function SecaoExpansivel({
                   </View>
                   <View style={styles.anotacaoAcoes}>
                     <TouchableOpacity onPress={() => editarAnotacao(a)} hitSlop={8}>
-                      <Text style={styles.anotacaoIcone}>✏️</Text>
+                      <Ionicons name="pencil" size={16} color={ClinicalColors.primary} />
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => excluirAnotacao(a)} hitSlop={8}>
-                      <Text style={styles.anotacaoIcone}>🗑️</Text>
+                      <Ionicons name="trash-outline" size={16} color={ClinicalColors.danger} />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -1129,7 +1134,7 @@ function CampoTexto({
           <Text style={[styles.leituraTexto, !value && styles.leituraVazio]}>
             {value || placeholder || "—"}
           </Text>
-          <Text style={styles.lapisIcone}>✏️</Text>
+          <Ionicons name="pencil" size={16} color={ClinicalColors.primary} />
         </TouchableOpacity>
       )}
     </View>
@@ -1226,7 +1231,7 @@ function CampoLeitura({
           <Text style={[styles.leituraTexto, !value && styles.leituraVazio]}>
             {value || placeholder || "—"}
           </Text>
-          <Text style={styles.lapisIcone}>✏️</Text>
+          <Ionicons name="pencil" size={16} color={ClinicalColors.primary} />
         </TouchableOpacity>
       )}
     </View>
@@ -1280,7 +1285,7 @@ function EvolucaoBeiraLeitoSecao({
         activeOpacity={0.7}
       >
         <Text style={styles.secaoHeaderTitulo}>Evolução Beira-Leito</Text>
-        <Text style={styles.secaoChevron}>{aberto ? "▲" : "▼"}</Text>
+        <Ionicons name={aberto ? "chevron-up" : "chevron-down"} size={18} color={ClinicalColors.chevron} />
       </TouchableOpacity>
 
       {aberto && (
@@ -1442,7 +1447,7 @@ function CondutaSecao({
         activeOpacity={0.7}
       >
         <Text style={styles.secaoHeaderTitulo}>Conduta do Dia</Text>
-        <Text style={styles.secaoChevron}>{aberto ? "▲" : "▼"}</Text>
+        <Ionicons name={aberto ? "chevron-up" : "chevron-down"} size={18} color={ClinicalColors.chevron} />
       </TouchableOpacity>
       {aberto && (
         <View style={styles.secaoBody}>
@@ -1544,7 +1549,7 @@ function ProblemasSecao({
           <Text style={styles.secaoHeaderTitulo}>
             Problemas Ativos{problemas.length ? ` (${problemas.length})` : ""}
           </Text>
-          <Text style={styles.secaoChevron}>{aberto ? "▲" : "▼"}</Text>
+          <Ionicons name={aberto ? "chevron-up" : "chevron-down"} size={18} color={ClinicalColors.chevron} />
         </TouchableOpacity>
         <TouchableOpacity style={styles.botaoMais} onPress={abrirNovo} hitSlop={8}>
           <Text style={styles.botaoMaisTexto}>+</Text>
@@ -1571,10 +1576,10 @@ function ProblemasSecao({
                   <Text style={styles.problemaTitulo}>{p.titulo}</Text>
                   <View style={styles.anotacaoAcoes}>
                     <TouchableOpacity onPress={() => abrirEdicao(p)} hitSlop={8}>
-                      <Text style={styles.anotacaoIcone}>✏️</Text>
+                      <Ionicons name="pencil" size={16} color={ClinicalColors.primary} />
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => excluir(p)} hitSlop={8}>
-                      <Text style={styles.anotacaoIcone}>🗑️</Text>
+                      <Ionicons name="trash-outline" size={16} color={ClinicalColors.danger} />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -1754,7 +1759,7 @@ function PendenciasSecao({
           <Text style={styles.secaoHeaderTitulo}>
             Pendências{abertas ? ` (${abertas})` : ""}
           </Text>
-          <Text style={styles.secaoChevron}>{aberto ? "▲" : "▼"}</Text>
+          <Ionicons name={aberto ? "chevron-up" : "chevron-down"} size={18} color={ClinicalColors.chevron} />
         </TouchableOpacity>
         <TouchableOpacity style={styles.botaoMais} onPress={abrirNovo} hitSlop={8}>
           <Text style={styles.botaoMaisTexto}>+</Text>
@@ -1772,7 +1777,11 @@ function PendenciasSecao({
             return (
               <View key={p.id} style={styles.pendenciaLinha}>
                 <TouchableOpacity onPress={() => alternar(p)} hitSlop={8}>
-                  <Text style={styles.checkbox}>{p.feito ? "☑" : "☐"}</Text>
+                  <Ionicons
+                    name={p.feito ? "checkmark-circle" : "ellipse-outline"}
+                    size={22}
+                    color={p.feito ? ClinicalColors.accent : ClinicalColors.chevron}
+                  />
                 </TouchableOpacity>
                 <Text
                   style={[
@@ -1788,7 +1797,7 @@ function PendenciasSecao({
                   />
                 )}
                 <TouchableOpacity onPress={() => excluir(p)} hitSlop={8}>
-                  <Text style={styles.anotacaoIcone}>🗑️</Text>
+                  <Ionicons name="trash-outline" size={16} color={ClinicalColors.danger} />
                 </TouchableOpacity>
               </View>
             );
@@ -1908,7 +1917,7 @@ function ResumoRapidoSecao({
             {gerando ? (
               <ActivityIndicator size="small" color={ClinicalColors.primary} />
             ) : (
-              <Text style={styles.resumoGerarTexto}>✨ Gerar</Text>
+              <Text style={styles.resumoGerarTexto}>Gerar resumo</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -2028,7 +2037,7 @@ function LabEvolucao({
                     onPress={() => removerExame(s.exame)}
                     hitSlop={8}
                   >
-                    <Text style={styles.anotacaoIcone}>🗑️</Text>
+                    <Ionicons name="trash-outline" size={16} color={ClinicalColors.danger} />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -2167,7 +2176,7 @@ function ChecklistAltaSecao({
         <Text style={styles.secaoHeaderTitulo}>
           Checklist de Alta ({feitos}/{CHECKLIST_ALTA.length})
         </Text>
-        <Text style={styles.secaoChevron}>{aberto ? "▲" : "▼"}</Text>
+        <Ionicons name={aberto ? "chevron-up" : "chevron-down"} size={18} color={ClinicalColors.chevron} />
       </TouchableOpacity>
       {aberto && (
         <View style={styles.secaoBody}>
@@ -2180,9 +2189,12 @@ function ChecklistAltaSecao({
                 onPress={() => onChange({ ...checklist, [item.id]: !feito })}
                 activeOpacity={0.7}
               >
-                <Text style={[styles.checkbox, feito && styles.checkboxFeito]}>
-                  {feito ? "☑" : "☐"}
-                </Text>
+                <Ionicons
+                  name={feito ? "checkmark-circle" : "ellipse-outline"}
+                  size={22}
+                  color={feito ? ClinicalColors.accent : ClinicalColors.chevron}
+                  style={{ marginRight: 4 }}
+                />
                 <Text
                   style={[styles.checkItemTexto, feito && styles.checkItemFeito]}
                 >
@@ -2409,7 +2421,7 @@ function PrescricaoSecao({
             onPress={() => onChange(medicamentos.filter((x) => x.id !== m.id))}
             hitSlop={8}
           >
-            <Text style={styles.anotacaoIcone}>🗑️</Text>
+            <Ionicons name="trash-outline" size={16} color={ClinicalColors.danger} />
           </TouchableOpacity>
         </View>
       ))}
@@ -2437,7 +2449,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 160,
   },
-  botaoVoltarTexto: { color: ClinicalColors.primary, fontSize: 16 },
+  botaoVoltar: { flexDirection: "row", alignItems: "center" },
+  botaoVoltarTexto: { color: ClinicalColors.primary, fontSize: 17 },
   aviso: { color: ClinicalColors.textMuted, fontSize: 15, marginTop: 24 },
   cabecalho: {
     flexDirection: "row",

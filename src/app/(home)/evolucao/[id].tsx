@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
@@ -82,8 +83,13 @@ export default function Evolucao() {
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity style={styles.voltar} onPress={() => router.back()}>
-        <Text style={styles.voltarTexto}>← Voltar</Text>
+      <TouchableOpacity
+        style={[styles.voltar, { flexDirection: "row", alignItems: "center" }]}
+        onPress={() => router.back()}
+        hitSlop={8}
+      >
+        <Ionicons name="chevron-back" size={22} color="#007AFF" />
+        <Text style={styles.voltarTexto}>Voltar</Text>
       </TouchableOpacity>
 
       <Text style={styles.titulo}>Passar o Caso</Text>
@@ -121,8 +127,8 @@ export default function Evolucao() {
             {salvamento === "salvando"
               ? "Salvando…"
               : salvamento === "salvo"
-                ? "✓ Salvo na nuvem"
-                : "⚠️ Não salvo (offline)"}
+                ? "Salvo na nuvem"
+                : "Não salvo (offline)"}
           </Text>
         )}
       </View>
@@ -133,7 +139,7 @@ export default function Evolucao() {
           onPress={gerar}
           disabled={gerando || !paciente}
         >
-          <Text style={styles.botaoSecundarioTexto}>↻ Gerar de novo</Text>
+          <Text style={styles.botaoSecundarioTexto}>Gerar de novo</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.botao, styles.botaoPrimario]}
@@ -141,7 +147,7 @@ export default function Evolucao() {
           disabled={gerando || !texto}
         >
           <Text style={styles.botaoPrimarioTexto}>
-            {copiado ? "✓ Copiado!" : "📋 Copiar"}
+            {copiado ? "Copiado!" : "Copiar"}
           </Text>
         </TouchableOpacity>
       </View>

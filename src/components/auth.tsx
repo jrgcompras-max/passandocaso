@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { type ReactNode } from "react";
 import {
   ActivityIndicator,
@@ -29,7 +30,7 @@ export function AuthScreen({ children }: { children: ReactNode }) {
       extraScrollHeight={20}
     >
       <View style={styles.marca}>
-        <Text style={styles.marcaIcone}>📋</Text>
+        <Ionicons name="medkit" size={40} color={C.primary} style={styles.marcaIcone} />
         <Text style={styles.marcaNome}>Passando Caso</Text>
       </View>
       {children}
