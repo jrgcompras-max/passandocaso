@@ -15,6 +15,9 @@ import {
 type AcoesContextValor = {
   pedidoAdicionar: number;
   pedirAdicionar: () => void;
+  /** Nº de pendências na Rede (passagens + solicitações) para o badge da aba. */
+  redeBadge: number;
+  setRedeBadge: (n: number) => void;
 };
 
 const AcoesContext = createContext<AcoesContextValor | null>(null);
@@ -22,9 +25,10 @@ const AcoesContext = createContext<AcoesContextValor | null>(null);
 export function AcoesProvider({ children }: { children: ReactNode }) {
   const [pedidoAdicionar, setPedido] = useState(0);
   const pedirAdicionar = useCallback(() => setPedido((n) => n + 1), []);
+  const [redeBadge, setRedeBadge] = useState(0);
   const valor = useMemo(
-    () => ({ pedidoAdicionar, pedirAdicionar }),
-    [pedidoAdicionar, pedirAdicionar],
+    () => ({ pedidoAdicionar, pedirAdicionar, redeBadge, setRedeBadge }),
+    [pedidoAdicionar, pedirAdicionar, redeBadge],
   );
   return <AcoesContext.Provider value={valor}>{children}</AcoesContext.Provider>;
 }

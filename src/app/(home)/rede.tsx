@@ -18,6 +18,7 @@ import {
 import { PassarPlantaoModal } from "@/components/PassarPlantaoModal";
 import { ClinicalColors as C, Radius } from "@/constants/clinicalTheme";
 import * as rede from "@/lib/rede";
+import { useAcoes } from "@/store/AcoesContext";
 import { useAuth } from "@/store/AuthContext";
 import { useHospitais } from "@/store/HospitaisContext";
 
@@ -37,6 +38,7 @@ type ModalAtivo = null | "buscar" | "convidar" | "criarGrupo" | "entrarGrupo";
 export default function RedeScreen() {
   const { hospitais, hospitalAtivo } = useHospitais();
   const { usuario, atualizarUsuario } = useAuth();
+  const { setRedeBadge } = useAcoes();
   const hosp = hospitais.find((h) => h.id === hospitalAtivo);
 
   // Boas-vindas da Rede (uma vez).
@@ -89,7 +91,8 @@ export default function RedeScreen() {
     setGrupos(gr);
     setConexoes(cx);
     setSolic(sl);
-  }, []);
+    setRedeBadge(pg.length + sl.length);
+  }, [setRedeBadge]);
 
   useEffect(() => {
     (async () => {

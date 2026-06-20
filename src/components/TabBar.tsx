@@ -31,7 +31,7 @@ type TabBarProps = { state: any; navigation: any };
  */
 export function TabBar({ state, navigation }: TabBarProps) {
   const insets = useSafeAreaInsets();
-  const { pedirAdicionar } = useAcoes();
+  const { pedirAdicionar, redeBadge } = useAcoes();
   const atual = state.routes[state.index]?.name;
 
   const aoPressionar = (name: Aba) => {
@@ -53,6 +53,7 @@ export function TabBar({ state, navigation }: TabBarProps) {
 
   const item = (name: Aba) => {
     const cor = atual === name ? C.primary : C.textMuted;
+    const badge = name === "rede" && redeBadge > 0 ? redeBadge : 0;
     return (
       <Pressable
         key={name}
@@ -60,7 +61,14 @@ export function TabBar({ state, navigation }: TabBarProps) {
         onPress={() => aoPressionar(name)}
         hitSlop={6}
       >
-        <Ionicons name={ICONES[name]} size={24} color={cor} />
+        <View>
+          <Ionicons name={ICONES[name]} size={24} color={cor} />
+          {badge > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeTxt}>{badge > 9 ? "9+" : badge}</Text>
+            </View>
+          )}
+        </View>
         <Text style={[styles.label, { color: cor }]}>{LABELS[name]}</Text>
       </Pressable>
     );
@@ -104,6 +112,19 @@ const styles = StyleSheet.create({
   },
   item: { flex: 1, alignItems: "center", justifyContent: "center", gap: 3, paddingTop: 4 },
   label: { fontSize: 10, fontWeight: "600" },
+  badge: {
+    position: "absolute",
+    top: -5,
+    right: -10,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: C.danger,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 3,
+  },
+  badgeTxt: { color: "#fff", fontSize: 10, fontWeight: "700" },
   centroWrap: { flex: 1, alignItems: "center" },
   centro: {
     width: 56,

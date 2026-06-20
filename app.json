@@ -12,7 +12,8 @@
       "bundleIdentifier": "com.jrguilherme.passandocasoapp",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSLocationWhenInUseUsageDescription": "Usamos sua localização para encontrar hospitais próximos."
+        "NSLocationWhenInUseUsageDescription": "Usamos sua localização para encontrar hospitais próximos.",
+        "NSUserNotificationUsageDescription": "Receba avisos quando colegas quiserem te passar pacientes."
       }
     },
     "android": {
@@ -55,6 +56,14 @@
         "expo-location",
         {
           "locationWhenInUsePermission": "Usamos sua localização para encontrar hospitais próximos."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#007AFF",
+          "sounds": []
         }
       ]
     ],
