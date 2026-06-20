@@ -15,16 +15,41 @@
 require("dotenv").config();
 const crypto = require("crypto");
 
-if (!process.env.DATABASE_URL) {
-  console.error(
-    "✗ DATABASE_URL ausente. Rode apontando para o Postgres do Railway:\n" +
-      '  DATABASE_URL="postgresql://...proxy.rlwy.net:PORTA/railway" node scripts/migrar-hospital.js\n' +
-      "  (URL pública em Railway → Postgres → Variables → DATABASE_PUBLIC_URL)",
-  );
-  process.exit(1);
-}
+exigirDatabaseUrl();
 
 const db = require("../db");
+
+/** Valida DATABASE_URL com mensagens claras (ausente / placeholder / formato). */
+function exigirDatabaseUrl() {
+  const url = process.env.DATABASE_URL || "";
+  const dica =
+    "Forma mais robusta: adicione a linha em backend/.env e rode\n" +
+    "  `node scripts/migrar-hospital.js`:\n" +
+    "    DATABASE_URL=postgresql://USUARIO:SENHA@HOST.proxy.rlwy.net:PORTA/railway\n" +
+    "  Ou na linha de comando use ASPAS SIMPLES (evita expansão de $ pelo shell):\n" +
+    "    DATABASE_URL='postgresql://...proxy.rlwy.net:PORTA/railway' node scripts/migrar-hospital.js\n" +
+    "  (URL pública em Railway → Postgres → Variables → DATABASE_PUBLIC_URL)";
+  if (!url) {
+    console.error(`✗ DATABASE_URL ausente.\n  ${dica}`);
+    process.exit(1);
+  }
+  if (url.includes("${") || url.includes("{{")) {
+    console.error(
+      `✗ DATABASE_URL contém um placeholder não resolvido (ex.: \${{...}}).\n` +
+        `  Copie o VALOR já resolvido, não a referência da variável.\n  ${dica}`,
+    );
+    process.exit(1);
+  }
+  if (!/^postgres(ql)?:\/\/.+@.+\/.+/i.test(url)) {
+    console.error(
+      "✗ DATABASE_URL com formato inválido. Esperado:\n" +
+        "    postgresql://USUARIO:SENHA@HOST:PORTA/BANCO\n" +
+        "  Se a senha tem caracteres especiais ($ @ # &), use aspas simples ou o .env.\n" +
+        `  ${dica}`,
+    );
+    process.exit(1);
+  }
+}
 
 const EMAIL_LETICIA = "leticiasoares655@gmail.com";
 
