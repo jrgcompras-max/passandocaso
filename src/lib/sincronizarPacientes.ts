@@ -17,12 +17,18 @@ export async function buscarPacientes(): Promise<Paciente[]> {
   return Array.isArray(json?.pacientes) ? (json.pacientes as Paciente[]) : [];
 }
 
-/** Envia (upsert) a lista completa de pacientes para o backend. */
+/**
+ * Envia os pacientes para o backend (upsert) UM POR REQUISIÇÃO — evita um
+ * payload único enorme (fotos/base64 de vários pacientes de uma vez). Sequencial
+ * e best-effort: o chamador trata falhas.
+ */
 export async function enviarPacientes(pacientes: Paciente[]): Promise<void> {
-  await apiFetch("/api/pacientes/sync", {
-    method: "POST",
-    body: JSON.stringify({ pacientes }),
-  });
+  for (const p of pacientes) {
+    await apiFetch("/api/pacientes/sync", {
+      method: "POST",
+      body: JSON.stringify({ pacientes: [p] }),
+    });
+  }
 }
 
 /** Remove um paciente (escopado por hospital) no backend. */

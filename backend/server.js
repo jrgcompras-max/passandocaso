@@ -23,8 +23,10 @@ const ORIGENS_PERMITIDAS = [
 ];
 app.use(cors({ origin: ORIGENS_PERMITIDAS }));
 
-// Imagens em base64 são grandes — aumenta o limite do corpo JSON.
+// Imagens em base64 são grandes — aumenta o limite do corpo (ANTES das rotas).
+// 15mb (>= 10mb) dá folga para o JPEG base64 do /api/extract.
 app.use(express.json({ limit: "15mb" }));
+app.use(express.urlencoded({ limit: "15mb", extended: true }));
 
 // Inicialização preguiçosa: o construtor do SDK lança erro se não houver apiKey.
 // Criar sob demanda evita derrubar o servidor no boot quando a chave não está
