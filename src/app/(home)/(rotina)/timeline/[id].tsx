@@ -25,7 +25,11 @@ const MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "o
 const INVERTIDOS = /^(hb|hemoglob|ht|hematocr|plaq)/i;
 
 function partes(data: string) {
-  const [y, m, d] = data.split("-").map(Number);
+  // O backend serializa a coluna DATE como ISO com horário (ex.:
+  // "2026-06-20T00:00:00.000Z"). Pegamos só "YYYY-MM-DD" (10 primeiros chars) e
+  // construímos a data no fuso LOCAL — evita "NaN"/"undefined" e o off-by-one de
+  // UTC (data aparecendo um dia antes).
+  const [y, m, d] = String(data ?? "").slice(0, 10).split("-").map(Number);
   return { y, m, d, dt: new Date(y, m - 1, d) };
 }
 function rotuloData(data: string) {
