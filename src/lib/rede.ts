@@ -74,9 +74,11 @@ export function salvarPushToken(token: string) {
 export async function buscarProfissionais(
   nome: string,
   hospitalCnes?: string,
+  hospitalNome?: string,
 ): Promise<ProfissionalRede[]> {
   const q = new URLSearchParams({ nome });
   if (hospitalCnes) q.set("hospital_cnes", hospitalCnes);
+  if (hospitalNome) q.set("hospital_nome", hospitalNome);
   const r = await req<{ profissionais: ProfissionalRede[] }>(
     `/api/rede/buscar?${q.toString()}`,
   );

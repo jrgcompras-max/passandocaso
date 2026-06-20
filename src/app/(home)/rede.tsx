@@ -328,6 +328,7 @@ export default function RedeScreen() {
       <ModalBuscarColega
         visivel={modal === "buscar"}
         hospitalCnes={hosp?.cnes}
+        hospitalNome={hosp?.nome}
         onFechar={() => setModal(null)}
         onConectou={carregar}
       />
@@ -437,11 +438,13 @@ function ModalEntradaTexto({
 function ModalBuscarColega({
   visivel,
   hospitalCnes,
+  hospitalNome,
   onFechar,
   onConectou,
 }: {
   visivel: boolean;
   hospitalCnes?: string;
+  hospitalNome?: string;
   onFechar: () => void;
   onConectou: () => void;
 }) {
@@ -460,14 +463,14 @@ function ModalBuscarColega({
     const timer = setTimeout(async () => {
       setBuscando(true);
       try {
-        setResultados(await rede.buscarProfissionais(t, hospitalCnes));
+        setResultados(await rede.buscarProfissionais(t, hospitalCnes, hospitalNome));
       } catch {
         setResultados([]);
       }
       setBuscando(false);
     }, 500);
     return () => clearTimeout(timer);
-  }, [termo, visivel, hospitalCnes]);
+  }, [termo, visivel, hospitalCnes, hospitalNome]);
 
   const conectar = async (id: string) => {
     try {

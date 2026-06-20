@@ -125,14 +125,31 @@ router.put("/perfil/push-token", async (req, res) => {
 router.get("/rede/buscar", async (req, res) => {
   const nome = String(req.query.nome || "").trim();
   const cnes = String(req.query.hospital_cnes || "").trim();
+  const hospNome = String(req.query.hospital_nome || "").trim();
   if (nome.length < 2) return res.json({ profissionais: [] });
   try {
     const params = [req.usuario.id, `%${nome}%`];
     let where = "u.id <> $1 AND (u.nome ILIKE $2 OR u.nome_exibicao ILIKE $2)";
+
+    // "Mesmo hospital": casa por CNES (preciso) OU, como fallback, pelo nome do
+    // hospital — necessário quando um cadastrou via API do CNES e outro
+    // manualmente (cnes null), senão ninguém se encontra.
+    const hospConds = [];
     if (cnes) {
       params.push(cnes);
-      where += ` AND EXISTS (SELECT 1 FROM hospitais h WHERE h.medico_id = u.id AND h.cnes = $3)`;
+      hospConds.push(`(h.cnes IS NOT NULL AND h.cnes = $${params.length})`);
     }
+    if (hospNome) {
+      params.push(hospNome);
+      hospConds.push(`(LOWER(BTRIM(h.nome)) = LOWER(BTRIM($${params.length})))`);
+    }
+    if (hospConds.length) {
+      where += ` AND EXISTS (
+        SELECT 1 FROM hospitais h
+         WHERE h.medico_id = u.id AND (${hospConds.join(" OR ")})
+      )`;
+    }
+
     const r = await db.query(
       `SELECT DISTINCT u.id, u.nome, u.nome_exibicao, u.categoria, u.especialidade, u.foto_url
          FROM usuarios u WHERE ${where} LIMIT 25`,
