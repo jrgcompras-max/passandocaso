@@ -28,7 +28,7 @@ type HospitaisContextValue = {
   carregado: boolean;
   selecionar: (id: string) => void;
   trocarHospital: () => void;
-  adicionarHospital: (nome: string, cidade: string) => Hospital;
+  adicionarHospital: (nome: string, cidade: string, cnes?: string) => Hospital;
   removerHospital: (id: string) => void;
 };
 
@@ -95,11 +95,16 @@ export function HospitaisProvider({ children }: { children: ReactNode }) {
   const selecionar = (id: string) => setHospitalAtivo(id);
   const trocarHospital = () => setHospitalAtivo(null);
 
-  const adicionarHospital = (nome: string, cidade: string): Hospital => {
+  const adicionarHospital = (
+    nome: string,
+    cidade: string,
+    cnes?: string,
+  ): Hospital => {
     const novo: Hospital = {
       id: `h-${Date.now()}`,
       nome: nome.trim(),
       cidade: cidade.trim(),
+      ...(cnes ? { cnes } : {}),
     };
     setHospitais((prev) => [...prev, novo]);
     setHospitalAtivo(novo.id);

@@ -620,7 +620,8 @@ app.delete("/api/pacientes/:hospitalId/:pacienteId", auth.autenticar, async (req
 // Busca de estabelecimentos no CNES/DATASUS, com cache de 24h em memória.
 const cacheCnes = new Map(); // chave -> { ts, dados }
 const cacheMunic = new Map(); // "cidade|uf" -> { ts, cod }
-const CNES_TTL_MS = 24 * 60 * 60 * 1000;
+const CNES_TTL_MS = 24 * 60 * 60 * 1000; // códigos IBGE (estáveis)
+const CNES_RESULTADOS_TTL_MS = 60 * 60 * 1000; // resultados de busca (1h)
 const normalizar = (s) =>
   String(s || "")
     .normalize("NFD")
@@ -666,7 +667,7 @@ app.get("/api/hospitais/buscar", auth.autenticar, async (req, res) => {
   }
   const chave = `${normalizar(cidade)}|${uf}|${normalizar(termo)}`;
   const cache = cacheCnes.get(chave);
-  if (cache && Date.now() - cache.ts < CNES_TTL_MS) {
+  if (cache && Date.now() - cache.ts < CNES_RESULTADOS_TTL_MS) {
     return res.json({ hospitais: cache.dados, fonte: "cache" });
   }
   try {
@@ -716,7 +717,7 @@ app.get("/api/hospitais/buscar", auth.autenticar, async (req, res) => {
 app.get("/api/hospitais", auth.autenticar, async (req, res) => {
   try {
     const r = await db.query(
-      "SELECT id, nome, cidade FROM hospitais WHERE medico_id = $1 ORDER BY nome",
+      "SELECT id, nome, cidade, cnes FROM hospitais WHERE medico_id = $1 ORDER BY nome",
       [req.usuario.id],
     );
     res.json({ hospitais: r.rows });
@@ -736,11 +737,12 @@ app.post("/api/hospitais/sync", auth.autenticar, async (req, res) => {
     for (const h of hospitais) {
       if (!h || !h.id || !h.nome) continue;
       await db.query(
-        `INSERT INTO hospitais (id, medico_id, nome, cidade, updated_at)
-         VALUES ($1, $2, $3, $4, NOW())
+        `INSERT INTO hospitais (id, medico_id, nome, cidade, cnes, updated_at)
+         VALUES ($1, $2, $3, $4, $5, NOW())
          ON CONFLICT (id) DO UPDATE
-           SET nome = EXCLUDED.nome, cidade = EXCLUDED.cidade, updated_at = NOW()`,
-        [h.id, req.usuario.id, h.nome, h.cidade || ""],
+           SET nome = EXCLUDED.nome, cidade = EXCLUDED.cidade,
+               cnes = COALESCE(EXCLUDED.cnes, hospitais.cnes), updated_at = NOW()`,
+        [h.id, req.usuario.id, h.nome, h.cidade || "", h.cnes || null],
       );
     }
     res.json({ status: "ok", total: hospitais.length });

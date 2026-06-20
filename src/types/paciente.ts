@@ -9,6 +9,8 @@ export type Hospital = {
   id: string;
   nome: string;
   cidade: string;
+  /** Código CNES quando o hospital veio da busca; null/ausente se manual. */
+  cnes?: string;
 };
 
 /** Dados extraídos do cabeçalho do prontuário (sistema Tasy). */

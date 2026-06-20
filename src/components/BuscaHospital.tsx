@@ -33,7 +33,7 @@ export function BuscaHospital({
 }: {
   visivel: boolean;
   onFechar: () => void;
-  onEscolher: (h: { nome: string; cidade: string }) => void;
+  onEscolher: (h: { nome: string; cidade: string; cnes?: string }) => void;
   titulo?: string;
 }) {
   const insets = useSafeAreaInsets();
@@ -83,13 +83,13 @@ export function BuscaHospital({
     return () => clearTimeout(timer);
   }, [termo, visivel, cidade, uf]);
 
-  const escolher = (nome: string, cid: string) => {
-    onEscolher({ nome: nome.trim(), cidade: cid.trim() });
+  const escolher = (nome: string, cid: string, cnes?: string) => {
+    onEscolher({ nome: nome.trim(), cidade: cid.trim(), cnes: cnes || undefined });
     limpar();
   };
   const adicionarManual = () => {
     if (!manNome.trim()) return;
-    escolher(manNome, manCidade);
+    escolher(manNome, manCidade); // manual → sem cnes
   };
   const limpar = () => {
     setTermo("");
@@ -140,7 +140,7 @@ export function BuscaHospital({
             <TouchableOpacity
               key={h.cnes || h.nomeFantasia + h.cidade}
               style={styles.card}
-              onPress={() => escolher(h.nomeFantasia, h.cidade)}
+              onPress={() => escolher(h.nomeFantasia, h.cidade, h.cnes)}
             >
               <Ionicons name="business-outline" size={22} color={C.primary} />
               <View style={{ flex: 1 }}>

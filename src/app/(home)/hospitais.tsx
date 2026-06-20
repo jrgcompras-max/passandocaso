@@ -25,8 +25,8 @@ export default function HospitaisScreen() {
     router.navigate("/");
   };
 
-  const aoEscolher = (h: { nome: string; cidade: string }) => {
-    adicionarHospital(h.nome, h.cidade); // cria e já define como ativo
+  const aoEscolher = (h: { nome: string; cidade: string; cnes?: string }) => {
+    adicionarHospital(h.nome, h.cidade, h.cnes); // cria e já define como ativo
     setBusca(false);
     router.navigate("/");
   };

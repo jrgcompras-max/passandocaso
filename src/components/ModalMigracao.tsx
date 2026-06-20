@@ -56,8 +56,8 @@ export function ModalMigracao({
     );
   };
 
-  const aoEscolherNovo = (h: { nome: string; cidade: string }) => {
-    const novo = adicionarHospital(h.nome, h.cidade);
+  const aoEscolherNovo = (h: { nome: string; cidade: string; cnes?: string }) => {
+    const novo = adicionarHospital(h.nome, h.cidade, h.cnes);
     setBusca(false);
     migrarPara(novo.id, novo.nome);
   };
