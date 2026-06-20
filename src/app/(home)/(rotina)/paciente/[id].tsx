@@ -752,15 +752,38 @@ function parseBlocos(texto: string): Bloco[] | null {
 function ConteudoExtraido({
   texto,
   medicacao,
+  onChange,
 }: {
   texto: string;
   medicacao?: boolean;
+  /** Quando presente, cada item ganha uma lixeira (remover exame extraído). */
+  onChange?: (texto: string) => void;
 }) {
   if (!texto) return <Text style={styles.secaoConteudo}>—</Text>;
 
   const blocos = parseBlocos(texto) ?? [
     { titulo: "", itens: dividirItens(texto) },
   ];
+  const editavel = !!onChange;
+
+  const remover = (bi: number, ii: number) => {
+    const item = blocos[bi]?.itens[ii] ?? "este item";
+    Alert.alert("Remover este exame?", item, [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Remover",
+        style: "destructive",
+        onPress: () => {
+          const novos = blocos
+            .map((b, i) =>
+              i === bi ? { ...b, itens: b.itens.filter((_, j) => j !== ii) } : b,
+            )
+            .filter((b) => b.itens.length > 0);
+          onChange?.(JSON.stringify(novos));
+        },
+      },
+    ]);
+  };
 
   return (
     <View style={styles.conteudoBlocos}>
@@ -769,11 +792,16 @@ function ConteudoExtraido({
           {!!bloco.titulo && (
             <Text style={styles.blocoTitulo}>{bloco.titulo}</Text>
           )}
-          {medicacao || ehMedicacao(bloco.titulo) ? (
+          {editavel || medicacao || ehMedicacao(bloco.titulo) ? (
             bloco.itens.map((item, j) => (
               <View key={j} style={styles.itemRow}>
                 <Text style={styles.itemBullet}>•</Text>
                 <Text style={styles.itemTexto}>{item}</Text>
+                {editavel && (
+                  <TouchableOpacity onPress={() => remover(i, j)} hitSlop={8}>
+                    <Ionicons name="trash-outline" size={16} color={ClinicalColors.danger} />
+                  </TouchableOpacity>
+                )}
               </View>
             ))
           ) : (
@@ -1241,7 +1269,11 @@ function SecaoExpansivel({
               <Text style={[styles.campoLabel, styles.campoLabelEspacado]}>
                 Informações do sistema
               </Text>
-              <ConteudoExtraido texto={extraido} medicacao={medicacao} />
+              <ConteudoExtraido
+                texto={extraido}
+                medicacao={medicacao}
+                onChange={onExtraido}
+              />
             </>
           )}
 
