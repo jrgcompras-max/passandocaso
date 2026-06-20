@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { BlurView } from "expo-blur";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -75,7 +76,9 @@ export function TabBar({ state, navigation }: TabBarProps) {
   };
 
   return (
-    <View
+    <BlurView
+      intensity={80}
+      tint="light"
       style={[styles.barra, { height: 64 + insets.bottom, paddingBottom: insets.bottom }]}
     >
       {item("(rotina)")}
@@ -91,7 +94,7 @@ export function TabBar({ state, navigation }: TabBarProps) {
       </View>
       {item("rede")}
       {item("perfil")}
-    </View>
+    </BlurView>
   );
 }
 
@@ -103,8 +106,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     flexDirection: "row",
     alignItems: "flex-start",
-    // Fundo sólido translúcido (sem BlurView, que exige módulo nativo do novo build).
-    backgroundColor: "rgba(242, 242, 247, 0.97)",
+    // Frosted glass real (BlurView). Sem backgroundColor para o blur aparecer.
     borderTopWidth: 0.5,
     borderTopColor: C.border,
     paddingTop: 10,
