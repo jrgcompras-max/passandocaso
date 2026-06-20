@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
+    AppState,
     LayoutAnimation,
     Modal,
     ScrollView,
@@ -50,6 +51,7 @@ import { gerarResumoIA } from "@/lib/gerarResumoIA";
 import { converterParaJpegBase64 } from "@/lib/imagem";
 import { agruparPorExame, TENDENCIA_INFO } from "@/lib/lab";
 import { montarDadosParaResumo } from "@/lib/resumoPaciente";
+import { listarEvolucaoDiaria, salvarSnapshotDiario } from "@/lib/salvarEvolucaoDiaria";
 import { fraseSinaisVitais, O2_OPCOES, SV_VAZIO } from "@/lib/sinaisVitais";
 import { usePacientes } from "@/store/PacientesContext";
 import {
@@ -199,6 +201,26 @@ export default function Paciente() {
       }
     });
   };
+
+  // Evolução temporal: contagem de registros + snapshot ao ir para background.
+  const [registrosCount, setRegistrosCount] = useState(0);
+  useEffect(() => {
+    let vivo = true;
+    listarEvolucaoDiaria(id, 60).then((r) => {
+      if (vivo) setRegistrosCount(r.length);
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [id]);
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (estado) => {
+      if ((estado === "inactive" || estado === "background") && paciente) {
+        salvarSnapshotDiario(paciente);
+      }
+    });
+    return () => sub.remove();
+  }, [paciente]);
 
   // Edição
   const [editando, setEditando] = useState(false);
@@ -453,6 +475,20 @@ export default function Paciente() {
                 )}
               </View>
 
+              <TouchableOpacity
+                style={styles.verEvolucao}
+                onPress={() => router.push({ pathname: "/timeline/[id]", params: { id } })}
+              >
+                <Ionicons name="stats-chart-outline" size={18} color={ClinicalColors.primary} />
+                <Text style={styles.verEvolucaoTxt}>Ver evolução</Text>
+                {registrosCount > 0 && (
+                  <Text style={styles.verEvolucaoBadge}>
+                    {registrosCount} {registrosCount === 1 ? "registro" : "registros"}
+                  </Text>
+                )}
+                <Ionicons name="chevron-forward" size={16} color={ClinicalColors.chevron} />
+              </TouchableOpacity>
+
               <View style={styles.statusClinicoBox}>
                 <Text style={styles.campoLabel}>Status clínico</Text>
                 <View style={styles.statusClinicoRow}>
@@ -602,9 +638,10 @@ export default function Paciente() {
             )}
             <TouchableOpacity
               style={styles.botaoPassarCaso}
-              onPress={() =>
-                router.push({ pathname: "/evolucao/[id]", params: { id } })
-              }
+              onPress={() => {
+                if (paciente) salvarSnapshotDiario(paciente);
+                router.push({ pathname: "/evolucao/[id]", params: { id } });
+              }}
             >
               <Text style={styles.botaoPassarCasoTexto}>Passar o Caso</Text>
             </TouchableOpacity>
@@ -2490,6 +2527,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
   },
+  verEvolucao: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: ClinicalColors.background,
+    borderRadius: Radius.card,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 16,
+  },
+  verEvolucaoTxt: { color: ClinicalColors.primary, fontSize: 15, fontWeight: "600" },
+  verEvolucaoBadge: { flex: 1, textAlign: "right", color: ClinicalColors.textMuted, fontSize: 13 },
   botaoPassarCaso: {
     backgroundColor: ClinicalColors.accent,
     borderRadius: Radius.card,

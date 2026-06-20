@@ -154,6 +154,28 @@ async function initDB() {
     );
   `);
 
+  // === FASE 3 — Evolução temporal (snapshot diário por paciente) ===
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS evolucoes_diarias (
+      id SERIAL PRIMARY KEY,
+      paciente_id TEXT NOT NULL,
+      medico_id TEXT NOT NULL,
+      data DATE NOT NULL DEFAULT CURRENT_DATE,
+      sinais_vitais JSONB,
+      exames_laboratoriais JSONB,
+      exames_imagem TEXT,
+      evolucao_beira_leito JSONB,
+      conduta TEXT,
+      problemas_ativos JSONB,
+      passou_caso TEXT,
+      criado_em TIMESTAMP DEFAULT NOW(),
+      UNIQUE(paciente_id, medico_id, data)
+    );
+  `);
+  await pool.query(
+    "CREATE INDEX IF NOT EXISTS idx_evolucoes_paciente ON evolucoes_diarias(paciente_id, data DESC);",
+  );
+
   console.log("PostgreSQL — tabelas verificadas/criadas.");
 }
 

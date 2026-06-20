@@ -864,6 +864,83 @@ app.get("/api/evolucao/:data", auth.autenticar, async (req, res) => {
   }
 });
 
+// --- Evolução temporal (Fase 3) — snapshot diário por paciente ---
+
+/** Salva/atualiza (upsert) o snapshot do dia. Body: { pacienteId, data, ... } */
+app.post("/api/evolucao-diaria/salvar", auth.autenticar, async (req, res) => {
+  const b = req.body || {};
+  const pacienteId = String(b.pacienteId || "");
+  const data = String(b.data || "").slice(0, 10) || new Date().toISOString().slice(0, 10);
+  if (!pacienteId) return res.status(400).json({ erro: "pacienteId obrigatório." });
+  try {
+    const r = await db.query(
+      `INSERT INTO evolucoes_diarias
+         (paciente_id, medico_id, data, sinais_vitais, exames_laboratoriais,
+          exames_imagem, evolucao_beira_leito, conduta, problemas_ativos, passou_caso)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+       ON CONFLICT (paciente_id, medico_id, data) DO UPDATE SET
+         sinais_vitais = EXCLUDED.sinais_vitais,
+         exames_laboratoriais = EXCLUDED.exames_laboratoriais,
+         exames_imagem = EXCLUDED.exames_imagem,
+         evolucao_beira_leito = EXCLUDED.evolucao_beira_leito,
+         conduta = EXCLUDED.conduta,
+         problemas_ativos = EXCLUDED.problemas_ativos,
+         passou_caso = COALESCE(EXCLUDED.passou_caso, evolucoes_diarias.passou_caso)
+       RETURNING id`,
+      [
+        pacienteId, req.usuario.id, data,
+        b.sinaisVitais ? JSON.stringify(b.sinaisVitais) : null,
+        b.examesLab ? JSON.stringify(b.examesLab) : null,
+        b.examesImagem || null,
+        b.evolucaoBeiraleito ? JSON.stringify(b.evolucaoBeiraleito) : null,
+        b.conduta || null,
+        b.problemasAtivos ? JSON.stringify(b.problemasAtivos) : null,
+        b.passouCaso || null,
+      ],
+    );
+    res.json({ ok: true, id: r.rows[0].id });
+  } catch (e) {
+    console.error("Erro em /api/evolucao-diaria/salvar:", e);
+    res.status(500).json({ erro: e.message || "Falha ao salvar evolução diária." });
+  }
+});
+
+/** Lista os snapshots de um paciente (mais recentes primeiro, últimos N dias). */
+app.get("/api/evolucao-diaria/:pacienteId", auth.autenticar, async (req, res) => {
+  const { pacienteId } = req.params;
+  const dias = Math.min(365, Math.max(1, Number(req.query.dias) || 30));
+  try {
+    const r = await db.query(
+      `SELECT data, sinais_vitais, exames_laboratoriais, exames_imagem,
+              evolucao_beira_leito, conduta, problemas_ativos, passou_caso
+         FROM evolucoes_diarias
+        WHERE paciente_id = $1 AND medico_id = $2
+          AND data >= CURRENT_DATE - ($3::int - 1)
+        ORDER BY data DESC`,
+      [pacienteId, req.usuario.id, dias],
+    );
+    res.json({ registros: r.rows });
+  } catch (e) {
+    console.error("Erro em GET /api/evolucao-diaria:", e);
+    res.status(500).json({ erro: e.message || "Falha ao listar evolução." });
+  }
+});
+
+/** Snapshot de uma data específica. */
+app.get("/api/evolucao-diaria/:pacienteId/:data", auth.autenticar, async (req, res) => {
+  const { pacienteId, data } = req.params;
+  try {
+    const r = await db.query(
+      `SELECT * FROM evolucoes_diarias
+        WHERE paciente_id = $1 AND medico_id = $2 AND data = $3`,
+      [pacienteId, req.usuario.id, data],
+    );
+    res.json({ registro: r.rows[0] || null });
+  } catch (e) {
+    res.status(500).json({ erro: e.message || "Falha ao buscar registro." });
+  }
+});
+
 // Fase 2 — rede clínica colaborativa (perfil, conexões, grupos, passagens).
 app.use("/api", redeRouter);
 
