@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Passando Caso — Roadmap</title>
+    <link rel="manifest" href="manifest.json" />
+    <meta name="theme-color" content="#007AFF" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Roadmap PC" />
+    <link rel="apple-touch-icon" href="/icon.png" />
+    <style>
+      :root {
+        --bg: #f2f2f7;
+        --surface: #fff;
+        --text: #000;
+        --text2: #3c3c43;
+        --muted: #8e8e93;
+        --border: #e5e5ea;
+        --azul: #007aff;
+        --verde: #34c759;
+        --laranja: #ff9500;
+        --cinza: #c7c7cc;
+      }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        -webkit-font-smoothing: antialiased;
+      }
+      .hidden { display: none !important; }
+
+      /* Login */
+      .login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+      .login { width: 100%; max-width: 360px; background: var(--surface); border-radius: 16px; padding: 28px; text-align: center; }
+      .login .logo { font-size: 38px; }
+      .login h1 { font-size: 20px; font-weight: 700; margin: 8px 0 20px; letter-spacing: -0.3px; }
+      input {
+        width: 100%; padding: 13px 14px; border: 1px solid var(--border); border-radius: 12px;
+        font-size: 16px; color: var(--text); background: var(--bg); margin-bottom: 12px;
+      }
+      input:focus { outline: 2px solid var(--azul); border-color: var(--azul); }
+      button {
+        width: 100%; background: var(--azul); color: #fff; border: none; border-radius: 12px;
+        padding: 14px; font-size: 16px; font-weight: 600; cursor: pointer;
+      }
+      .erro { color: #ff3b30; font-size: 14px; margin-top: 10px; min-height: 18px; }
+
+      /* App */
+      header.topo {
+        position: sticky; top: 0; z-index: 10; background: rgba(242,242,247,0.92);
+        backdrop-filter: saturate(180%) blur(12px); -webkit-backdrop-filter: saturate(180%) blur(12px);
+        border-bottom: 0.5px solid var(--border); padding: 14px 16px;
+        padding-top: max(14px, env(safe-area-inset-top));
+      }
+      header.topo .t { font-size: 18px; font-weight: 800; letter-spacing: -0.4px; }
+      header.topo .sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+      main { max-width: 720px; margin: 0 auto; padding: 16px 16px 60px; }
+
+      .fase { background: var(--surface); border-radius: 16px; padding: 18px; margin-bottom: 16px; }
+      .fase-topo { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
+      .fase h2 { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
+      .badge { font-size: 12px; font-weight: 700; border-radius: 20px; padding: 4px 12px; white-space: nowrap; color: #fff; }
+      .barra { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin: 10px 0 6px; }
+      .barra > div { height: 100%; border-radius: 3px; }
+      .pct { font-size: 12px; color: var(--muted); margin-bottom: 12px; }
+
+      .grupo { margin-top: 14px; }
+      .linha { display: flex; align-items: flex-start; gap: 10px; padding: 5px 0; }
+      .grupo-titulo .txt { font-size: 16px; font-weight: 600; }
+      .item { padding-left: 28px; }
+      .item .txt { font-size: 14.5px; color: var(--text2); }
+      .subsecao { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin: 16px 0 6px; }
+
+      /* Checkbox */
+      .cb { flex-shrink: 0; width: 18px; height: 18px; border-radius: 50%; margin-top: 1px; display: inline-flex; align-items: center; justify-content: center; }
+      .cb.feito { background: var(--verde); }
+      .cb.feito::after { content: "✓"; color: #fff; font-size: 11px; font-weight: 800; }
+      .cb.andamento { border: 2px solid var(--laranja); }
+      .cb.andamento::after { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--laranja); }
+      .cb.pendente { border: 2px solid var(--cinza); }
+      .txt.feito { opacity: 0.6; }
+      .txt.andamento { font-weight: 700; }
+
+      footer { text-align: center; color: var(--muted); font-size: 12px; line-height: 1.7; padding: 24px 16px 40px; }
+    </style>
+  </head>
+  <body>
+    <!-- LOGIN -->
+    <div id="login" class="login-wrap">
+      <div class="login">
+        <div class="logo">📋</div>
+        <h1>Passando Caso · Roadmap</h1>
+        <input id="senha" type="password" placeholder="Senha" autocomplete="current-password"
+               onkeydown="if(event.key==='Enter')entrar()" />
+        <button onclick="entrar()">Entrar</button>
+        <div id="erro" class="erro"></div>
+      </div>
+    </div>
+
+    <!-- APP -->
+    <div id="app" class="hidden">
+      <header class="topo">
+        <div class="t">📋 Passando Caso · Roadmap</div>
+        <div class="sub">Atualizado em 20 de junho de 2026</div>
+      </header>
+      <main id="conteudo"></main>
+      <footer>
+        Desenvolvido por Safracore Ltda · CNPJ 67.126.820/0001-03<br />
+        © 2026 Passando Caso · Todos os direitos reservados<br />
+        Última atualização: 20 de junho de 2026
+      </footer>
+    </div>
+
+    <script>
+      // ====== ACESSO ======
+      const SENHA = "safracore2026";
+      const KEY = "roadmap_auth";
+      function entrar() {
+        const v = document.getElementById("senha").value;
+        if (v === SENHA) {
+          localStorage.setItem(KEY, "1");
+          mostrarApp();
+        } else {
+          document.getElementById("erro").textContent = "Senha incorreta";
+        }
+      }
+      function mostrarApp() {
+        document.getElementById("login").classList.add("hidden");
+        document.getElementById("app").classList.remove("hidden");
+        render();
+      }
+
+      /* ============================================================
+         MANUTENÇÃO DO ROADMAP — a cada sprint entregue, o Code deve:
+         1. Mudar o status do item em DADOS: "pendente" → "feito"
+            (ou "andamento" para em progresso). Pode ser item string
+            (herda o status do grupo) ou { txt, status } para sobrescrever.
+         2. Atualizar a data no header (.sub) e no rodapé.
+         3. Ajustar o "progresso" da fase, se aplicável.
+         4. ./deploy.sh publica automaticamente (site/ → Vercel).
+         ============================================================ */
+      const DADOS = [
+        {
+          titulo: "Fase 1 — Produto individual",
+          badge: "Concluída", cor: "#34c759", progresso: 100,
+          grupos: [
+            { titulo: "Rotina do dia", status: "feito", itens: [
+              "Lista de pacientes por status", "Grupos expansíveis com prioridade",
+              "Swipe para excluir", "Animação de mudança de status" ] },
+            { titulo: "Ficha do paciente", status: "feito", itens: [
+              "Extração por foto (processamento automático)", "10 seções clínicas estruturadas",
+              "Prescrição com classificação automática", "Exame físico por aparelhos",
+              "Conduta do dia separada" ] },
+            { titulo: "Passar o caso", status: "feito", itens: [
+              "Evolução Médica formato Tasy", "*S: *O: *A: *P: estruturado",
+              "SSVV em linha única", "Companion web para copiar no hospital" ] },
+            { titulo: "Infraestrutura", status: "feito", itens: [
+              "Auth JWT + trial 30 dias", "Backend Railway + PostgreSQL",
+              "TestFlight iOS + OTA updates", "Site + companion + admin no ar",
+              "Design Apple Health completo" ] },
+          ],
+        },
+        {
+          titulo: "Fase 2 — Rede clínica colaborativa",
+          badge: "Concluída", cor: "#ff9500", progresso: 100,
+          grupos: [
+            { titulo: "Fundação da rede", status: "feito", itens: [
+              "Tabelas: conexões, grupos, passagens, convites",
+              "Rotas /api/rede/* completas com JWT",
+              "Validação mesmo hospital via CNES", "Push server SDK instalado" ] },
+            { titulo: "Aba Rede + conexões", status: "feito", itens: [
+              ' 5ª aba "Rede" na tab bar',
+              "Busca de profissional por nome no mesmo hospital (Opção A)",
+              "Convite direto por email — gera novo usuário (Opção B)",
+              "Grupos clínicos com código de 6 chars (Opção C)",
+              "Aceitar/recusar passagens recebidas" ] },
+            { titulo: "Passar plantão (envio)", status: "feito", itens: [
+              'Botão "Passar plantão" na rotina do dia',
+              "Modal 3 passos: quem, quais pacientes, mensagem",
+              "Nome sempre abreviado (LGPD)",
+              'Tag "recebido de" no paciente importado',
+              "Banner de revisão ao abrir paciente recebido" ] },
+            { titulo: "Onboarding progressivo", status: "feito", itens: [
+              "Categoria no cadastro (médico/residente/estudante/etc)",
+              "Especialidade no primeiro hospital",
+              "Boas-vindas da rede (CRM + nome de exibição)",
+              "Perfil ampliado (subespecialidade, ano residência, instituição)" ] },
+            { titulo: "Push notifications", status: "feito", itens: [
+              "expo-notifications instalado", "Badge numérico na aba Rede",
+              "Notificação de passagem recebida",
+              "Navegação automática ao tocar notificação" ] },
+          ],
+        },
+        {
+          titulo: "Fase 3 — Inteligência clínica",
+          badge: "Planejada", cor: "#007aff", progresso: 0,
+          grupos: [
+            { titulo: "Evolução temporal do paciente", status: "pendente", itens: [
+              "Linha do tempo dia a dia", "Histórico de exames com tendência",
+              "Histórico de sinais vitais", "Visual Apple Saúde (gráfico semanal)" ] },
+            { titulo: "Alertas de tendência", status: "pendente", itens: [
+              "Detecção de padrão laboratorial",
+              "Ex: creatinina subindo 3 dias seguidos",
+              "Alerta visual sutil no card do paciente",
+              "Sem sugestão de conduta (conformidade ANVISA)" ] },
+            { titulo: "Templates por especialidade", status: "pendente", itens: [
+              "Clínica Médica · UTI · Cardiologia",
+              "Neurologia · Pediatria · Cirurgia",
+              "Campos e seções adaptados por especialidade",
+              "Seções visíveis/ocultas por contexto clínico" ] },
+            { titulo: "Módulo de procedimentos", status: "pendente", itens: [
+              "Checklist de segurança (modelo OMS)",
+              "Paracentese · Acesso central · Toracocentese",
+              "Consentimento documentado", "Registro do procedimento realizado" ] },
+          ],
+        },
+        {
+          titulo: "Fase 4 — Educação e expansão",
+          badge: "Visão", cor: "#af52de", progresso: 0,
+          grupos: [
+            { titulo: "Módulo de educação clínica", status: "pendente", itens: [
+              "Feedback estruturado preceptor → residente",
+              "Diário de aprendizado clínico",
+              "Avaliação de apresentação de caso", "Portfólio de casos do residente" ] },
+            { titulo: "Interconsulta entre especialidades", status: "pendente", itens: [
+              "Médico solicita avaliação de especialista",
+              "App identifica especialistas no mesmo hospital",
+              "Resposta estruturada pelo especialista", "Histórico de interconsultas" ] },
+            { titulo: "Banco de casos clínicos anonimizados", status: "pendente", itens: [
+              "Casos salvos com permissão do usuário",
+              "Busca por diagnóstico ou especialidade",
+              "Referência para estudantes e residentes",
+              "Revisão por pares antes de publicar" ] },
+            { titulo: "Modo ensino + wearables", status: "pendente", itens: [
+              "Professor cria casos fictícios para prática",
+              "Aluno pratica apresentação estruturada",
+              "Professor avalia e dá feedback",
+              "Sinais vitais via Bluetooth do monitor" ] },
+          ],
+        },
+        {
+          titulo: "Empresa e compliance",
+          badge: "Gestão", cor: "#5e2ca5", progresso: null,
+          subsecoes: [
+            { titulo: "Jurídico e fiscal", itens: [
+              "Alterar objeto social da Safracore para incluir saúde e SaaS",
+              "Adicionar CNAE de saúde (conversa com contador na segunda)",
+              "Consulta com advogado de direito regulatório (ANVISA/LGPD)",
+              "Definir política de retenção e exclusão de dados de usuários",
+              "RIPD — Relatório de Impacto à Proteção de Dados (antes de 1.000 usuários)",
+              "Contrato com Anthropic como sub-operadora de dados",
+              "Avaliar abertura de CNPJ separado para o Passando Caso (antes de 5.000 usuários)" ] },
+            { titulo: "Produto e crescimento", itens: [
+              "Canal de suporte ao usuário antes do lançamento público",
+              "Pen test de segurança antes de escalar",
+              "Plano institucional B2B (hospitais e faculdades) com contrato e nota fiscal",
+              "Monitoramento de performance do banco de dados",
+              "Fallback para outros modelos além do atual provedor de IA" ] },
+            { titulo: "App Store", itens: [
+              "Publicação pública na App Store", "Publicação no Google Play",
+              "Links das lojas no site institucional" ] },
+          ],
+        },
+      ];
+
+      function esc(s) { return String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])); }
+      function checkbox(status) { return '<span class="cb ' + status + '"></span>'; }
+      function linha(item, statusGrupo, classe) {
+        const st = (item && typeof item === "object") ? (item.status || statusGrupo) : statusGrupo;
+        const txt = (item && typeof item === "object") ? item.txt : item;
+        return (
+          '<div class="linha ' + classe + '">' +
+          checkbox(st) +
+          '<span class="txt ' + st + '">' + esc(txt) + "</span></div>"
+        );
+      }
+
+      function render() {
+        let h = "";
+        for (const f of DADOS) {
+          h += '<section class="fase">';
+          h += '<div class="fase-topo"><h2>' + esc(f.titulo) + "</h2>" +
+               '<span class="badge" style="background:' + f.cor + '">' + esc(f.badge) + "</span></div>";
+          if (f.progresso != null) {
+            h += '<div class="barra"><div style="width:' + f.progresso + "%;background:" + f.cor + '"></div></div>';
+            h += '<div class="pct">' + f.progresso + "% concluído</div>";
+          }
+          if (f.grupos) {
+            for (const g of f.grupos) {
+              h += '<div class="grupo">';
+              h += linha(g.titulo, g.status, "grupo-titulo");
+              for (const it of g.itens) h += linha(it, g.status, "item");
+              h += "</div>";
+            }
+          }
+          if (f.subsecoes) {
+            for (const s of f.subsecoes) {
+              h += '<div class="subsecao">' + esc(s.titulo) + "</div>";
+              for (const it of s.itens) h += linha(it, "pendente", "item");
+            }
+          }
+          h += "</section>";
+        }
+        document.getElementById("conteudo").innerHTML = h;
+      }
+
+      // ====== BOOT ======
+      if (localStorage.getItem(KEY) === "1") mostrarApp();
+
+      // ====== PWA ======
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker.register("sw.js").catch(() => {});
+        });
+      }
+    </script>
+  </body>
+</html>
