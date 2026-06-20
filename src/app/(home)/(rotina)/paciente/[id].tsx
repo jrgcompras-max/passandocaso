@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
@@ -278,6 +278,23 @@ export default function Paciente() {
       vivo = false;
     };
   }, [id]);
+
+  // Destaque de interações GRAVES no header (scroll até a Prescrição ao tocar).
+  const scrollRef = useRef<KeyboardAwareScrollView>(null);
+  const [prescY, setPrescY] = useState(0);
+  const [interacoesGraves, setInteracoesGraves] = useState<Interacao[]>([]);
+  const medsTexto = (paciente?.medicamentos ?? []).map((m) => m.texto).join("|");
+  useEffect(() => {
+    let vivo = true;
+    buscarInteracoes((paciente?.medicamentos ?? []).map((m) => m.texto)).then((l) => {
+      if (vivo) setInteracoesGraves(l.filter((i) => i.severidade === "grave"));
+    });
+    return () => {
+      vivo = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [medsTexto]);
+  const irParaPrescricao = () => scrollRef.current?.scrollToPosition(0, Math.max(0, prescY - 8), true);
   useEffect(() => {
     const sub = AppState.addEventListener("change", (estado) => {
       if ((estado === "inactive" || estado === "background") && paciente) {
@@ -405,6 +422,22 @@ export default function Paciente() {
               </View>
             )}
           </View>
+
+          {!editando && interacoesGraves.length > 0 && (
+            <TouchableOpacity
+              style={styles.alertaGraveBanner}
+              onPress={irParaPrescricao}
+              activeOpacity={0.8}
+              accessibilityLabel="Ver interações graves na prescrição"
+            >
+              <Ionicons name="warning" size={16} color="#FFFFFF" />
+              <Text style={styles.alertaGraveTexto}>
+                {interacoesGraves.length}{" "}
+                {interacoesGraves.length === 1 ? "interação grave" : "interações graves"}
+              </Text>
+              <Ionicons name="chevron-forward" size={15} color="#FFFFFF" />
+            </TouchableOpacity>
+          )}
 
           {editando ? (
             <>
@@ -628,6 +661,7 @@ export default function Paciente() {
 
   return (
     <KeyboardAwareScrollView
+      ref={scrollRef}
       style={styles.container}
       contentContainerStyle={styles.containerConteudo}
       keyboardShouldPersistTaps="handled"
@@ -638,8 +672,15 @@ export default function Paciente() {
       {cabecalho}
       {mostrarSecoes &&
         SECOES.map((item) => (
-          <SecaoExpansivel
+          <View
             key={item.id}
+            onLayout={
+              item.id === "prescricaoHospitalar"
+                ? (e) => setPrescY(e.nativeEvent.layout.y)
+                : undefined
+            }
+          >
+          <SecaoExpansivel
             titulo={item.titulo}
             instrucao={item.instrucao}
             secaoId={item.id}
@@ -749,6 +790,7 @@ export default function Paciente() {
               ) : null
             }
           />
+          </View>
         ))}
       {mostrarSecoes && (
         <>
@@ -3500,6 +3542,17 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
   },
+  alertaGraveBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#FF3B30",
+    borderRadius: Radius.card,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 12,
+  },
+  alertaGraveTexto: { flex: 1, color: "#FFFFFF", fontSize: 14, fontWeight: "700" },
   aviso: { color: ClinicalColors.textMuted, fontSize: 15, marginTop: 24 },
   // Card de tendências laboratoriais (descritivo — ANVISA).
   alertasCard: {
