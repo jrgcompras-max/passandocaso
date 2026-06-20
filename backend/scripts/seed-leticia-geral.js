@@ -47,6 +47,15 @@ const PACIENTES = [
     diag: "Pneumonia comunitária",
     conduta: "Antibioticoterapia, oxigenoterapia, fisioterapia respiratória.",
     problemas: [["Pneumonia", "alta"], ["Anemia", "media"]],
+    comorb: ["HAS", "DPOC", "Tabagismo (ex)"],
+    muc: ["Losartana 50mg 1x/dia", "Budesonida inalatória 2x/dia"],
+    hda: "Idosa, ex-tabagista, com tosse produtiva, febre e dispneia há 4 dias, com piora do padrão respiratório. RX evidenciou consolidação em base direita.",
+    prescricao: [
+      { texto: "Amoxicilina-Clavulanato 875mg 12/12h", classe: "Antibiótico" },
+      { texto: "Dipirona 1g EV 6/6h SOS", classe: "Analgésico" },
+      { texto: "Budesonida inalatória 12/12h", classe: "Corticoide inalatório" },
+    ],
+    imagem: { nome: "RX de tórax", laudo: "Consolidação em base direita, sem derrame pleural significativo." },
     dias: [
       { PCR: 180, Hb: 10.4, LT: 16000, Na: 138 },
       { PCR: 150, Hb: 10.2, LT: 14000, Na: 137 },
@@ -62,6 +71,15 @@ const PACIENTES = [
     diag: "Injúria renal aguda",
     conduta: "Hidratação, suspensão de nefrotóxicos, controle de potássio.",
     problemas: [["IRA", "alta"], ["Hipercalemia", "alta"]],
+    comorb: ["HAS", "DM2", "Nefrolitíase de repetição"],
+    muc: ["Enalapril 10mg 12/12h (suspenso)", "Metformina 850mg 2x/dia (suspensa)"],
+    hda: "Masculino, hipertenso e diabético, com redução do débito urinário e elevação de escórias após quadro de desidratação por diarreia. Nega dor lombar ou febre.",
+    prescricao: [
+      { texto: "Hidratação venosa SF 0,9% conforme balanço", classe: "Hidratação" },
+      { texto: "Furosemida 20mg EV conforme diurese", classe: "Diurético" },
+      { texto: "Insulina regular conforme HGT", classe: "Hipoglicemiante" },
+    ],
+    imagem: { nome: "USG de rins e vias urinárias", laudo: "Rins de dimensões normais, sem dilatação pielocalicial ou cálculos obstrutivos." },
     dias: [
       { Cr: 1.4, K: 5.0, Ureia: 80, Hb: 12.8 },
       { Cr: 2.1, K: 5.3, Ureia: 110, Hb: 12.6 },
@@ -75,7 +93,16 @@ const PACIENTES = [
     status: "pendente", clinico: "melhora",
     diag: "Hiponatremia sintomática",
     conduta: "Restrição hídrica, reposição cautelosa de sódio.",
-    problemas: [["Hiponatremia", "alta"]],
+    problemas: [["Hiponatremia", "alta"], ["Hipotireoidismo", "baixa"]],
+    comorb: ["HAS", "Hipotireoidismo", "Transtorno depressivo"],
+    muc: ["Hidroclorotiazida 25mg 1x/dia (suspensa)", "Levotiroxina 50mcg 1x/dia", "Sertralina 50mg 1x/dia"],
+    hda: "Idosa em uso de tiazídico e ISRS, trazida por confusão e queda. Identificada hiponatremia grave, sem sinais de hipervolemia. Tiazídico suspenso na admissão.",
+    prescricao: [
+      { texto: "Restrição hídrica 800 mL/dia", classe: "Medida" },
+      { texto: "NaCl 0,9% conforme protocolo de hiponatremia", classe: "Hidratação" },
+      { texto: "Levotiroxina 50mcg 1x/dia", classe: "Hormônio tireoidiano" },
+    ],
+    imagem: { nome: "TC de crânio", laudo: "Sem lesões expansivas ou sinais de sangramento agudo; atrofia cortical compatível com a idade." },
     dias: [
       { Na: 123, K: 3.4, Cr: 1.1, Hb: 11.8 },
       { Na: 121, K: 3.6, Cr: 1.1, Hb: 11.7 },
@@ -106,18 +133,31 @@ function construir(p, medicoId) {
     }
   });
 
+  // Seções (foto-extraídas) em blocos JSON, como o app armazena.
+  const secoes = {};
+  const blocosCM = [];
+  if (p.comorb?.length) blocosCM.push({ titulo: "Comorbidades", itens: p.comorb });
+  if (p.muc?.length) blocosCM.push({ titulo: "Medicações de uso contínuo", itens: p.muc });
+  if (blocosCM.length) secoes.comorbidadesMedicacoes = { anotacoes: [], extraido: JSON.stringify(blocosCM) };
+  if (p.hda) secoes.historia = { anotacoes: [], extraido: JSON.stringify([{ titulo: "História da doença atual", itens: [p.hda] }]) };
+  if (p.imagem) secoes.imagem = { anotacoes: [], extraido: JSON.stringify([{ titulo: p.imagem.nome, itens: [p.imagem.laudo] }]) };
+
+  const medicamentos = (p.prescricao || []).map((m, i) => ({
+    id: `${p.pront}-med-${i}`, texto: m.texto, classe: m.classe || "",
+  }));
+
   const dados = {
     id: p.pront, nomeCompleto: p.nome, idade: p.idade, sexo: p.sexo,
     leito: p.leito, setor: "Clínica Médica", dataEntrada: datas[0],
     numeroProntuario: p.pront, status: p.status, hospitalId: HOSPITAL_ID,
     diagnosticoPrincipal: p.diag, motivoInternacao: p.diag, statusClinico: p.clinico,
     resumoRapido: `${p.diag} · D${N}`,
-    problemas, pendencias: [], medicamentos: [], resultadosLab,
+    problemas, pendencias: [], medicamentos, resultadosLab,
     sinaisVitais: { [hoje]: { ...SV_VAZIO } },
     evolucoes: { [hoje]: { ...EVOLUCAO_BASE, condutaDoDia: p.conduta } },
     diasAcompanhamento: datas,
-    dadosClinicos: { motivoInternacao: p.diag, comorbidades: "", examesRecentes: "", sinaisVitais: "", intercorrencias: "" },
-    secoes: {},
+    dadosClinicos: { motivoInternacao: p.diag, comorbidades: (p.comorb || []).join(", "), examesRecentes: "", sinaisVitais: "", intercorrencias: "" },
+    secoes,
   };
 
   const snapshots = datas.map((data, i) => {
