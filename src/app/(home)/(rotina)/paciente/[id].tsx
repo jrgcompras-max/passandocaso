@@ -2432,21 +2432,35 @@ function LabsPorData({
       const base64 = await converterParaJpegBase64(r.assets[0].uri);
       const instrucao =
         SECOES.find((s) => s.id === "examesLaboratoriais")?.instrucao ?? "";
-      const json = await extrairDadosImagem<{ blocos: Bloco[] }>(
+      // O backend retorna JSON estruturado (campos hb, cr, ...) + blocos derivados.
+      const json = await extrairDadosImagem<Record<string, unknown>>(
         base64,
         `${instrucao} ${SUFIXO_JSON}`,
         "examesLaboratoriais",
       );
-      const itens = (json.blocos ?? []).flatMap((b) => b.itens || []);
       setForm((prev) => {
         const f = { ...(prev ?? {}) };
-        for (const it of itens) {
-          const [nomeRaw, ...resto] = String(it).split(":");
-          const valorTxt = resto.join(":") || nomeRaw;
-          const num = valorNumerico(valorTxt);
-          if (num == null) continue;
-          const campo = LAB_CAMPOS.find((c) => c.alias.test(nomeRaw.trim()));
-          if (campo) f[campo.key] = String(num);
+        // 1) Campos estruturados (preferencial).
+        let achouEstruturado = false;
+        for (const c of LAB_CAMPOS) {
+          const v = json[c.key.toLowerCase()];
+          if (v != null && String(v).trim() !== "") {
+            f[c.key] = String(valorNumerico(String(v)) ?? v);
+            achouEstruturado = true;
+          }
+        }
+        // 2) Fallback: parse dos blocos derivados ("Hb 9.5").
+        if (!achouEstruturado && Array.isArray((json as { blocos?: Bloco[] }).blocos)) {
+          const itens = ((json as { blocos?: Bloco[] }).blocos ?? []).flatMap(
+            (b) => b.itens || [],
+          );
+          for (const it of itens) {
+            const [nomeRaw, ...resto] = String(it).split(":");
+            const num = valorNumerico(resto.join(":") || nomeRaw);
+            if (num == null) continue;
+            const campo = LAB_CAMPOS.find((c) => c.alias.test(nomeRaw.trim()));
+            if (campo) f[campo.key] = String(num);
+          }
         }
         return f;
       });

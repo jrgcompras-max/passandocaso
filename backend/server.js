@@ -9,6 +9,7 @@ const auth = require("./auth");
 const redeRouter = require("./rede");
 const { analisarTendencias } = require("./alertasTendencia");
 const ontologia = require("./ontologia");
+const { PROMPTS: PROMPTS_SECAO, deriveBlocos } = require("./promptsSecao");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -81,6 +82,11 @@ app.post("/api/extract", auth.autenticar, async (req, res) => {
   }
 
   try {
+    // Extração ESTRUTURADA: se a seção tem prompt próprio, ele substitui a
+    // instrução do cliente (a IA retorna JSON mapeado em campos). Senão, usa a
+    // instrução enviada (compatibilidade).
+    const promptUsado = (secao && PROMPTS_SECAO[secao]) || instrucao;
+
     const msg = await getAnthropic().messages.create({
       model: "claude-sonnet-4-6",
       max_tokens: 1000,
@@ -96,7 +102,7 @@ app.post("/api/extract", auth.autenticar, async (req, res) => {
                 data: imagemBase64,
               },
             },
-            { type: "text", text: instrucao },
+            { type: "text", text: promptUsado },
           ],
         },
       ],
@@ -105,6 +111,11 @@ app.post("/api/extract", auth.autenticar, async (req, res) => {
     const bloco = msg.content.find((c) => c.type === "text");
     const texto = bloco ? bloco.text : "";
     const dados = JSON.parse(extrairBlocoJson(texto));
+    // Deriva `blocos` do estruturado para a UI atual continuar funcionando
+    // (mantém também os campos estruturados para mapeamento direto no app).
+    if (dados && !Array.isArray(dados.blocos) && secao && PROMPTS_SECAO[secao]) {
+      dados.blocos = deriveBlocos(secao, dados);
+    }
     // Camada de ontologia: valida/enriquece (não-destrutivo) e alimenta o
     // feedback loop com termos não reconhecidos. Best-effort: nunca quebra.
     if (dados && Array.isArray(dados.blocos) && secao) {
