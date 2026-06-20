@@ -1210,12 +1210,12 @@
         const st = document.getElementById("pc-status");
         if (!ta) return;
         pcOriginal = ta.value;
-        st.innerHTML = '<span style="color:var(--muted)">✨ Refinando com IA…</span>';
+        st.innerHTML = '<span style="color:var(--muted)">Padronizando texto…</span>';
         try {
           const r = await apiPost("/api/formatar", { texto: ta.value, instrucao: INSTRUCAO_ELEGANTE });
           if (r && r.texto && r.texto.trim()) {
             ta.value = r.texto;
-            st.innerHTML = '<span style="color:var(--accent)">✓ Texto refinado</span> · <a href="#" onclick="reverterCaso();return false">Reverter ao original</a>';
+            st.innerHTML = '<span style="color:var(--accent)">Texto padronizado</span> · <a href="#" onclick="reverterCaso();return false">Reverter ao original</a>';
           } else {
             st.innerHTML = '<span class="erro">Não foi possível refinar — mantido o texto original.</span>';
           }

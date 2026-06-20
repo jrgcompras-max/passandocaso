@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
@@ -8,6 +9,7 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  LayoutAnimation,
   Modal,
   ScrollView,
   StyleSheet,
@@ -58,6 +60,17 @@ function proximoStatus(atual: StatusType): StatusType {
   const i = ORDEM_STATUS.indexOf(atual);
   return ORDEM_STATUS[(i + 1) % ORDEM_STATUS.length];
 }
+
+/** Ordem de prioridade para abrir o primeiro grupo com pacientes no launch. */
+const ORDEM_AUTO: StatusType[] = [
+  "naoVisitado",
+  "revisar",
+  "pendente",
+  "visitado",
+  "altaProvavel",
+  "altaRealizada",
+];
+const KEY_GRUPOS = "@passandocaso/gruposAbertos";
 
 /**
  * Data por extenso em pt-BR com apenas a primeira letra maiúscula
@@ -163,6 +176,44 @@ export default function Index() {
     titulo: ROTULO_GRUPO[status],
     data: pacientesHosp.filter((p) => grupoDe(p) === status),
   })).filter((s) => s.data.length > 0);
+
+  // Grupos expansíveis. Estado salvo no AsyncStorage; "Não visitados" (ou o
+  // primeiro grupo com pacientes) sempre reabre no launch.
+  const [grupoAberto, setGrupoAberto] = useState<Record<string, boolean>>({});
+  const initGrupos = useRef(false);
+  const temPac = (st: StatusType) => pacientesHosp.some((p) => grupoDe(p) === st);
+  const primeiroComPac = ORDEM_AUTO.find((st) => temPac(st));
+  const estaAberto = (st: StatusType) => grupoAberto[st] ?? st === primeiroComPac;
+
+  useEffect(() => {
+    if (initGrupos.current || pacientes.length === 0) return;
+    initGrupos.current = true;
+    (async () => {
+      let salvo: Record<string, boolean> = {};
+      try {
+        const raw = await AsyncStorage.getItem(KEY_GRUPOS);
+        if (raw) salvo = JSON.parse(raw) || {};
+      } catch {
+        // sem cache
+      }
+      // O grupo de maior prioridade com pacientes volta ao padrão (aberto).
+      const primeiro = ORDEM_AUTO.find((st) =>
+        pacientesHosp.some((p) => grupoDe(p) === st),
+      );
+      if (primeiro) delete salvo[primeiro];
+      setGrupoAberto(salvo);
+    })();
+  }, [pacientes, pacientesHosp]);
+
+  const alternarGrupo = (st: StatusType) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setGrupoAberto((prev) => {
+      const atual = prev[st] ?? st === primeiroComPac;
+      const novo = { ...prev, [st]: !atual };
+      AsyncStorage.setItem(KEY_GRUPOS, JSON.stringify(novo)).catch(() => {});
+      return novo;
+    });
+  };
 
   const avancarStatus = (id: string, atual: StatusType) => {
     // Atualiza o status na hora (o badge já muda), mas ancora o card no grupo
@@ -352,11 +403,23 @@ export default function Index() {
                 key={`h-${s.status}`}
                 layout={LinearTransition.duration(450)}
               >
-                <Text style={styles.separador}>
-                  {s.titulo} ({s.data.length})
-                </Text>
+                <TouchableOpacity
+                  style={styles.grupoHeader}
+                  onPress={() => alternarGrupo(s.status)}
+                  activeOpacity={0.6}
+                >
+                  <Text style={styles.separador}>
+                    {s.titulo} ({s.data.length})
+                  </Text>
+                  <Ionicons
+                    name={estaAberto(s.status) ? "chevron-up" : "chevron-down"}
+                    size={14}
+                    color={ClinicalColors.chevron}
+                  />
+                </TouchableOpacity>
               </Reanimated.View>,
-              ...s.data.map((item) => {
+              ...(estaAberto(s.status)
+                ? s.data.map((item) => {
                 const dia = diaDeInternacao(item.dataEntrada);
                 const pendenciasAbertas =
                   item.pendencias?.filter((p) => !p.feito).length ?? 0;
@@ -432,7 +495,8 @@ export default function Index() {
                     </ReanimatedSwipeable>
                   </Reanimated.View>
                 );
-              }),
+                  })
+                : []),
             ])}
       </ScrollView>
 
@@ -679,14 +743,20 @@ const styles = StyleSheet.create({
   erroTexto: { color: StatusColors.pendente.text, fontSize: 13, lineHeight: 18 },
   vazioContainer: { flexGrow: 1, justifyContent: "center" },
   listaConteudo: { paddingBottom: 110 },
+  grupoHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    minHeight: 44,
+    paddingRight: 4,
+    marginTop: 4,
+  },
   separador: {
     color: ClinicalColors.textMuted,
     fontSize: 11,
     fontWeight: "600",
     textTransform: "uppercase",
     letterSpacing: 0.5,
-    marginTop: 16,
-    marginBottom: 8,
     marginLeft: 4,
   },
   vazio: { alignItems: "center", paddingHorizontal: 24 },

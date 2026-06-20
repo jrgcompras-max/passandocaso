@@ -938,7 +938,7 @@ function SecaoExpansivel({
           </View>
 
           {extraindo && (
-            <Text style={styles.extraindo}>Extraindo dados...</Text>
+            <Text style={styles.extraindo}>Lendo prontuário...</Text>
           )}
 
           {erro && (
@@ -2246,7 +2246,7 @@ function PrescricaoSecao({
   return (
     <View style={styles.prescBox}>
       <Text style={[styles.campoLabel, styles.campoLabelEspacado]}>
-        Medicamentos (classe definida pela IA)
+        Medicamentos
       </Text>
       {medicamentos.map((m) => (
         <View key={m.id} style={styles.medRow}>

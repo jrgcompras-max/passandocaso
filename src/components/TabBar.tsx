@@ -1,31 +1,68 @@
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
-import { useRouter, useSegments } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ClinicalColors as C } from "@/constants/clinicalTheme";
 import { useAcoes } from "@/store/AcoesContext";
 
+const ICONES = {
+  "(rotina)": "list-outline",
+  hospitais: "business-outline",
+  perfil: "person-outline",
+} as const;
+const LABELS = {
+  "(rotina)": "Rotina",
+  hospitais: "Hospitais",
+  perfil: "Perfil",
+} as const;
+type Aba = keyof typeof ICONES;
+type Rota = { key: string; name: string };
+
+// Props vêm do navegador de abas do expo-router; tipadas frouxas para evitar
+// acoplar à tipagem interna do @react-navigation.
+type TabBarProps = { state: any; navigation: any };
+
 /**
- * Bottom tab bar estilo iOS: [Hospitais] [+] [Perfil]. Fundo "frosted glass"
- * (BlurView) sobreposto ao conteúdo; botão central azul elevado. Fica absoluta
- * no rodapé — as telas roláveis reservam padding inferior para não esconder
- * conteúdo atrás dela.
+ * Bottom tab bar iOS (frosted glass) para o navegador de abas paralelas:
+ * [Rotina] [Hospitais] [+] [Perfil]. O "+" é ação (abre o modal na Rotina),
+ * não uma aba. Tocar na aba já ativa volta ao topo do stack dela.
  */
-export function TabBar() {
-  const router = useRouter();
-  const segments = useSegments();
+export function TabBar({ state, navigation }: TabBarProps) {
   const insets = useSafeAreaInsets();
   const { pedirAdicionar } = useAcoes();
+  const atual = state.routes[state.index]?.name;
 
-  const atual = segments[segments.length - 1];
-  const corHosp = atual === "hospitais" ? C.primary : C.textMuted;
-  const corPerfil = atual === "perfil" ? C.primary : C.textMuted;
+  const aoPressionar = (name: Aba) => {
+    const route = state.routes.find((r: Rota) => r.name === name);
+    if (!route) return;
+    const focado = atual === name;
+    const event = navigation.emit({
+      type: "tabPress",
+      target: route.key,
+      canPreventDefault: true,
+    });
+    if (!focado && !event.defaultPrevented) navigation.navigate(name);
+  };
 
   const adicionar = () => {
     pedirAdicionar();
-    router.navigate("/");
+    navigation.navigate("(rotina)");
+  };
+
+  const item = (name: Aba) => {
+    const cor = atual === name ? C.primary : C.textMuted;
+    return (
+      <Pressable
+        key={name}
+        style={styles.item}
+        onPress={() => aoPressionar(name)}
+        hitSlop={6}
+      >
+        <Ionicons name={ICONES[name]} size={24} color={cor} />
+        <Text style={[styles.label, { color: cor }]}>{LABELS[name]}</Text>
+      </Pressable>
+    );
   };
 
   return (
@@ -34,11 +71,8 @@ export function TabBar() {
       tint="light"
       style={[styles.barra, { height: 64 + insets.bottom, paddingBottom: insets.bottom }]}
     >
-      <Pressable style={styles.item} onPress={() => router.navigate("/hospitais")} hitSlop={6}>
-        <Ionicons name="business-outline" size={24} color={corHosp} />
-        <Text style={[styles.label, { color: corHosp }]}>Hospitais</Text>
-      </Pressable>
-
+      {item("(rotina)")}
+      {item("hospitais")}
       <View style={styles.centroWrap}>
         <Pressable
           style={styles.centro}
@@ -48,11 +82,7 @@ export function TabBar() {
           <Ionicons name="add" size={28} color="#FFFFFF" />
         </Pressable>
       </View>
-
-      <Pressable style={styles.item} onPress={() => router.navigate("/perfil")} hitSlop={6}>
-        <Ionicons name="person-outline" size={24} color={corPerfil} />
-        <Text style={[styles.label, { color: corPerfil }]}>Perfil</Text>
-      </Pressable>
+      {item("perfil")}
     </BlurView>
   );
 }

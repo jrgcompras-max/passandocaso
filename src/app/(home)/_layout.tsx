@@ -1,35 +1,25 @@
-import { Stack, useSegments } from "expo-router";
-import { View } from "react-native";
+import { Tabs } from "expo-router";
 
 import { TabBar } from "@/components/TabBar";
 import { AcoesProvider } from "@/store/AcoesContext";
 import { HospitaisProvider } from "@/store/HospitaisContext";
 import { PacientesProvider } from "@/store/PacientesContext";
 
-export default function HomeStackLayout() {
+export default function HomeLayout() {
   return (
     <HospitaisProvider>
       <PacientesProvider>
         <AcoesProvider>
-          <Conteudo />
+          <Tabs
+            screenOptions={{ headerShown: false }}
+            tabBar={(props) => <TabBar {...props} />}
+          >
+            <Tabs.Screen name="(rotina)" options={{ title: "Rotina" }} />
+            <Tabs.Screen name="hospitais" options={{ title: "Hospitais" }} />
+            <Tabs.Screen name="perfil" options={{ title: "Perfil" }} />
+          </Tabs>
         </AcoesProvider>
       </PacientesProvider>
     </HospitaisProvider>
-  );
-}
-
-function Conteudo() {
-  const segments = useSegments() as string[];
-  // A tab bar some nas telas de detalhe (paciente / passar o caso).
-  const ocultarTab =
-    segments.includes("paciente") || segments.includes("evolucao");
-
-  return (
-    <View style={{ flex: 1 }}>
-      <View style={{ flex: 1 }}>
-        <Stack screenOptions={{ headerShown: false }} />
-      </View>
-      {!ocultarTab && <TabBar />}
-    </View>
   );
 }
