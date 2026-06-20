@@ -17,7 +17,6 @@ import {
     View,
 } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
     BorderWidth,
@@ -172,7 +171,6 @@ function extraidoLegado(
 export default function Paciente() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const {
     carregado,
     getPaciente,
@@ -575,17 +573,6 @@ export default function Paciente() {
       paciente.status === "altaRealizada");
 
   return (
-    <>
-    <View style={[styles.topoFixo, { paddingTop: insets.top + 6 }]}>
-      <TouchableOpacity
-        onPress={() => router.back()}
-        style={styles.botaoVoltar}
-        hitSlop={8}
-      >
-        <Ionicons name="chevron-back" size={20} color={ClinicalColors.primary} />
-        <Text style={styles.botaoVoltarTexto}>Voltar</Text>
-      </TouchableOpacity>
-    </View>
     <KeyboardAwareScrollView
       style={styles.container}
       contentContainerStyle={styles.containerConteudo}
@@ -670,7 +657,6 @@ export default function Paciente() {
         </>
       )}
     </KeyboardAwareScrollView>
-    </>
   );
 }
 
@@ -2404,18 +2390,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: ClinicalColors.background,
   },
-  topoFixo: {
-    backgroundColor: ClinicalColors.background,
-    paddingHorizontal: 16,
-    paddingBottom: 4,
-  },
   containerConteudo: {
     paddingTop: 8,
     paddingHorizontal: 16,
     paddingBottom: 160,
   },
-  botaoVoltar: { flexDirection: "row", alignItems: "center" },
-  botaoVoltarTexto: { color: ClinicalColors.primary, fontSize: 17 },
   bannerRecebido: {
     flexDirection: "row",
     alignItems: "center",
