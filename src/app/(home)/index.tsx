@@ -1,6 +1,6 @@
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import ReanimatedSwipeable from "react-native-gesture-handler/ReanimatedSwipeable";
 import Reanimated, { FadeOut, LinearTransition } from "react-native-reanimated";
 import {
@@ -28,10 +28,10 @@ import { diaDeInternacao } from "@/lib/datas";
 import { extrairDadosImagem } from "@/lib/extrairDadosImagem";
 import { formatarNome } from "@/lib/formatarNome";
 import { converterParaJpegBase64 } from "@/lib/imagem";
-import { useAuth } from "@/store/AuthContext";
+import { useAcoes } from "@/store/AcoesContext";
 import { useHospitais } from "@/store/HospitaisContext";
 import { usePacientes } from "@/store/PacientesContext";
-import { type CabecalhoProntuario, type Hospital } from "@/types/paciente";
+import { type CabecalhoProntuario } from "@/types/paciente";
 
 /** Ordem de prioridade (topo → fim) usada tanto para avançar quanto para ordenar. */
 const ORDEM_STATUS: StatusType[] = [
@@ -122,7 +122,7 @@ const INSTRUCAO_CABECALHO =
 
 export default function Index() {
   const router = useRouter();
-  const { usuario, sair } = useAuth();
+  const { pedidoAdicionar } = useAcoes();
   const { pacientes, adicionarPorCabecalho, atualizarPaciente, removerPaciente } =
     usePacientes();
   const {
@@ -130,9 +130,12 @@ export default function Index() {
     hospitalAtivo,
     carregado: hospCarregado,
     selecionar,
-    trocarHospital,
-    adicionarHospital,
   } = useHospitais();
+
+  // Sem hospital ativo, seleciona "Geral" por padrão (a troca é feita na aba Hospitais).
+  useEffect(() => {
+    if (hospCarregado && !hospitalAtivo) selecionar("geral");
+  }, [hospCarregado, hospitalAtivo, selecionar]);
   const [processando, setProcessando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [modalVisivel, setModalVisivel] = useState(false);
@@ -258,6 +261,15 @@ export default function Index() {
 
   const fecharModal = () => setModalVisivel(false);
 
+  // O botão "+" da tab bar incrementa o pedido; aqui abrimos o modal de adicionar.
+  const ultimoPedido = useRef(0);
+  useEffect(() => {
+    if (pedidoAdicionar > ultimoPedido.current) {
+      ultimoPedido.current = pedidoAdicionar;
+      abrirModal();
+    }
+  }, [pedidoAdicionar]);
+
   // Opção "Fotografar prontuário": fecha o modal e segue o fluxo de foto atual.
   const escolherFoto = () => {
     setModalVisivel(false);
@@ -293,57 +305,17 @@ export default function Index() {
   const hospitalNome =
     hospitais.find((h) => h.id === hospitalAtivo)?.nome ?? "";
 
-  const confirmarSair = () => {
-    Alert.alert(
-      "Sair da conta",
-      usuario?.nome ? `Encerrar a sessão de ${usuario.nome}?` : "Encerrar a sessão?",
-      [
-        { text: "Cancelar", style: "cancel" },
-        { text: "Sair", style: "destructive", onPress: () => void sair() },
-      ],
-    );
-  };
-
-  // Antes da Rotina: tela de seleção de hospital.
-  if (hospCarregado && !hospitalAtivo) {
-    return (
-      <SelecaoHospital
-        hospitais={hospitais}
-        onSelecionar={selecionar}
-        onAdicionar={adicionarHospital}
-      />
-    );
-  }
-
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <View style={styles.headerTextos}>
-          <View style={styles.topoLinha}>
-            <TouchableOpacity onPress={trocarHospital} style={styles.trocarHosp}>
-              <Text style={styles.trocarHospTexto}>
-                🏥 {hospitalNome || "Hospital"} ⌄
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={confirmarSair} hitSlop={8}>
-              <Text style={styles.sairTexto}>Sair</Text>
-            </TouchableOpacity>
-          </View>
           <Text style={styles.titulo}>Rotina do Dia</Text>
-          <Text style={styles.subtitulo}>{dataPorExtenso()}</Text>
+          <Text style={styles.subtitulo}>
+            {hospitalNome ? `${hospitalNome} · ` : ""}
+            {dataPorExtenso()}
+          </Text>
         </View>
-        <TouchableOpacity
-          style={styles.botaoAdd}
-          onPress={abrirModal}
-          disabled={processando}
-          accessibilityLabel="Adicionar paciente"
-        >
-          {processando ? (
-            <ActivityIndicator color={ClinicalColors.textOnPrimary} />
-          ) : (
-            <Text style={styles.botaoAddTexto}>+</Text>
-          )}
-        </TouchableOpacity>
+        {processando && <ActivityIndicator color={ClinicalColors.primary} />}
       </View>
 
       {processando && (
@@ -595,79 +567,6 @@ function CampoForm({
         placeholderTextColor={ClinicalColors.textMuted}
         multiline={multiline}
       />
-    </View>
-  );
-}
-
-/**
- * Tela de seleção de hospital (antes da Rotina do Dia). Lista os hospitais do
- * médico e permite adicionar um novo (nome + cidade).
- */
-function SelecaoHospital({
-  hospitais,
-  onSelecionar,
-  onAdicionar,
-}: {
-  hospitais: Hospital[];
-  onSelecionar: (id: string) => void;
-  onAdicionar: (nome: string, cidade: string) => void;
-}) {
-  const [mostrarForm, setMostrarForm] = useState(false);
-  const [nome, setNome] = useState("");
-  const [cidade, setCidade] = useState("");
-
-  const salvar = () => {
-    if (!nome.trim()) return;
-    onAdicionar(nome, cidade);
-    setNome("");
-    setCidade("");
-    setMostrarForm(false);
-  };
-
-  return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.headerTextos}>
-          <Text style={styles.titulo}>Hospitais</Text>
-          <Text style={styles.subtitulo}>
-            Selecione um hospital para começar
-          </Text>
-        </View>
-        <TouchableOpacity
-          style={styles.botaoAdd}
-          onPress={() => setMostrarForm((v) => !v)}
-          accessibilityLabel="Adicionar hospital"
-        >
-          <Text style={styles.botaoAddTexto}>+</Text>
-        </TouchableOpacity>
-      </View>
-
-      {mostrarForm && (
-        <View style={styles.hospForm}>
-          <CampoForm label="Nome do hospital *" value={nome} onChange={setNome} />
-          <CampoForm label="Cidade" value={cidade} onChange={setCidade} />
-          <TouchableOpacity
-            style={[styles.salvarBtn, !nome.trim() && styles.salvarBtnDesativado]}
-            onPress={salvar}
-            disabled={!nome.trim()}
-          >
-            <Text style={styles.salvarBtnTexto}>Salvar hospital</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      <ScrollView contentContainerStyle={styles.listaConteudo}>
-        {hospitais.map((h) => (
-          <TouchableOpacity
-            key={h.id}
-            style={styles.hospCard}
-            onPress={() => onSelecionar(h.id)}
-          >
-            <Text style={styles.hospNome}>{h.nome}</Text>
-            {!!h.cidade && <Text style={styles.hospCidade}>{h.cidade}</Text>}
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
     </View>
   );
 }
