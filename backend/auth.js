@@ -152,8 +152,26 @@ async function enviarEmailRecuperacao(email, link) {
   return { enviado: true };
 }
 
+/** Envio genérico de e-mail (best-effort). Sem SMTP, registra no console. */
+async function enviarEmail(to, assunto, texto, html) {
+  const t = getTransporter();
+  if (!t) {
+    console.log(`[email] (sem SMTP) Para ${to} — ${assunto}: ${texto}`);
+    return { enviado: false };
+  }
+  await t.sendMail({
+    from: process.env.EMAIL_FROM || `Passando Caso <${process.env.EMAIL_USER}>`,
+    to,
+    subject: assunto,
+    text: texto,
+    html: html || `<p>${texto}</p>`,
+  });
+  return { enviado: true };
+}
+
 module.exports = {
   ehAdmin,
+  enviarEmail,
   hashSenha,
   conferirSenha,
   gerarToken,

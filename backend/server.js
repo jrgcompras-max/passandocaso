@@ -6,6 +6,7 @@ const cors = require("cors");
 const Anthropic = require("@anthropic-ai/sdk");
 const db = require("./db");
 const auth = require("./auth");
+const redeRouter = require("./rede");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -818,6 +819,9 @@ app.get("/api/evolucao/:data", auth.autenticar, async (req, res) => {
     res.status(500).json({ erro: e.message || "Falha ao listar evoluções." });
   }
 });
+
+// Fase 2 — rede clínica colaborativa (perfil, conexões, grupos, passagens).
+app.use("/api", redeRouter);
 
 // Tratador de erros final: corpo acima do limite (express.json) vira 413 claro
 // em vez de erro genérico.
