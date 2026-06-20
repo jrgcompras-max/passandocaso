@@ -1,7 +1,7 @@
 // Service worker do Roadmap PWA.
 // Estratégia network-first para sempre pegar o deploy mais novo quando online,
 // com fallback ao cache para funcionar offline.
-const CACHE = "roadmap-v1";
+const CACHE = "roadmap-v2";
 const ASSETS = ["./", "./index.html", "./manifest.json", "/icon.png"];
 
 self.addEventListener("install", (e) => {
