@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ClinicalColors, Radius } from "@/constants/clinicalTheme";
 import { diaDeInternacao, hojeISO } from "@/lib/datas";
@@ -37,6 +38,7 @@ function identificacaoLinha(p: Paciente): string {
 export default function Evolucao() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { carregado, getPaciente } = usePacientes();
   const paciente = getPaciente(id);
 
@@ -82,13 +84,13 @@ export default function Evolucao() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top + 6 }]}>
       <TouchableOpacity
         style={[styles.voltar, { flexDirection: "row", alignItems: "center" }]}
         onPress={() => router.back()}
         hitSlop={8}
       >
-        <Ionicons name="chevron-back" size={22} color="#007AFF" />
+        <Ionicons name="chevron-back" size={20} color="#007AFF" />
         <Text style={styles.voltarTexto}>Voltar</Text>
       </TouchableOpacity>
 
@@ -159,12 +161,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: ClinicalColors.background,
-    paddingTop: 60,
     paddingHorizontal: 16,
     paddingBottom: 32,
   },
   voltar: { marginBottom: 12 },
-  voltarTexto: { color: ClinicalColors.primary, fontSize: 16 },
+  voltarTexto: { color: ClinicalColors.primary, fontSize: 17 },
   titulo: { fontSize: 24, fontWeight: "bold", color: ClinicalColors.text },
   subtitulo: {
     fontSize: 14,

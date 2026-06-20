@@ -16,6 +16,7 @@ import {
     View,
 } from "react-native";
 import { KeyboardAwareFlatList } from "react-native-keyboard-aware-scroll-view";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
     BorderWidth,
@@ -163,6 +164,7 @@ function extraidoLegado(
 export default function Paciente() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const {
     carregado,
     getPaciente,
@@ -268,17 +270,6 @@ export default function Paciente() {
 
   const cabecalho = (
     <>
-      <View style={styles.topoBar}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={styles.botaoVoltar}
-          hitSlop={8}
-        >
-          <Ionicons name="chevron-back" size={20} color={ClinicalColors.primary} />
-          <Text style={styles.botaoVoltarTexto}>Voltar</Text>
-        </TouchableOpacity>
-      </View>
-
       {bannerRecebido && paciente?.recebidoDe && (
         <View style={styles.bannerRecebido}>
           <Text style={styles.bannerRecebidoTexto}>
@@ -529,6 +520,16 @@ export default function Paciente() {
 
   return (
     <>
+    <View style={[styles.topoFixo, { paddingTop: insets.top + 6 }]}>
+      <TouchableOpacity
+        onPress={() => router.back()}
+        style={styles.botaoVoltar}
+        hitSlop={8}
+      >
+        <Ionicons name="chevron-back" size={20} color={ClinicalColors.primary} />
+        <Text style={styles.botaoVoltarTexto}>Voltar</Text>
+      </TouchableOpacity>
+    </View>
     <KeyboardAwareFlatList
       style={styles.container}
       contentContainerStyle={styles.containerConteudo}
@@ -2346,8 +2347,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: ClinicalColors.background,
   },
+  topoFixo: {
+    backgroundColor: ClinicalColors.background,
+    paddingHorizontal: 16,
+    paddingBottom: 4,
+  },
   containerConteudo: {
-    paddingTop: 60,
+    paddingTop: 8,
     paddingHorizontal: 16,
     paddingBottom: 160,
   },
