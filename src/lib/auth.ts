@@ -17,6 +17,17 @@ export type Usuario = {
   trialFim: string | null;
   diasRestantes: number | null;
   expirado: boolean;
+  // Perfil profissional (Fase 2)
+  categoria?: string;
+  especialidade?: string | null;
+  subespecialidade?: string | null;
+  crm?: string | null;
+  foto_url?: string | null;
+  ano_residencia?: number | null;
+  instituicao_formacao?: string | null;
+  nome_exibicao?: string | null;
+  especialidade_definida?: boolean;
+  onboarding_completo?: boolean;
 };
 
 const USUARIO_KEY = "@passandocaso/usuario";
@@ -41,14 +52,25 @@ export async function cadastrar(
   nome: string,
   email: string,
   senha: string,
+  categoria?: string,
 ): Promise<Usuario> {
   const resp = await apiFetch("/api/auth/cadastro", {
     method: "POST",
-    body: JSON.stringify({ nome, email, senha }),
+    body: JSON.stringify({ nome, email, senha, categoria }),
   });
   if (!resp.ok) throw new Error(await lerErro(resp));
   const { token, usuario } = await resp.json();
   return persistirSessao(token, usuario);
+}
+
+/** Mescla campos no usuário em cache (após editar o perfil) e persiste. */
+export async function mesclarUsuarioLocal(parcial: Partial<Usuario>): Promise<Usuario | null> {
+  const raw = await AsyncStorage.getItem(USUARIO_KEY);
+  if (!raw) return null;
+  const atual = JSON.parse(raw) as Usuario;
+  const novo = { ...atual, ...parcial };
+  await AsyncStorage.setItem(USUARIO_KEY, JSON.stringify(novo));
+  return novo;
 }
 
 export async function entrar(email: string, senha: string): Promise<Usuario> {

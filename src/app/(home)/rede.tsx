@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Clipboard from "expo-clipboard";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -17,7 +18,10 @@ import {
 import { PassarPlantaoModal } from "@/components/PassarPlantaoModal";
 import { ClinicalColors as C, Radius } from "@/constants/clinicalTheme";
 import * as rede from "@/lib/rede";
+import { useAuth } from "@/store/AuthContext";
 import { useHospitais } from "@/store/HospitaisContext";
+
+const KEY_REDE_ONBOARDING = "@passandocaso/rede_onboarding";
 
 function iniciais(nome: string) {
   return (nome || "?")
@@ -32,7 +36,37 @@ type ModalAtivo = null | "buscar" | "convidar" | "criarGrupo" | "entrarGrupo";
 
 export default function RedeScreen() {
   const { hospitais, hospitalAtivo } = useHospitais();
+  const { usuario, atualizarUsuario } = useAuth();
   const hosp = hospitais.find((h) => h.id === hospitalAtivo);
+
+  // Boas-vindas da Rede (uma vez).
+  const [onboard, setOnboard] = useState(false);
+  const [nomeEx, setNomeEx] = useState("");
+  const [crmEx, setCrmEx] = useState("");
+  useEffect(() => {
+    AsyncStorage.getItem(KEY_REDE_ONBOARDING).then((v) => {
+      if (!v) {
+        setNomeEx(usuario?.nome_exibicao || usuario?.nome || "");
+        setOnboard(true);
+      }
+    });
+  }, [usuario?.nome_exibicao, usuario?.nome]);
+  const fecharOnboard = () => {
+    AsyncStorage.setItem(KEY_REDE_ONBOARDING, "1").catch(() => {});
+    setOnboard(false);
+  };
+  const prontoOnboard = async () => {
+    try {
+      await rede.atualizarPerfil({
+        nome_exibicao: nomeEx.trim() || undefined,
+        crm: crmEx.trim() || undefined,
+      });
+      atualizarUsuario({ nome_exibicao: nomeEx.trim() || usuario?.nome, crm: crmEx.trim() || null });
+    } catch {
+      // segue mesmo se falhar
+    }
+    fecharOnboard();
+  };
 
   const [passagens, setPassagens] = useState<rede.PassagemRecebida[]>([]);
   const [grupos, setGrupos] = useState<rede.GrupoClinico[]>([]);
@@ -299,6 +333,46 @@ export default function RedeScreen() {
         destinatarioPre={passarPara ?? undefined}
         onFechar={() => setPassarPara(null)}
       />
+
+      <Modal visible={onboard} animationType="fade" transparent onRequestClose={fecharOnboard}>
+        <View style={styles.modalBg}>
+          <View style={styles.modalCard}>
+            <Ionicons name="people" size={44} color={C.primary} style={{ alignSelf: "center" }} />
+            <Text style={[styles.modalTitulo, { textAlign: "center", marginTop: 8 }]}>
+              Conecte-se com seus colegas
+            </Text>
+            <Text style={styles.welcomeTxt}>
+              Encontre profissionais do mesmo hospital, troque plantões e colabore com
+              segurança. Os dados dos pacientes são sempre protegidos.
+            </Text>
+            <Text style={styles.modalRotulo}>Nome de exibição</Text>
+            <TextInput
+              style={styles.input}
+              value={nomeEx}
+              onChangeText={setNomeEx}
+              placeholder="Como colegas vão te reconhecer"
+              placeholderTextColor={C.textMuted}
+            />
+            <Text style={styles.modalRotulo}>CRM (opcional)</Text>
+            <TextInput
+              style={styles.input}
+              value={crmEx}
+              onChangeText={setCrmEx}
+              placeholder="Aumenta sua credibilidade na rede"
+              placeholderTextColor={C.textMuted}
+              autoCapitalize="characters"
+            />
+            <View style={styles.modalAcoes}>
+              <TouchableOpacity style={styles.btnSec} onPress={fecharOnboard}>
+                <Text style={styles.btnSecTxt}>Depois</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.btnPrim} onPress={prontoOnboard}>
+                <Text style={styles.btnPrimTxt}>Pronto</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -541,6 +615,7 @@ const styles = StyleSheet.create({
   modalBg: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "center", padding: 24 },
   modalCard: { backgroundColor: C.surface, borderRadius: Radius.card, padding: 20 },
   modalTitulo: { fontSize: 18, fontWeight: "700", color: C.text },
+  welcomeTxt: { fontSize: 14, color: C.textSecondary, textAlign: "center", lineHeight: 20, marginTop: 8 },
   modalRotulo: { fontSize: 13, color: C.textMuted, marginTop: 12, marginBottom: 6 },
   input: {
     backgroundColor: C.background,

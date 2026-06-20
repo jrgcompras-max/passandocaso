@@ -78,6 +78,17 @@ function usuarioPublico(u) {
     trialFim: u.trial_fim,
     diasRestantes,
     expirado,
+    // Perfil profissional (Fase 2)
+    categoria: u.categoria || "medico",
+    especialidade: u.especialidade || null,
+    subespecialidade: u.subespecialidade || null,
+    crm: u.crm || null,
+    foto_url: u.foto_url || null,
+    ano_residencia: u.ano_residencia || null,
+    instituicao_formacao: u.instituicao_formacao || null,
+    nome_exibicao: u.nome_exibicao || u.nome,
+    especialidade_definida: !!u.especialidade_definida,
+    onboarding_completo: !!u.onboarding_completo,
   };
 }
 

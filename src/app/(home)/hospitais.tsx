@@ -11,23 +11,47 @@ import {
 } from "react-native";
 
 import { BuscaHospital } from "@/components/BuscaHospital";
+import { ModalEspecialidade } from "@/components/ModalEspecialidade";
 import { ClinicalColors as C, Radius } from "@/constants/clinicalTheme";
+import { definirEspecialidade } from "@/lib/rede";
+import { useAuth } from "@/store/AuthContext";
 import { HOSPITAL_GERAL, useHospitais } from "@/store/HospitaisContext";
 
 export default function HospitaisScreen() {
   const router = useRouter();
+  const { usuario, atualizarUsuario } = useAuth();
   const { hospitais, hospitalAtivo, selecionar, adicionarHospital, removerHospital } =
     useHospitais();
   const [busca, setBusca] = useState(false);
+  const [espVisivel, setEspVisivel] = useState(false);
+  const [cnesPendente, setCnesPendente] = useState<string | undefined>(undefined);
+
+  // Após escolher um hospital: se a especialidade ainda não foi definida, faz o
+  // onboarding antes de voltar à Rotina.
+  const aposEscolher = (cnes?: string) => {
+    if (!usuario?.especialidade_definida) {
+      setCnesPendente(cnes);
+      setEspVisivel(true);
+    } else {
+      router.navigate("/");
+    }
+  };
 
   const selecionarEVoltar = (id: string) => {
     selecionar(id);
-    router.navigate("/");
+    aposEscolher(hospitais.find((h) => h.id === id)?.cnes);
   };
 
   const aoEscolher = (h: { nome: string; cidade: string; cnes?: string }) => {
     adicionarHospital(h.nome, h.cidade, h.cnes); // cria e já define como ativo
     setBusca(false);
+    aposEscolher(h.cnes);
+  };
+
+  const confirmarEspecialidade = (esp: string) => {
+    definirEspecialidade(esp, cnesPendente).catch(() => {});
+    atualizarUsuario({ especialidade: esp, especialidade_definida: true });
+    setEspVisivel(false);
     router.navigate("/");
   };
 
@@ -83,6 +107,14 @@ export default function HospitaisScreen() {
         visivel={busca}
         onFechar={() => setBusca(false)}
         onEscolher={aoEscolher}
+      />
+      <ModalEspecialidade
+        visivel={espVisivel}
+        onConfirmar={confirmarEspecialidade}
+        onPular={() => {
+          setEspVisivel(false);
+          router.navigate("/");
+        }}
       />
     </View>
   );

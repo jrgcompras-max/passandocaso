@@ -233,6 +233,9 @@ app.post("/api/auth/cadastro", async (req, res) => {
   const nome = String((req.body || {}).nome || "").trim();
   const email = String((req.body || {}).email || "").trim().toLowerCase();
   const senha = String((req.body || {}).senha || "");
+  const categoriasOk = ["medico", "residente", "estudante", "enfermeiro", "outro"];
+  const catBruta = String((req.body || {}).categoria || "medico").trim().toLowerCase();
+  const categoria = categoriasOk.includes(catBruta) ? catBruta : "medico";
   if (!nome || !email || !senha) {
     return res.status(400).json({ erro: "Campos obrigatórios: nome, email, senha." });
   }
@@ -250,9 +253,9 @@ app.post("/api/auth/cadastro", async (req, res) => {
     const id = crypto.randomUUID();
     const senhaHash = await auth.hashSenha(senha);
     const ins = await db.query(
-      `INSERT INTO usuarios (id, nome, email, senha_hash, is_admin)
-       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [id, nome, email, senhaHash, auth.ehAdmin(email)],
+      `INSERT INTO usuarios (id, nome, email, senha_hash, is_admin, categoria, nome_exibicao)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [id, nome, email, senhaHash, auth.ehAdmin(email), categoria, nome],
     );
     const usuario = ins.rows[0];
 

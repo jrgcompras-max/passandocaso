@@ -15,9 +15,16 @@ type AuthContextValor = {
   usuario: Usuario | null;
   carregando: boolean;
   entrar: (email: string, senha: string) => Promise<void>;
-  cadastrar: (nome: string, email: string, senha: string) => Promise<void>;
+  cadastrar: (
+    nome: string,
+    email: string,
+    senha: string,
+    categoria?: string,
+  ) => Promise<void>;
   recuperar: (email: string) => Promise<void>;
   sair: () => Promise<void>;
+  /** Mescla campos no usuário local (após editar perfil/onboarding). */
+  atualizarUsuario: (parcial: Partial<Usuario>) => void;
 };
 
 const AuthContext = createContext<AuthContextValor | null>(null);
@@ -46,8 +53,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const cadastrar = useCallback(
-    async (nome: string, email: string, senha: string) => {
-      setUsuario(await authLib.cadastrar(nome, email, senha));
+    async (nome: string, email: string, senha: string, categoria?: string) => {
+      setUsuario(await authLib.cadastrar(nome, email, senha, categoria));
     },
     [],
   );
@@ -61,9 +68,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUsuario(null);
   }, []);
 
+  const atualizarUsuario = useCallback((parcial: Partial<Usuario>) => {
+    setUsuario((u) => (u ? { ...u, ...parcial } : u));
+    authLib.mesclarUsuarioLocal(parcial).catch(() => {});
+  }, []);
+
   const valor = useMemo(
-    () => ({ usuario, carregando, entrar, cadastrar, recuperar, sair }),
-    [usuario, carregando, entrar, cadastrar, recuperar, sair],
+    () => ({ usuario, carregando, entrar, cadastrar, recuperar, sair, atualizarUsuario }),
+    [usuario, carregando, entrar, cadastrar, recuperar, sair, atualizarUsuario],
   );
 
   return <AuthContext.Provider value={valor}>{children}</AuthContext.Provider>;

@@ -1,100 +1,292 @@
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
-
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import { useEffect, useState } from "react";
 import {
-  BorderWidth,
-  ClinicalColors as C,
-  Radius,
-} from "@/constants/clinicalTheme";
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+
+import { ModalEspecialidade } from "@/components/ModalEspecialidade";
+import { ClinicalColors as C, Radius } from "@/constants/clinicalTheme";
+import * as rede from "@/lib/rede";
 import { useAuth } from "@/store/AuthContext";
 
-export default function PerfilScreen() {
-  const { usuario, sair } = useAuth();
+const CATEGORIA_LABEL: Record<string, string> = {
+  medico: "Médico",
+  residente: "Residente",
+  estudante: "Estudante",
+  enfermeiro: "Enfermeiro",
+  outro: "Outro",
+};
+const CATEGORIA_COR: Record<string, { bg: string; fg: string }> = {
+  medico: { bg: "#E5F0FF", fg: "#007AFF" },
+  residente: { bg: "#E5F7EE", fg: "#34C759" },
+  estudante: { bg: "#F3E5FF", fg: "#AF52DE" },
+  enfermeiro: { bg: "#FFE5E5", fg: "#FF3B30" },
+  outro: { bg: "#F2F2F7", fg: "#8E8E93" },
+};
 
-  // Cor e texto do badge de trial conforme o estado da assinatura.
+function iniciais(nome: string) {
+  return (nome || "?").trim().split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase() ?? "").join("");
+}
+
+export default function PerfilScreen() {
+  const router = useRouter();
+  const { usuario, sair, atualizarUsuario } = useAuth();
+
+  const [nomeEx, setNomeEx] = useState(usuario?.nome_exibicao || usuario?.nome || "");
+  const [esp, setEsp] = useState(usuario?.especialidade || "");
+  const [subesp, setSubesp] = useState(usuario?.subespecialidade || "");
+  const [crm, setCrm] = useState(usuario?.crm || "");
+  const [anoRes, setAnoRes] = useState<number | null>(usuario?.ano_residencia ?? null);
+  const [instituicao, setInstituicao] = useState(usuario?.instituicao_formacao || "");
+  const [espModal, setEspModal] = useState(false);
+  const [salvando, setSalvando] = useState(false);
+  const [contagem, setContagem] = useState({ conexoes: 0, grupos: 0 });
+
+  const categoria = usuario?.categoria || "medico";
+  const cor = CATEGORIA_COR[categoria] || CATEGORIA_COR.outro;
+
+  useEffect(() => {
+    Promise.all([
+      rede.listarConexoes().catch(() => []),
+      rede.listarGrupos().catch(() => []),
+    ]).then(([cx, gr]) => setContagem({ conexoes: cx.length, grupos: gr.length }));
+  }, []);
+
+  const salvar = async () => {
+    const mudancas: Record<string, unknown> = {};
+    const set = (chave: string, valor: any, original: any) => {
+      if ((valor || "") !== (original || "")) mudancas[chave] = valor || null;
+    };
+    set("nome_exibicao", nomeEx.trim(), usuario?.nome_exibicao || usuario?.nome);
+    set("especialidade", esp.trim(), usuario?.especialidade);
+    set("subespecialidade", subesp.trim(), usuario?.subespecialidade);
+    set("crm", crm.trim(), usuario?.crm);
+    set("instituicao_formacao", instituicao.trim(), usuario?.instituicao_formacao);
+    if ((anoRes ?? null) !== (usuario?.ano_residencia ?? null)) mudancas.ano_residencia = anoRes;
+    if (Object.keys(mudancas).length === 0) {
+      Alert.alert("Perfil", "Nada para salvar.");
+      return;
+    }
+    setSalvando(true);
+    try {
+      await rede.atualizarPerfil(mudancas);
+      atualizarUsuario(mudancas);
+      Alert.alert("Perfil", "Alterações salvas.");
+    } catch (e: any) {
+      Alert.alert("Erro", e.message);
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  // Badge de trial.
   let badge = { txt: "", bg: "#DBEAFE", fg: "#1E40AF" };
   if (usuario) {
-    if (usuario.plano === "ativo") {
-      badge = { txt: "Plano ativo", bg: "#DCFCE7", fg: "#166534" };
-    } else if (usuario.expirado) {
-      badge = { txt: "Trial expirado", bg: "#FEE2E2", fg: "#991B1B" };
-    } else {
+    if (usuario.plano === "ativo") badge = { txt: "Assinante ativo", bg: "#DCFCE7", fg: "#166534" };
+    else if (usuario.expirado) badge = { txt: "Trial expirado", bg: "#FEE2E2", fg: "#991B1B" };
+    else {
       const d = usuario.diasRestantes ?? 0;
-      const texto = `Trial · ${d} ${d === 1 ? "dia restante" : "dias restantes"}`;
-      badge =
-        d <= 7
-          ? { txt: texto, bg: "#FEF3C7", fg: "#B45309" }
-          : { txt: texto, bg: "#DCFCE7", fg: "#166534" };
+      const t = `${d} ${d === 1 ? "dia restante" : "dias restantes"}`;
+      badge = d <= 7 ? { txt: t, bg: "#FEF3C7", fg: "#B45309" } : { txt: t, bg: "#DCFCE7", fg: "#166534" };
     }
   }
 
-  const iniciais = (usuario?.nome || "?")
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((p) => p[0]?.toUpperCase() ?? "")
-    .join("");
-
   return (
     <View style={styles.container}>
-      <Text style={styles.titulo}>Perfil</Text>
-
-      <View style={styles.card}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarTxt}>{iniciais}</Text>
-        </View>
-        <Text style={styles.nome}>{usuario?.nome ?? "—"}</Text>
-        <Text style={styles.email}>{usuario?.email ?? ""}</Text>
-        {!!badge.txt && (
-          <View style={[styles.badge, { backgroundColor: badge.bg }]}>
-            <Text style={[styles.badgeTxt, { color: badge.fg }]}>{badge.txt}</Text>
-          </View>
-        )}
+      <View style={styles.topo}>
+        <Text style={styles.titulo}>Perfil</Text>
+        <TouchableOpacity onPress={salvar} disabled={salvando} hitSlop={8}>
+          <Text style={styles.salvar}>{salvando ? "Salvando…" : "Salvar"}</Text>
+        </TouchableOpacity>
       </View>
 
-      <TouchableOpacity style={styles.sairBtn} onPress={() => void sair()}>
-        <Text style={styles.sairTxt}>Sair da conta</Text>
-      </TouchableOpacity>
+      <ScrollView contentContainerStyle={{ paddingBottom: 120 }} keyboardShouldPersistTaps="handled">
+        {/* IDENTIDADE */}
+        <View style={styles.identidade}>
+          <TouchableOpacity
+            style={styles.avatar}
+            onPress={() => Alert.alert("Foto de perfil", "Em breve: adicionar foto.")}
+          >
+            <Text style={styles.avatarTxt}>{iniciais(nomeEx)}</Text>
+          </TouchableOpacity>
+          <View style={[styles.catBadge, { backgroundColor: cor.bg }]}>
+            <Text style={[styles.catBadgeTxt, { color: cor.fg }]}>
+              {CATEGORIA_LABEL[categoria] || "Profissional"}
+            </Text>
+          </View>
+        </View>
+
+        <Text style={styles.secaoLabel}>Identidade</Text>
+        <View style={styles.cardCampos}>
+          <Campo rotulo="Nome de exibição" valor={nomeEx} onChange={setNomeEx} placeholder="Seu nome" />
+          <View style={styles.sep} />
+          <View style={styles.campoLeitura}>
+            <Text style={styles.campoRotulo}>E-mail</Text>
+            <Text style={styles.campoValorLeitura}>{usuario?.email}</Text>
+          </View>
+        </View>
+
+        {/* DADOS PROFISSIONAIS */}
+        <Text style={styles.secaoLabel}>Dados profissionais</Text>
+        <View style={styles.cardCampos}>
+          <TouchableOpacity style={styles.campoToque} onPress={() => setEspModal(true)}>
+            <Text style={styles.campoRotulo}>Especialidade</Text>
+            <View style={styles.campoToqueDir}>
+              <Text style={[styles.campoValorLeitura, !esp && styles.placeholder]}>
+                {esp || "Definir"}
+              </Text>
+              <Ionicons name="chevron-forward" size={16} color={C.chevron} />
+            </View>
+          </TouchableOpacity>
+          <View style={styles.sep} />
+          <Campo rotulo="Subespecialidade" valor={subesp} onChange={setSubesp} placeholder="Opcional" />
+          <View style={styles.sep} />
+          <Campo rotulo="CRM" valor={crm} onChange={setCrm} placeholder="Opcional" autoCapitalize="characters" />
+          {categoria === "residente" && (
+            <>
+              <View style={styles.sep} />
+              <View style={styles.campoLeitura}>
+                <Text style={styles.campoRotulo}>Ano de residência</Text>
+                <View style={styles.anosRow}>
+                  {[1, 2, 3].map((a) => (
+                    <TouchableOpacity
+                      key={a}
+                      style={[styles.anoChip, anoRes === a && styles.anoChipSel]}
+                      onPress={() => setAnoRes(anoRes === a ? null : a)}
+                    >
+                      <Text style={[styles.anoChipTxt, anoRes === a && styles.anoChipTxtSel]}>{a}º</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            </>
+          )}
+          <View style={styles.sep} />
+          <Campo
+            rotulo="Instituição de formação"
+            valor={instituicao}
+            onChange={setInstituicao}
+            placeholder="Opcional"
+          />
+        </View>
+
+        {/* MINHA REDE */}
+        <Text style={styles.secaoLabel}>Minha rede</Text>
+        <TouchableOpacity style={styles.redeCard} onPress={() => router.navigate("/rede")}>
+          <Ionicons name="people" size={24} color={C.primary} />
+          <Text style={styles.redeTxt}>
+            {contagem.conexoes} {contagem.conexoes === 1 ? "conexão" : "conexões"} ·{" "}
+            {contagem.grupos} {contagem.grupos === 1 ? "grupo" : "grupos"}
+          </Text>
+          <Ionicons name="chevron-forward" size={18} color={C.chevron} />
+        </TouchableOpacity>
+
+        {/* CONTA */}
+        <Text style={styles.secaoLabel}>Conta</Text>
+        <View style={styles.cardCampos}>
+          <View style={styles.campoLeitura}>
+            <Text style={styles.campoRotulo}>Assinatura</Text>
+            {!!badge.txt && (
+              <View style={[styles.trialBadge, { backgroundColor: badge.bg }]}>
+                <Text style={[styles.trialBadgeTxt, { color: badge.fg }]}>{badge.txt}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+        <TouchableOpacity style={styles.sairBtn} onPress={() => void sair()}>
+          <Text style={styles.sairTxt}>Sair da conta</Text>
+        </TouchableOpacity>
+      </ScrollView>
+
+      <ModalEspecialidade
+        visivel={espModal}
+        titulo="Sua especialidade"
+        rotuloPular="Cancelar"
+        onConfirmar={(v) => { setEsp(v); setEspModal(false); }}
+        onPular={() => setEspModal(false)}
+      />
+    </View>
+  );
+}
+
+function Campo({
+  rotulo,
+  valor,
+  onChange,
+  placeholder,
+  autoCapitalize,
+}: {
+  rotulo: string;
+  valor: string;
+  onChange: (t: string) => void;
+  placeholder?: string;
+  autoCapitalize?: "none" | "characters" | "words" | "sentences";
+}) {
+  return (
+    <View style={styles.campoLeitura}>
+      <Text style={styles.campoRotulo}>{rotulo}</Text>
+      <TextInput
+        style={styles.campoInput}
+        value={valor}
+        onChangeText={onChange}
+        placeholder={placeholder}
+        placeholderTextColor={C.textMuted}
+        autoCapitalize={autoCapitalize}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.background, paddingTop: 60, paddingHorizontal: 16 },
-  titulo: { fontSize: 28, fontWeight: "bold", color: C.text, marginBottom: 20 },
-  card: {
-    backgroundColor: C.surface,
-    borderColor: C.border,
-    borderWidth: BorderWidth.hairline,
-    borderRadius: Radius.card,
-    padding: 24,
-    alignItems: "center",
-  },
+  topo: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 },
+  titulo: { fontSize: 28, fontWeight: "700", color: C.text, letterSpacing: -0.5 },
+  salvar: { color: C.primary, fontSize: 17, fontWeight: "600" },
+  identidade: { alignItems: "center", marginBottom: 12 },
   avatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: C.primary,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 14,
+    width: 72, height: 72, borderRadius: 36, backgroundColor: C.primary,
+    alignItems: "center", justifyContent: "center", marginBottom: 10,
   },
-  avatarTxt: { color: "#FFFFFF", fontSize: 26, fontWeight: "800" },
-  nome: { fontSize: 20, fontWeight: "700", color: C.text },
-  email: { fontSize: 14, color: C.textMuted, marginTop: 2 },
-  badge: {
-    marginTop: 14,
-    borderRadius: Radius.badge,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
+  avatarTxt: { color: "#fff", fontSize: 26, fontWeight: "800" },
+  catBadge: { borderRadius: Radius.pill, paddingHorizontal: 12, paddingVertical: 4 },
+  catBadgeTxt: { fontSize: 13, fontWeight: "700" },
+  secaoLabel: {
+    fontSize: 11, fontWeight: "600", color: C.textMuted, textTransform: "uppercase",
+    letterSpacing: 0.5, marginTop: 20, marginBottom: 8, marginLeft: 4,
   },
-  badgeTxt: { fontSize: 13, fontWeight: "700" },
+  cardCampos: { backgroundColor: C.surface, borderRadius: Radius.card, paddingHorizontal: 14 },
+  sep: { height: 0.5, backgroundColor: C.border },
+  campoLeitura: { paddingVertical: 12 },
+  campoToque: { paddingVertical: 12, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  campoToqueDir: { flexDirection: "row", alignItems: "center", gap: 6 },
+  campoRotulo: { fontSize: 12, color: C.textMuted, marginBottom: 4 },
+  campoInput: { fontSize: 16, color: C.text, padding: 0 },
+  campoValorLeitura: { fontSize: 16, color: C.text },
+  placeholder: { color: C.textMuted },
+  anosRow: { flexDirection: "row", gap: 8, marginTop: 2 },
+  anoChip: {
+    paddingHorizontal: 16, paddingVertical: 8, borderRadius: Radius.pill, backgroundColor: C.background,
+  },
+  anoChipSel: { backgroundColor: "#E5F0FF" },
+  anoChipTxt: { fontSize: 15, fontWeight: "600", color: C.textMuted },
+  anoChipTxtSel: { color: C.primary },
+  redeCard: {
+    flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: C.surface,
+    borderRadius: Radius.card, padding: 16,
+  },
+  redeTxt: { flex: 1, fontSize: 16, fontWeight: "500", color: C.text },
+  trialBadge: { alignSelf: "flex-start", borderRadius: Radius.pill, paddingHorizontal: 12, paddingVertical: 5, marginTop: 2 },
+  trialBadgeTxt: { fontSize: 13, fontWeight: "700" },
   sairBtn: {
-    marginTop: 24,
-    borderWidth: 1,
-    borderColor: "#FECACA",
-    borderRadius: Radius.card,
-    paddingVertical: 14,
-    alignItems: "center",
+    marginTop: 16, borderWidth: 1, borderColor: "#FECACA", borderRadius: Radius.card,
+    paddingVertical: 14, alignItems: "center",
   },
-  sairTxt: { color: "#991B1B", fontSize: 15, fontWeight: "700" },
+  sairTxt: { color: "#FF3B30", fontSize: 15, fontWeight: "700" },
 });
