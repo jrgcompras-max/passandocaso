@@ -225,7 +225,7 @@ export default function Index() {
       );
       return;
     }
-    const result = await ImagePicker.launchCameraAsync({ quality: 0.8 });
+    const result = await ImagePicker.launchCameraAsync({ quality: 0.5 });
     if (!result.canceled) processarImagem(result.assets[0].uri);
   };
 
@@ -237,7 +237,7 @@ export default function Index() {
       );
       return;
     }
-    const result = await ImagePicker.launchImageLibraryAsync({ quality: 0.8 });
+    const result = await ImagePicker.launchImageLibraryAsync({ quality: 0.5 });
     if (!result.canceled) processarImagem(result.assets[0].uri);
   };
 
