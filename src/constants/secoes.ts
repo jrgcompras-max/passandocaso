@@ -10,63 +10,98 @@ export type SecaoConfig = {
 };
 
 /**
- * Seções clínicas expansíveis, na ordem oficial de exibição (e de geração do
- * texto de evolução). `medicacao: true` força linhas com bullet.
+ * Definição interna de cada seção de extração por foto:
+ *  - `escopo`: o que PERTENCE àquela seção (frase curta).
+ *  - `especifico`: como organizar/estruturar a saída daquela seção.
  *
- * Cada instrução é ESTRITA: a IA deve extrair APENAS o conteúdo daquela seção e
- * ignorar tudo que pertença às outras (evita misturar HDA com comorbidades/MUC,
- * exames, etc. quando a foto pega trechos vizinhos do prontuário).
+ * A instrução final é montada por `montarInstrucao`, que prefixa um bloco de
+ * ISOLAMENTO listando TODAS as outras seções e mandando ignorá-las. Como a foto
+ * costuma pegar uma página inteira do prontuário (com várias seções), dar ao
+ * modelo a taxonomia completa + a lista de exclusão é a forma mais robusta de
+ * evitar que ele misture conteúdo (ex.: comorbidades/MUC vazando para a HDA).
  */
-export const SECOES: SecaoConfig[] = [
+type SecaoDef = {
+  id: SecaoId;
+  titulo: string;
+  escopo: string;
+  especifico: string;
+  medicacao?: boolean;
+};
+
+const DEFS: SecaoDef[] = [
   {
     id: "comorbidadesMedicacoes",
     titulo: "Comorbidades e MUC",
-    instrucao:
-      "Extraia APENAS as comorbidades/doenças de base e as medicações de uso contínuo desta tela de prontuário. " +
-      "Ignore completamente história da doença atual, exames laboratoriais, exames de imagem, sinais vitais, prescrição hospitalar e qualquer outra informação. " +
-      "Use dois blocos: 'Comorbidades' (uma doença por item) e 'Medicações de uso contínuo' (uma medicação com dose/posologia por item).",
+    escopo: "as comorbidades/doenças de base e as medicações de uso contínuo (MUC) prévias à internação",
+    especifico:
+      "Use dois blocos: 'Comorbidades' (uma doença crônica por item) e 'Medicações de uso contínuo' (uma medicação com dose/posologia por item). " +
+      "NÃO inclua o motivo/história da internação atual, nem medicamentos iniciados nesta internação (esses são prescrição hospitalar).",
   },
   {
     id: "historia",
     titulo: "História da Doença Atual",
-    instrucao:
-      "Extraia APENAS a história clínica (motivo da internação, história da doença atual e antecedentes) desta tela de prontuário. " +
-      "Ignore completamente comorbidades, medicações de uso contínuo, exames laboratoriais, exames de imagem, sinais vitais, prescrições e qualquer outra informação que pertença a outras seções. " +
-      "Use blocos como 'Motivo da internação', 'História da doença atual' e 'Antecedentes', cada fato relevante como um item.",
+    escopo: "a história clínica: motivo da internação, história da doença atual (HDA) e antecedentes do quadro",
+    especifico:
+      "Use blocos como 'Motivo da internação', 'História da doença atual' e 'Antecedentes', cada fato relevante como um item. " +
+      "NÃO inclua listas de comorbidades crônicas, medicações de uso contínuo, exames, exame físico nem prescrição.",
   },
   {
     id: "examesLaboratoriais",
     titulo: "Exames Laboratoriais",
-    instrucao:
-      "Extraia APENAS os resultados de exames laboratoriais desta tela de prontuário. " +
-      "Ignore completamente comorbidades, medicações, história clínica, exames de imagem, sinais vitais e prescrições. " +
+    escopo: "os resultados de exames laboratoriais (sangue, urina, líquor, etc.)",
+    especifico:
       "Agrupe por painel/sistema (ex.: 'Hemograma', 'Função renal', 'Eletrólitos', 'Função hepática', 'Coagulação', 'Gasometria', 'Marcadores'), " +
-      "cada exame com valor e unidade como um item.",
+      "cada exame com valor e unidade como um item. NÃO inclua laudos de exames de imagem.",
   },
   {
     id: "imagem",
     titulo: "Imagem",
-    instrucao:
-      "Extraia APENAS os laudos de exames de imagem (raio-x, tomografia, ressonância, ultrassom, etc.) desta tela de prontuário. " +
-      "Ignore completamente comorbidades, medicações, história clínica, exames laboratoriais, sinais vitais e prescrições. " +
-      "Use um bloco por exame, com o título sendo o NOME do exame (ex.: 'TC de crânio', 'RM de abdome', 'RX de tórax') e cada achado do laudo como um item.",
+    escopo: "os laudos de exames de imagem (raio-X, tomografia, ressonância, ultrassom, etc.)",
+    especifico:
+      "Use um bloco por exame, com o título sendo o NOME do exame (ex.: 'TC de crânio', 'RM de abdome', 'RX de tórax') " +
+      "e cada achado do laudo como um item. NÃO inclua valores de exames laboratoriais.",
   },
   {
     id: "prescricaoHospitalar",
     titulo: "Prescrição Hospitalar",
     medicacao: true,
-    instrucao:
-      "Extraia APENAS os medicamentos em uso no hospital desta tela de prescrição. " +
-      "Ignore completamente comorbidades, medicações de uso contínuo prévias, história clínica, exames laboratoriais, exames de imagem e sinais vitais. " +
+    escopo: "os medicamentos da prescrição hospitalar ATUAL (em uso durante esta internação)",
+    especifico:
       "Agrupe por classe (ex.: 'Antibióticos', 'Antifúngicos', 'Corticoides', 'Analgesia', 'Sintomáticos'), " +
-      "cada medicamento com dose, via e posologia como um item.",
+      "cada medicamento com dose, via e posologia como um item. NÃO inclua as medicações de uso contínuo prévias do paciente.",
   },
   {
     id: "sinaisVitaisIntercorrencias",
     titulo: "Sinais Vitais e Intercorrências",
-    instrucao:
-      "Extraia APENAS os sinais vitais e as intercorrências desta tela de prontuário. " +
-      "Ignore completamente comorbidades, medicações, história clínica, exames laboratoriais, exames de imagem e prescrições. " +
+    escopo: "os sinais vitais e as intercorrências do dia",
+    especifico:
       "Use dois blocos: 'Sinais vitais' (PA, FC, FR, Tax, SatO2, etc., um por item) e 'Intercorrências' (uma por item).",
   },
 ];
+
+/** Monta a instrução final com o bloco de isolamento (taxonomia + exclusão). */
+function montarInstrucao(def: SecaoDef): string {
+  const outras = DEFS.filter((d) => d.id !== def.id)
+    .map((d) => `"${d.titulo}" (${d.escopo})`)
+    .join("; ");
+  return (
+    "Esta é UMA seção de um prontuário. A foto pode conter VÁRIAS seções ao mesmo tempo, " +
+    "mas você deve extrair SOMENTE o conteúdo desta seção: " +
+    `${def.escopo}. ` +
+    "IGNORE COMPLETAMENTE qualquer informação que pertença às outras seções, mesmo que apareça na foto — " +
+    `são elas: ${outras}. ` +
+    "Se um dado não pertencer claramente a ESTA seção, NÃO o inclua de forma alguma. " +
+    def.especifico
+  );
+}
+
+/**
+ * Seções clínicas expansíveis, na ordem oficial de exibição (e de geração do
+ * texto de evolução). `medicacao: true` força linhas com bullet.
+ */
+export const SECOES: SecaoConfig[] = DEFS.map((d) => ({
+  id: d.id,
+  titulo: d.titulo,
+  medicacao: d.medicacao,
+  instrucao: montarInstrucao(d),
+}));
