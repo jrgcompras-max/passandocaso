@@ -859,6 +859,123 @@ function ComorbidadesUnificado({
 }
 
 /**
+ * Seção "Imagem": cada exame em seu próprio card (nome em destaque + laudo),
+ * com excluir individual (confirmado) e botão para adicionar manualmente. O
+ * conteúdo é persistido no mesmo formato de blocos (titulo = nome do exame,
+ * itens = achados do laudo).
+ */
+function ImagemSecao({
+  extraido,
+  onChange,
+}: {
+  extraido: string;
+  onChange: (texto: string) => void;
+}) {
+  const blocos =
+    parseBlocos(extraido) ??
+    (extraido.trim() ? [{ titulo: "", itens: dividirItens(extraido) }] : []);
+  const [adicionando, setAdicionando] = useState(false);
+  const [nome, setNome] = useState("");
+  const [laudo, setLaudo] = useState("");
+
+  const salvar = (lista: Bloco[]) => onChange(JSON.stringify(lista));
+
+  const remover = (i: number) => {
+    Alert.alert("Remover este exame?", blocos[i]?.titulo || "Exame de imagem", [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Remover",
+        style: "destructive",
+        onPress: () => salvar(blocos.filter((_, j) => j !== i)),
+      },
+    ]);
+  };
+
+  const adicionar = () => {
+    if (!nome.trim() && !laudo.trim()) return;
+    salvar([
+      ...blocos,
+      { titulo: nome.trim(), itens: laudo.trim() ? [laudo.trim()] : [] },
+    ]);
+    setNome("");
+    setLaudo("");
+    setAdicionando(false);
+  };
+
+  return (
+    <View>
+      <Text style={[styles.campoLabel, styles.campoLabelEspacado]}>
+        Exames de imagem
+      </Text>
+
+      {blocos.length === 0 && !adicionando && (
+        <Text style={styles.secaoConteudo}>—</Text>
+      )}
+
+      {blocos.map((b, i) => (
+        <View key={i} style={styles.imgCard}>
+          <View style={styles.imgCardTopo}>
+            <Text style={styles.imgNome}>{b.titulo || "Exame"}</Text>
+            <TouchableOpacity onPress={() => remover(i)} hitSlop={8}>
+              <Ionicons name="trash-outline" size={16} color={ClinicalColors.danger} />
+            </TouchableOpacity>
+          </View>
+          {!!b.itens.length && (
+            <Text style={styles.imgLaudo}>{b.itens.join(". ")}</Text>
+          )}
+        </View>
+      ))}
+
+      {adicionando ? (
+        <View style={styles.formInline}>
+          <TextInput
+            style={styles.campoInput}
+            value={nome}
+            onChangeText={setNome}
+            placeholder="Nome do exame (ex.: TC de crânio)"
+            placeholderTextColor={ClinicalColors.textMuted}
+          />
+          <TextInput
+            style={[styles.campoInput, styles.imgLaudoInput]}
+            value={laudo}
+            onChangeText={setLaudo}
+            placeholder="Laudo / achados"
+            placeholderTextColor={ClinicalColors.textMuted}
+            multiline
+          />
+          <View style={styles.formAcoes}>
+            <TouchableOpacity
+              style={[styles.botaoAcao, styles.botaoSalvar]}
+              onPress={adicionar}
+            >
+              <Text style={styles.botaoAcaoTexto}>Adicionar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.botaoAcao, styles.botaoCancelar]}
+              onPress={() => {
+                setAdicionando(false);
+                setNome("");
+                setLaudo("");
+              }}
+            >
+              <Text style={styles.botaoCancelarTexto}>Cancelar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : (
+        <TouchableOpacity
+          style={styles.imgAddBtn}
+          onPress={() => setAdicionando(true)}
+        >
+          <Ionicons name="add" size={16} color={ClinicalColors.primary} />
+          <Text style={styles.imgAddTexto}>Adicionar exame</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+
+/**
  * Card de seção clínica expansível. Começa fechado; ao tocar no cabeçalho abre,
  * revelando o botão de câmera (foto → extração por IA), uma área de anotações
  * livres e o conteúdo extraído pela IA logo abaixo.
@@ -1055,6 +1172,28 @@ function SecaoExpansivel({
               anotacoes={anotacoes}
               onExcluir={excluirAnotacao}
             />
+          ) : secaoId === "imagem" ? (
+            <>
+              {anotacoesVisiveis.map((a) => (
+                <View key={a.id} style={styles.anotacaoCard}>
+                  <View style={styles.anotacaoConteudo}>
+                    {!!a.horario && (
+                      <Text style={styles.anotacaoHorario}>{a.horario}</Text>
+                    )}
+                    <Text style={styles.anotacaoTexto}>{a.texto}</Text>
+                  </View>
+                  <View style={styles.anotacaoAcoes}>
+                    <TouchableOpacity onPress={() => editarAnotacao(a)} hitSlop={8}>
+                      <Ionicons name="pencil" size={16} color={ClinicalColors.primary} />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => excluirAnotacao(a)} hitSlop={8}>
+                      <Ionicons name="trash-outline" size={16} color={ClinicalColors.danger} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+              <ImagemSecao extraido={extraido} onChange={onExtraido} />
+            </>
           ) : (
             <>
               {anotacoesVisiveis.map((a) => (
@@ -2026,7 +2165,14 @@ function LabEvolucao({
   };
 
   const removerExame = (nome: string) =>
-    onChange(resultados.filter((r) => r.exame.trim() !== nome));
+    Alert.alert("Remover este exame?", nome, [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Remover",
+        style: "destructive",
+        onPress: () => onChange(resultados.filter((r) => r.exame.trim() !== nome)),
+      },
+    ]);
 
   const series = agruparPorExame(resultados);
 
@@ -2717,6 +2863,38 @@ const styles = StyleSheet.create({
   anotacaoIcone: { fontSize: 16 },
   campoLabelEspacado: { marginTop: 16 },
   secaoConteudo: { color: ClinicalColors.textSecondary, fontSize: 15, lineHeight: 22 },
+  // Seção Imagem: card por exame.
+  imgCard: {
+    backgroundColor: ClinicalColors.background,
+    borderRadius: Radius.card,
+    padding: 12,
+    marginTop: 8,
+  },
+  imgCardTopo: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  imgNome: { flex: 1, fontSize: 14, fontWeight: "700", color: "#000" },
+  imgLaudo: {
+    fontSize: 13,
+    color: ClinicalColors.textSecondary,
+    lineHeight: 19,
+    marginTop: 4,
+  },
+  imgLaudoInput: { minHeight: 64, textAlignVertical: "top" },
+  imgAddBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    alignSelf: "flex-start",
+    marginTop: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    backgroundColor: ClinicalColors.background,
+    borderRadius: Radius.pill,
+  },
+  imgAddTexto: { fontSize: 14, fontWeight: "600", color: ClinicalColors.primary },
   conteudoBlocos: { gap: 12 },
   uniGrupo: { gap: 4, marginBottom: 8 },
   bloco: { gap: 4 },

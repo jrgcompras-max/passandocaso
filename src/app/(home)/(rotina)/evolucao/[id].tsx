@@ -3,9 +3,9 @@ import { useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -98,15 +98,18 @@ export default function Evolucao() {
         </View>
       )}
 
-      <TextInput
+      <ScrollView
         style={styles.editor}
-        value={texto}
-        multiline
-        editable={false}
-        placeholder="O texto da passagem de caso aparecerá aqui."
-        placeholderTextColor={ClinicalColors.textMuted}
-        textAlignVertical="top"
-      />
+        contentContainerStyle={styles.editorConteudo}
+      >
+        {texto.trim() ? (
+          <TextoComMarcadores texto={texto} />
+        ) : (
+          <Text style={styles.editorPlaceholder}>
+            O texto da passagem de caso aparecerá aqui.
+          </Text>
+        )}
+      </ScrollView>
 
       <View style={styles.rodapeInfo}>
         <Text style={styles.aviso}>
@@ -145,6 +148,48 @@ export default function Evolucao() {
   );
 }
 
+/** Marcadores do formato "Evolução Médica" exibidos em negrito. */
+const MARCADORES = [
+  "- Atual:", "- Antibióticos:", "- Culturais:",
+  "* Comorbidades:", "* MUC:", "* Alergias:",
+  "*HMA:", "*S:", "SSVV:", "*O:", "*A:", "*P:",
+  "Exames laboratoriais:", "Exames de imagem:",
+];
+
+/** Renderiza o texto da evolução com os marcadores em negrito (somente leitura, copiável). */
+function TextoComMarcadores({ texto }: { texto: string }) {
+  return (
+    <Text selectable style={styles.editorTexto}>
+      {texto.split("\n").map((linha, i) => {
+        const semWs = linha.replace(/^\s+/, "");
+        const ws = linha.slice(0, linha.length - semWs.length);
+        const nl = i > 0 ? "\n" : "";
+        if (semWs.trim() === "Evolução Médica") {
+          return (
+            <Text key={i}>
+              {nl}
+              {ws}
+              <Text style={styles.editorMarcador}>{semWs}</Text>
+            </Text>
+          );
+        }
+        const m = MARCADORES.find((mm) => semWs.startsWith(mm));
+        if (m) {
+          return (
+            <Text key={i}>
+              {nl}
+              {ws}
+              <Text style={styles.editorMarcador}>{m}</Text>
+              {semWs.slice(m.length)}
+            </Text>
+          );
+        }
+        return <Text key={i}>{nl}{linha}</Text>;
+      })}
+    </Text>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -174,11 +219,11 @@ const styles = StyleSheet.create({
     borderColor: ClinicalColors.border,
     borderWidth: 0.5,
     borderRadius: Radius.card,
-    padding: 14,
-    color: ClinicalColors.text,
-    fontSize: 14,
-    lineHeight: 20,
   },
+  editorConteudo: { padding: 14 },
+  editorTexto: { color: ClinicalColors.text, fontSize: 14, lineHeight: 20 },
+  editorMarcador: { fontWeight: "700", color: ClinicalColors.text },
+  editorPlaceholder: { color: ClinicalColors.textMuted, fontSize: 14 },
   rodapeInfo: {
     flexDirection: "row",
     alignItems: "center",

@@ -181,7 +181,10 @@
       .modal.modal-pc { max-width: 90vw; width: 90vw; height: 85vh; max-height: 85vh; display: flex; flex-direction: column; }
       .modal.modal-pc h3 { flex: 0 0 auto; }
       .modal.modal-pc .modal-acoes, .modal.modal-pc #pc-status, .modal.modal-pc .vazio { flex: 0 0 auto; }
-      #pc-texto { flex: 1 1 auto; min-height: 500px; white-space: pre-wrap; font-family: "Courier New", monospace; font-size: 14px; line-height: 1.6; color: #000; resize: none; }
+      /* Preview com marcadores em destaque (negrito) — superfície principal de leitura. */
+      .pc-preview { flex: 1 1 auto; overflow: auto; white-space: pre-wrap; word-wrap: break-word; font-family: "Courier New", monospace; font-size: 14px; line-height: 1.6; color: #000; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 10px; }
+      .pc-preview strong { font-weight: 700; }
+      #pc-texto { flex: 0 0 auto; min-height: 120px; max-height: 28vh; white-space: pre-wrap; font-family: "Courier New", monospace; font-size: 14px; line-height: 1.6; color: #000; resize: vertical; }
       .modal h3 { margin: 0 0 14px; font-size: 18px; }
       .modal-acoes { display: flex; gap: 12px; margin-top: 14px; }
       .btn-sec { flex: 1; background: #fff; border: 1px solid var(--border); color: var(--muted); padding: 12px; }
@@ -486,6 +489,19 @@
         if (anots.length) linhas.push(`Anotações: ${anots.join("; ")}`);
         return linhas;
       }
+      // Exames de imagem: uma linha por exame no formato "Nome: laudo".
+      function imagemLinhas(p) {
+        const sec = (p.secoes || {}).imagem;
+        const linhas = parseBlocos(sec && sec.extraido)
+          .map((b) => {
+            const laudo = (b.itens || []).join(". ");
+            if (!laudo && !b.titulo) return "";
+            return b.titulo ? `${b.titulo}: ${laudo}` : laudo;
+          })
+          .filter(Boolean);
+        const anots = ((sec && sec.anotacoes) || []).map((a) => (a.texto || "").trim()).filter(Boolean);
+        return linhas.concat(anots);
+      }
       // Antibióticos: medicamentos classificados como antibiótico pela IA.
       function antibioticoterapiaLinhas(p) {
         return (p.medicamentos || [])
@@ -518,7 +534,8 @@
         const sv = (p.sinaisVitais || {})[data];
 
         const ativos = (p.problemas || []).filter((x) => x.status === "ativo").map((x) => x.titulo.trim()).filter(Boolean);
-        const atual = [(p.diagnosticoPrincipal || "").trim(), ...ativos].filter(Boolean);
+        const atualProblemas = (p.problemas || []).filter((x) => x.status === "ativo" || x.status === "resolvendo").map((x) => x.titulo.trim()).filter(Boolean);
+        const atual = atualProblemas.length ? atualProblemas : [((p.motivoInternacao || "").trim() || (p.diagnosticoPrincipal || "").trim())].filter(Boolean);
         const blocoAtual = atual.length ? `- Atual: ${atual.join("\n")}` : null;
         const atb = antibioticoterapiaLinhas(p);
         const cult = culturasPendentes(p);
@@ -566,7 +583,7 @@
 
         const lab = laboratorioLinha(p);
         const exames = lab ? `Exames laboratoriais:\n${lab}` : null;
-        const img = secaoLinhas(p, "imagem");
+        const img = imagemLinhas(p);
         const imagem = img.length ? `Exames de imagem:\n${img.join("\n")}` : null;
 
         const a = ativos.length ? `*A: ${ativos.join("\n")}` : null;
@@ -1177,6 +1194,30 @@
       }
 
       // ---- Passar o Caso ----
+      // Marcadores do formato "Evolução Médica" — exibidos em negrito no preview.
+      const PC_MARCADORES = [
+        "- Atual:", "- Antibióticos:", "- Culturais:",
+        "* Comorbidades:", "* MUC:", "* Alergias:",
+        "*HMA:", "*S:", "SSVV:", "*O:", "*A:", "*P:",
+        "Exames laboratoriais:", "Exames de imagem:",
+      ];
+      // Converte o texto em HTML com os marcadores em <strong> (via regex por linha).
+      function destacarMarcadores(texto) {
+        return esc(texto).split("\n").map((linha) => {
+          const semWs = linha.replace(/^\s+/, "");
+          const ws = linha.slice(0, linha.length - semWs.length);
+          if (semWs.trim() === "Evolução Médica") return ws + "<strong>" + semWs + "</strong>";
+          for (const m of PC_MARCADORES) {
+            if (semWs.startsWith(m)) return ws + "<strong>" + m + "</strong>" + semWs.slice(m.length);
+          }
+          return linha;
+        }).join("\n");
+      }
+      function atualizarPreviewCaso() {
+        const ta = document.getElementById("pc-texto");
+        const pv = document.getElementById("pc-preview");
+        if (ta && pv) pv.innerHTML = destacarMarcadores(ta.value);
+      }
       function abrirPassarCaso() {
         const p = pa(); if (!p) return;
         // Texto determinístico, sem passar por IA — preserva exatamente o formato
@@ -1184,11 +1225,14 @@
         const texto = gerarTextoEvolucao(p, hojeISO());
         document.getElementById("modais").innerHTML = `<div class="modal-bg" onclick="if(event.target===this)fecharModal()"><div class="modal modal-pc">
           <h3>Passando o Caso — ${esc(formatarNome(p.nomeCompleto))}</h3>
-          <textarea id="pc-texto">${esc(texto)}</textarea>
+          <div id="pc-preview" class="pc-preview"></div>
+          <label class="label" style="margin-bottom:4px">Editar texto</label>
+          <textarea id="pc-texto" oninput="atualizarPreviewCaso()">${esc(texto)}</textarea>
           <p class="vazio" style="margin:8px 0">Revise e ajuste antes de copiar. Você decide o conteúdo final.</p>
           <div class="modal-acoes"><button class="btn-sec" onclick="fecharModal()">← Fechar</button><button class="btn-ok verde" id="pc-copiar" onclick="copiarCaso()">📋 Copiar</button></div>
           <div id="pc-status" class="vazio" style="margin-top:8px"></div>
         </div></div>`;
+        atualizarPreviewCaso();
         // Refina automaticamente ao abrir (preservando o original para reverter).
         refinarCaso();
       }
@@ -1215,6 +1259,7 @@
           const r = await apiPost("/api/formatar", { texto: ta.value, instrucao: INSTRUCAO_ELEGANTE });
           if (r && r.texto && r.texto.trim()) {
             ta.value = r.texto;
+            atualizarPreviewCaso();
             st.innerHTML = '<span style="color:var(--accent)">Texto padronizado</span> · <a href="#" onclick="reverterCaso();return false">Reverter ao original</a>';
           } else {
             st.innerHTML = '<span class="erro">Não foi possível refinar — mantido o texto original.</span>';
@@ -1226,6 +1271,7 @@
       function reverterCaso() {
         const ta = document.getElementById("pc-texto");
         if (ta && pcOriginal) ta.value = pcOriginal;
+        atualizarPreviewCaso();
         document.getElementById("pc-status").innerHTML = "";
       }
       async function copiarCaso() {

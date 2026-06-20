@@ -47,6 +47,26 @@ function secaoLinhas(p: Paciente, id: SecaoId): string[] {
   return [...linhas, ...anots];
 }
 
+/**
+ * Linhas dos exames de imagem, uma por exame no formato "Nome: laudo" (o título
+ * do bloco é o nome do exame; os achados viram o laudo). Anotações entram como
+ * linhas avulsas.
+ */
+function imagemLinhas(p: Paciente): string[] {
+  const sec = p.secoes?.imagem;
+  const linhas = parseBlocos(sec?.extraido)
+    .map((b) => {
+      const laudo = b.itens.join(". ");
+      if (!laudo && !b.titulo) return "";
+      return b.titulo ? `${b.titulo}: ${laudo}` : laudo;
+    })
+    .filter(Boolean);
+  const anots = ((sec?.anotacoes as Anotacao[]) || [])
+    .map((a) => (a.texto || "").trim())
+    .filter(Boolean);
+  return [...linhas, ...anots];
+}
+
 /** Comorbidades e medicações de uso contínuo (foto + anotações classificadas). */
 function comorbidadesMUC(p: Paciente): { comorb: string[]; muc: string[] } {
   const sec = p.secoes?.comorbidadesMedicacoes;
@@ -93,12 +113,21 @@ export function montarTextoEvolucao(paciente: Paciente, hoje: string): string {
   const evo = paciente.evolucoes?.[hoje];
   const sv = paciente.sinaisVitais?.[hoje];
 
-  // — Atual: diagnóstico principal + problemas ativos, um por linha —
+  // — Atual: problemas ativos/resolvendo (diagnósticos), um por linha. Sem
+  //   problemas, cai no motivo da internação / diagnóstico principal. —
   const ativos = (paciente.problemas || [])
     .filter((x) => x.status === "ativo")
     .map((x) => x.titulo.trim())
     .filter(Boolean);
-  const atual = [paciente.diagnosticoPrincipal?.trim(), ...ativos].filter(Boolean);
+  const atualProblemas = (paciente.problemas || [])
+    .filter((x) => x.status === "ativo" || x.status === "resolvendo")
+    .map((x) => x.titulo.trim())
+    .filter(Boolean);
+  const atual = atualProblemas.length
+    ? atualProblemas
+    : [paciente.motivoInternacao?.trim() || paciente.diagnosticoPrincipal?.trim()].filter(
+        Boolean,
+      );
   const blocoAtual = atual.length ? `- Atual: ${atual.join("\n")}` : null;
 
   // — Antibióticos / Culturais (com padrões -- / ---) —
@@ -159,7 +188,7 @@ export function montarTextoEvolucao(paciente: Paciente, hoje: string): string {
   // — Exames —
   const lab = laboratorioLinha(paciente);
   const exames = lab ? `Exames laboratoriais:\n${lab}` : null;
-  const img = secaoLinhas(paciente, "imagem");
+  const img = imagemLinhas(paciente);
   const imagem = img.length ? `Exames de imagem:\n${img.join("\n")}` : null;
 
   // — Avaliação (problemas ativos, um por linha) / Plano (conduta do dia) —
