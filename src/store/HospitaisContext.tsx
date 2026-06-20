@@ -28,9 +28,12 @@ type HospitaisContextValue = {
   carregado: boolean;
   selecionar: (id: string) => void;
   trocarHospital: () => void;
-  adicionarHospital: (nome: string, cidade: string) => void;
+  adicionarHospital: (nome: string, cidade: string) => Hospital;
   removerHospital: (id: string) => void;
 };
+
+/** Flag de migração dos pacientes do "Geral" (definida após migrar/concluir). */
+export const KEY_MIGRACAO_GERAL = "@passandocaso/migracaoGeral";
 
 const HospitaisContext = createContext<HospitaisContextValue | null>(null);
 
@@ -51,8 +54,10 @@ export function HospitaisProvider({ children }: { children: ReactNode }) {
         } catch {
           // sem rede: segue com o cache local
         }
-        // Garante o hospital "Geral" (destino dos pacientes legados).
-        if (!lista.find((h) => h.id === HOSPITAL_GERAL.id)) {
+        // Garante o hospital "Geral" (destino dos pacientes legados) — exceto se
+        // a migração já foi concluída (aí o "Geral" deve permanecer removido).
+        const migrou = await AsyncStorage.getItem(KEY_MIGRACAO_GERAL);
+        if (!migrou && !lista.find((h) => h.id === HOSPITAL_GERAL.id)) {
           lista = [HOSPITAL_GERAL, ...lista];
         }
         const ativoSalvo = await AsyncStorage.getItem(STORAGE_ATIVO);
@@ -90,7 +95,7 @@ export function HospitaisProvider({ children }: { children: ReactNode }) {
   const selecionar = (id: string) => setHospitalAtivo(id);
   const trocarHospital = () => setHospitalAtivo(null);
 
-  const adicionarHospital = (nome: string, cidade: string) => {
+  const adicionarHospital = (nome: string, cidade: string): Hospital => {
     const novo: Hospital = {
       id: `h-${Date.now()}`,
       nome: nome.trim(),
@@ -98,6 +103,7 @@ export function HospitaisProvider({ children }: { children: ReactNode }) {
     };
     setHospitais((prev) => [...prev, novo]);
     setHospitalAtivo(novo.id);
+    return novo;
   };
 
   const removerHospital = (id: string) => {

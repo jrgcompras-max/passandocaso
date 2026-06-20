@@ -71,6 +71,8 @@ type PacientesContextValue = {
     evolucao: EvolucaoBeiraLeito,
   ) => void;
   removerPaciente: (id: string) => void;
+  /** Move todos os pacientes de um hospital para outro. Retorna quantos moveu. */
+  migrarPacientesDeHospital: (origem: string, destino: string) => number;
 };
 
 /** Campos do paciente que podem ser editados manualmente. */
@@ -205,6 +207,18 @@ export function PacientesProvider({ children }: { children: ReactNode }) {
 
   const getPaciente = (id: string) => pacientes.find((p) => p.id === id);
 
+  const migrarPacientesDeHospital = (origem: string, destino: string) => {
+    const n = pacientes.filter((p) => (p.hospitalId ?? "geral") === origem).length;
+    if (n > 0) {
+      setPacientes((prev) =>
+        prev.map((p) =>
+          (p.hospitalId ?? "geral") === origem ? { ...p, hospitalId: destino } : p,
+        ),
+      );
+    }
+    return n;
+  };
+
   const adicionarPorCabecalho = (
     cab: CabecalhoProntuario,
     hospitalId?: string,
@@ -331,6 +345,7 @@ export function PacientesProvider({ children }: { children: ReactNode }) {
         atualizarPendencias,
         atualizarEvolucao,
         removerPaciente,
+        migrarPacientesDeHospital,
       }}
     >
       {children}

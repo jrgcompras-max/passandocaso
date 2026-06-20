@@ -31,8 +31,9 @@ import { diaDeInternacao } from "@/lib/datas";
 import { extrairDadosImagem } from "@/lib/extrairDadosImagem";
 import { formatarNome } from "@/lib/formatarNome";
 import { converterParaJpegBase64 } from "@/lib/imagem";
+import { ModalMigracao } from "@/components/ModalMigracao";
 import { useAcoes } from "@/store/AcoesContext";
-import { useHospitais } from "@/store/HospitaisContext";
+import { KEY_MIGRACAO_GERAL, useHospitais } from "@/store/HospitaisContext";
 import { usePacientes } from "@/store/PacientesContext";
 import { type CabecalhoProntuario } from "@/types/paciente";
 
@@ -137,8 +138,13 @@ const INSTRUCAO_CABECALHO =
 export default function Index() {
   const router = useRouter();
   const { pedidoAdicionar } = useAcoes();
-  const { pacientes, adicionarPorCabecalho, atualizarPaciente, removerPaciente } =
-    usePacientes();
+  const {
+    pacientes,
+    carregado: pacCarregado,
+    adicionarPorCabecalho,
+    atualizarPaciente,
+    removerPaciente,
+  } = usePacientes();
   const {
     hospitais,
     hospitalAtivo,
@@ -150,6 +156,28 @@ export default function Index() {
   useEffect(() => {
     if (hospCarregado && !hospitalAtivo) selecionar("geral");
   }, [hospCarregado, hospitalAtivo, selecionar]);
+
+  // Migração do "Geral": pergunta uma vez se houver pacientes em "Geral".
+  const [migracaoVisivel, setMigracaoVisivel] = useState(false);
+  const migracaoChecada = useRef(false);
+  useEffect(() => {
+    if (migracaoChecada.current || !pacCarregado || !hospCarregado) return;
+    migracaoChecada.current = true;
+    (async () => {
+      const feita = await AsyncStorage.getItem(KEY_MIGRACAO_GERAL);
+      if (feita) return;
+      const temGeralComPac = pacientes.some(
+        (p) => (p.hospitalId ?? "geral") === "geral",
+      );
+      const temGeral = hospitais.some((h) => h.id === "geral");
+      if (temGeralComPac && temGeral) setMigracaoVisivel(true);
+    })();
+  }, [pacCarregado, hospCarregado, pacientes, hospitais]);
+
+  const concluirMigracao = (sucesso: boolean) => {
+    setMigracaoVisivel(false);
+    if (sucesso) AsyncStorage.setItem(KEY_MIGRACAO_GERAL, "1").catch(() => {});
+  };
   const [processando, setProcessando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [modalVisivel, setModalVisivel] = useState(false);
@@ -362,10 +390,18 @@ export default function Index() {
       <View style={styles.header}>
         <View style={styles.headerTextos}>
           <Text style={styles.titulo}>Rotina do Dia</Text>
-          <Text style={styles.subtitulo}>
-            {hospitalNome ? `${hospitalNome} · ` : ""}
-            {dataPorExtenso()}
-          </Text>
+          <TouchableOpacity
+            style={styles.hospTopo}
+            onPress={() => router.navigate("/hospitais")}
+            hitSlop={6}
+          >
+            <Ionicons name="business-outline" size={14} color={ClinicalColors.primary} />
+            <Text style={styles.hospTopoTexto}>
+              {hospitalNome || "Selecionar hospital"}
+            </Text>
+            <Ionicons name="chevron-forward" size={14} color={ClinicalColors.primary} />
+          </TouchableOpacity>
+          <Text style={styles.subtitulo}>{dataPorExtenso()}</Text>
         </View>
         {processando && <ActivityIndicator color={ClinicalColors.primary} />}
       </View>
@@ -606,6 +642,8 @@ export default function Index() {
           </View>
         </View>
       </Modal>
+
+      <ModalMigracao visivel={migracaoVisivel} onConcluir={concluirMigracao} />
     </View>
   );
 }
@@ -706,11 +744,24 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: ClinicalColors.text,
     letterSpacing: -0.5,
-    marginBottom: 4,
+    marginBottom: 2,
+  },
+  hospTopo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    alignSelf: "flex-start",
+    paddingVertical: 2,
+  },
+  hospTopoTexto: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: ClinicalColors.primary,
   },
   subtitulo: {
     fontSize: 14,
     color: ClinicalColors.textMuted,
+    marginTop: 2,
   },
   botaoAdd: {
     width: 48,

@@ -616,6 +616,101 @@ app.delete("/api/pacientes/:hospitalId/:pacienteId", auth.autenticar, async (req
 
 // --- Hospitais (multi-tenancy por usuário) ---
 
+// Busca de estabelecimentos no CNES/DATASUS, com cache de 24h em memória.
+const cacheCnes = new Map(); // chave -> { ts, dados }
+const cacheMunic = new Map(); // "cidade|uf" -> { ts, cod }
+const CNES_TTL_MS = 24 * 60 * 60 * 1000;
+const normalizar = (s) =>
+  String(s || "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .trim();
+
+/** Converte nome de cidade (+UF) no código IBGE do município (filtro real do CNES). */
+async function codigoMunicipio(cidade, uf) {
+  const chave = `${normalizar(cidade)}|${uf}`;
+  const c = cacheMunic.get(chave);
+  if (c && Date.now() - c.ts < CNES_TTL_MS) return c.cod;
+  try {
+    const url = uf
+      ? `https://servicodados.ibge.gov.br/api/v1/localidades/estados/${encodeURIComponent(uf)}/municipios`
+      : `https://servicodados.ibge.gov.br/api/v1/localidades/municipios`;
+    const r = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    if (!r.ok) throw new Error(`IBGE HTTP ${r.status}`);
+    const arr = await r.json();
+    const m = (Array.isArray(arr) ? arr : []).find(
+      (x) => normalizar(x.nome) === normalizar(cidade),
+    );
+    const cod = m?.id ? String(m.id) : "";
+    cacheMunic.set(chave, { ts: Date.now(), cod });
+    return cod;
+  } catch (e) {
+    console.error("Erro IBGE:", e.message);
+    return "";
+  }
+}
+
+/**
+ * GET /api/hospitais/buscar?cidade=&uf=&termo=
+ * Filtra por município (via código IBGE) e/ou por nome (substring). Em qualquer
+ * falha devolve lista vazia (o app cai para entrada manual).
+ */
+app.get("/api/hospitais/buscar", auth.autenticar, async (req, res) => {
+  const cidade = String(req.query.cidade || "").trim();
+  const uf = String(req.query.uf || "").trim().toUpperCase();
+  const termo = String(req.query.termo || "").trim();
+  if (!cidade && !termo) {
+    return res.json({ hospitais: [], fonte: "vazio" });
+  }
+  const chave = `${normalizar(cidade)}|${uf}|${normalizar(termo)}`;
+  const cache = cacheCnes.get(chave);
+  if (cache && Date.now() - cache.ts < CNES_TTL_MS) {
+    return res.json({ hospitais: cache.dados, fonte: "cache" });
+  }
+  try {
+    const params = new URLSearchParams({ limit: "50" });
+    if (termo) params.set("nome_fantasia", termo);
+    if (cidade) {
+      const cod = await codigoMunicipio(cidade, uf);
+      if (cod) params.set("codigo_municipio", cod);
+    }
+    const url = `https://apidadosabertos.saude.gov.br/cnes/estabelecimentos?${params}`;
+    const r = await fetch(url, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!r.ok) throw new Error(`CNES HTTP ${r.status}`);
+    const data = await r.json();
+    const bruto = Array.isArray(data)
+      ? data
+      : data.estabelecimentos || data.results || data.data || [];
+    let hospitais = bruto
+      .map((e) => ({
+        cnes: String(e.codigo_cnes || e.cnes || ""),
+        nomeFantasia: e.nome_fantasia || e.nome_razao_social || "",
+        cidade: cidade || "",
+        uf,
+        endereco: e.endereco_estabelecimento || "",
+        telefone: e.numero_telefone_estabelecimento || "",
+        tipo: e.descricao_tipo_unidade || "",
+      }))
+      .filter((e) => e.nomeFantasia);
+    // A API às vezes ignora nome_fantasia — filtra por substring no servidor.
+    if (termo) {
+      const t = normalizar(termo);
+      hospitais = hospitais.filter((e) => normalizar(e.nomeFantasia).includes(t));
+    }
+    hospitais = hospitais.slice(0, 25);
+    cacheCnes.set(chave, { ts: Date.now(), dados: hospitais });
+    res.json({ hospitais, fonte: "cnes" });
+  } catch (e) {
+    console.error("Erro em /api/hospitais/buscar:", e.message);
+    // Fallback gracioso: o app permite entrada manual.
+    res.json({ hospitais: [], fonte: "indisponivel" });
+  }
+});
+
 /** Lista os hospitais do usuário. */
 app.get("/api/hospitais", auth.autenticar, async (req, res) => {
   try {
