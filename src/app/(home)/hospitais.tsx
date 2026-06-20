@@ -13,6 +13,7 @@ import {
 import { BuscaHospital } from "@/components/BuscaHospital";
 import { ModalEspecialidade } from "@/components/ModalEspecialidade";
 import { ClinicalColors as C, Radius } from "@/constants/clinicalTheme";
+import { formatarNomeHospital } from "@/lib/formatarNomeHospital";
 import { definirEspecialidade } from "@/lib/rede";
 import { useAuth } from "@/store/AuthContext";
 import { HOSPITAL_GERAL, useHospitais } from "@/store/HospitaisContext";
@@ -87,7 +88,7 @@ export default function HospitaisScreen() {
             >
               <Ionicons name="business-outline" size={22} color={C.primary} />
               <View style={{ flex: 1 }}>
-                <Text style={styles.hospNome}>{h.nome}</Text>
+                <Text style={styles.hospNome}>{formatarNomeHospital(h.nome)}</Text>
                 {!!h.cidade && <Text style={styles.hospCidade}>{h.cidade}</Text>}
               </View>
               {ativo && (

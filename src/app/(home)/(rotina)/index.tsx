@@ -34,6 +34,7 @@ import {
   setaAlerta,
 } from "@/lib/alertasTendencia";
 import { diaDeInternacao } from "@/lib/datas";
+import { formatarNomeHospital } from "@/lib/formatarNomeHospital";
 import { extrairDadosImagem } from "@/lib/extrairDadosImagem";
 import { formatarNome } from "@/lib/formatarNome";
 import { converterParaJpegBase64 } from "@/lib/imagem";
@@ -438,8 +439,9 @@ export default function Index() {
     setModalVisivel(false);
   };
 
-  const hospitalNome =
-    hospitais.find((h) => h.id === hospitalAtivo)?.nome ?? "";
+  const hospitalNome = formatarNomeHospital(
+    hospitais.find((h) => h.id === hospitalAtivo)?.nome,
+  );
 
   return (
     <View style={styles.container}>

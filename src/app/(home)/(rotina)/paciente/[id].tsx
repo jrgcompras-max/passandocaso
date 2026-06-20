@@ -601,10 +601,11 @@ export default function Paciente() {
               atualizarSecao(id, item.id, { anotacoes: lista })
             }
             onExtraido={(t) => atualizarSecao(id, item.id, { extraido: t })}
-            extra={
+            extra={(editando) =>
               item.id === "examesLaboratoriais" ? (
                 <LabEvolucao
                   resultados={paciente?.resultadosLab ?? []}
+                  editando={editando}
                   onChange={(lista) =>
                     atualizarPaciente(id, { resultadosLab: lista })
                   }
@@ -612,6 +613,7 @@ export default function Paciente() {
               ) : item.id === "prescricaoHospitalar" ? (
                 <PrescricaoSecao
                   medicamentos={paciente?.medicamentos ?? []}
+                  editando={editando}
                   onChange={(l) => atualizarPaciente(id, { medicamentos: l })}
                 />
               ) : item.id === "sinaisVitaisIntercorrencias" ? (
@@ -752,34 +754,59 @@ function parseBlocos(texto: string): Bloco[] | null {
 function ConteudoExtraido({
   texto,
   medicacao,
+  editando,
   onChange,
 }: {
   texto: string;
   medicacao?: boolean;
-  /** Quando presente, cada item ganha uma lixeira (remover exame extraído). */
+  /** Modo de revisão: itens viram editáveis (tocar para corrigir) + remover. */
+  editando?: boolean;
   onChange?: (texto: string) => void;
 }) {
+  // Item em edição inline: "bi-ii". rascunho mantém o texto sendo corrigido.
+  const [editId, setEditId] = useState<string | null>(null);
+  const [rascunho, setRascunho] = useState("");
+
   if (!texto) return <Text style={styles.secaoConteudo}>—</Text>;
 
   const blocos = parseBlocos(texto) ?? [
     { titulo: "", itens: dividirItens(texto) },
   ];
-  const editavel = !!onChange;
+  const editavel = !!editando && !!onChange;
+
+  const salvarBlocos = (novos: Bloco[]) =>
+    onChange?.(JSON.stringify(novos.filter((b) => b.itens.length > 0)));
+
+  const aplicarItem = (bi: number, ii: number, valor: string) => {
+    const v = valor.trim();
+    const novos = blocos.map((b, i) =>
+      i === bi
+        ? {
+            ...b,
+            itens: v
+              ? b.itens.map((it, j) => (j === ii ? v : it))
+              : b.itens.filter((_, j) => j !== ii),
+          }
+        : b,
+    );
+    salvarBlocos(novos);
+    setEditId(null);
+  };
 
   const remover = (bi: number, ii: number) => {
     const item = blocos[bi]?.itens[ii] ?? "este item";
-    Alert.alert("Remover este exame?", item, [
+    Alert.alert("Remover este item?", item, [
       { text: "Cancelar", style: "cancel" },
       {
         text: "Remover",
         style: "destructive",
         onPress: () => {
-          const novos = blocos
-            .map((b, i) =>
+          setEditId(null);
+          salvarBlocos(
+            blocos.map((b, i) =>
               i === bi ? { ...b, itens: b.itens.filter((_, j) => j !== ii) } : b,
-            )
-            .filter((b) => b.itens.length > 0);
-          onChange?.(JSON.stringify(novos));
+            ),
+          );
         },
       },
     ]);
@@ -792,16 +819,48 @@ function ConteudoExtraido({
           {!!bloco.titulo && (
             <Text style={styles.blocoTitulo}>{bloco.titulo}</Text>
           )}
-          {editavel || medicacao || ehMedicacao(bloco.titulo) ? (
+          {editavel ? (
+            // Modo edição: linha por item, tocar abre o campo; lixeira ao lado.
+            bloco.itens.map((item, j) => {
+              const key = `${i}-${j}`;
+              const emEdicao = editId === key;
+              return (
+                <View key={j} style={styles.itemRow}>
+                  <Text style={styles.itemBullet}>•</Text>
+                  {emEdicao ? (
+                    <>
+                      <TextInput
+                        style={[styles.campoInput, styles.itemEditInput]}
+                        value={rascunho}
+                        onChangeText={setRascunho}
+                        autoFocus
+                        onSubmitEditing={() => aplicarItem(i, j, rascunho)}
+                        onBlur={() => aplicarItem(i, j, rascunho)}
+                      />
+                      <TouchableOpacity onPress={() => remover(i, j)} hitSlop={8}>
+                        <Ionicons name="trash-outline" size={18} color={ClinicalColors.danger} />
+                      </TouchableOpacity>
+                    </>
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.itemTocavel}
+                      onPress={() => {
+                        setEditId(key);
+                        setRascunho(item);
+                      }}
+                    >
+                      <Text style={styles.itemTexto}>{item}</Text>
+                      <Ionicons name="create-outline" size={15} color={ClinicalColors.textMuted} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              );
+            })
+          ) : medicacao || ehMedicacao(bloco.titulo) ? (
             bloco.itens.map((item, j) => (
               <View key={j} style={styles.itemRow}>
                 <Text style={styles.itemBullet}>•</Text>
                 <Text style={styles.itemTexto}>{item}</Text>
-                {editavel && (
-                  <TouchableOpacity onPress={() => remover(i, j)} hitSlop={8}>
-                    <Ionicons name="trash-outline" size={16} color={ClinicalColors.danger} />
-                  </TouchableOpacity>
-                )}
               </View>
             ))
           ) : (
@@ -827,42 +886,79 @@ function ConteudoExtraido({
 function ComorbidadesUnificado({
   extraido,
   anotacoes,
+  editando,
   onExcluir,
+  onExtraido,
 }: {
   extraido: string;
   anotacoes: Anotacao[];
+  editando?: boolean;
   onExcluir: (a: Anotacao) => void;
+  onExtraido: (texto: string) => void;
 }) {
   const blocos =
     parseBlocos(extraido) ??
     (extraido.trim() ? [{ titulo: "", itens: dividirItens(extraido) }] : []);
-  const comorbExtra: string[] = [];
-  const mucExtra: string[] = [];
-  for (const b of blocos) {
-    const alvo = /medica|muc/i.test(b.titulo ?? "") ? mucExtra : comorbExtra;
-    alvo.push(...b.itens);
-  }
+  // Cada extra guarda a origem (bloco/índice) para permitir remover no modo edição.
+  type Extra = { texto: string; bi: number; ii: number };
+  const comorbExtra: Extra[] = [];
+  const mucExtra: Extra[] = [];
+  blocos.forEach((b, bi) => {
+    const muc = /medica|muc/i.test(b.titulo ?? "");
+    b.itens.forEach((texto, ii) =>
+      (muc ? mucExtra : comorbExtra).push({ texto, bi, ii }),
+    );
+  });
   const comorbAnot = anotacoes.filter((a) => a.categoria !== "medicacao");
   const mucAnot = anotacoes.filter((a) => a.categoria === "medicacao");
 
-  const grupo = (titulo: string, extras: string[], anots: Anotacao[]) => {
+  const removerExtra = (e: Extra) => {
+    Alert.alert("Remover este item?", e.texto, [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Remover",
+        style: "destructive",
+        onPress: () =>
+          onExtraido(
+            JSON.stringify(
+              blocos
+                .map((b, i) =>
+                  i === e.bi
+                    ? { ...b, itens: b.itens.filter((_, j) => j !== e.ii) }
+                    : b,
+                )
+                .filter((b) => b.itens.length > 0),
+            ),
+          ),
+      },
+    ]);
+  };
+
+  const grupo = (titulo: string, extras: Extra[], anots: Anotacao[]) => {
     if (!extras.length && !anots.length) return null;
     return (
       <View style={styles.uniGrupo}>
         <Text style={styles.blocoTitulo}>{titulo}</Text>
-        {extras.map((t, i) => (
+        {extras.map((e, i) => (
           <View key={`e${i}`} style={styles.itemRow}>
             <Text style={styles.itemBullet}>•</Text>
-            <Text style={styles.itemTexto}>{t}</Text>
+            <Text style={styles.itemTexto}>{e.texto}</Text>
+            {editando && (
+              <TouchableOpacity onPress={() => removerExtra(e)} hitSlop={8}>
+                <Ionicons name="trash-outline" size={16} color={ClinicalColors.danger} />
+              </TouchableOpacity>
+            )}
           </View>
         ))}
         {anots.map((a) => (
           <View key={a.id} style={styles.itemRow}>
             <Text style={styles.itemBullet}>•</Text>
             <Text style={styles.itemTexto}>{a.texto}</Text>
-            <TouchableOpacity onPress={() => onExcluir(a)} hitSlop={8}>
-              <Ionicons name="trash-outline" size={16} color={ClinicalColors.danger} />
-            </TouchableOpacity>
+            {editando && (
+              <TouchableOpacity onPress={() => onExcluir(a)} hitSlop={8}>
+                <Ionicons name="trash-outline" size={16} color={ClinicalColors.danger} />
+              </TouchableOpacity>
+            )}
           </View>
         ))}
       </View>
@@ -894,9 +990,11 @@ function ComorbidadesUnificado({
  */
 function ImagemSecao({
   extraido,
+  editando,
   onChange,
 }: {
   extraido: string;
+  editando?: boolean;
   onChange: (texto: string) => void;
 }) {
   const blocos =
@@ -944,9 +1042,11 @@ function ImagemSecao({
         <View key={i} style={styles.imgCard}>
           <View style={styles.imgCardTopo}>
             <Text style={styles.imgNome}>{b.titulo || "Exame"}</Text>
-            <TouchableOpacity onPress={() => remover(i)} hitSlop={8}>
-              <Ionicons name="trash-outline" size={16} color={ClinicalColors.danger} />
-            </TouchableOpacity>
+            {editando && (
+              <TouchableOpacity onPress={() => remover(i)} hitSlop={8}>
+                <Ionicons name="trash-outline" size={16} color={ClinicalColors.danger} />
+              </TouchableOpacity>
+            )}
           </View>
           {!!b.itens.length && (
             <Text style={styles.imgLaudo}>{b.itens.join(". ")}</Text>
@@ -954,7 +1054,7 @@ function ImagemSecao({
         </View>
       ))}
 
-      {adicionando ? (
+      {!editando ? null : adicionando ? (
         <View style={styles.formInline}>
           <TextInput
             style={styles.campoInput}
@@ -1025,8 +1125,11 @@ function SecaoExpansivel({
   anotacoes: Anotacao[];
   extraido: string;
   medicacao?: boolean;
-  /** Conteúdo estruturado extra renderizado no fim do corpo da seção. */
-  extra?: React.ReactNode;
+  /**
+   * Conteúdo estruturado extra no fim do corpo da seção. Pode ser um render-prop
+   * que recebe o estado de edição (para gating de ações de editar/remover).
+   */
+  extra?: React.ReactNode | ((editando: boolean) => React.ReactNode);
   onSalvarAnotacoes: (lista: Anotacao[]) => void;
   onExtraido: (texto: string) => void;
 }) {
@@ -1035,6 +1138,9 @@ function SecaoExpansivel({
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [extraindo, setExtraindo] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  // Modo de revisão/correção: fora dele, a exibição é limpa (sem lixeiras nem
+  // campos). Ligado pelo botão "Editar" — o médico revisa o que a IA escaneou.
+  const [editando, setEditando] = useState(false);
 
   const categorias = CATEGORIAS_SECAO[secaoId];
 
@@ -1155,6 +1261,24 @@ function SecaoExpansivel({
       {aberto && (
         <View style={styles.secaoBody}>
           <View style={styles.escanearRow}>
+            <TouchableOpacity
+              style={[styles.botaoEscanear, editando && styles.botaoEscanearAtivo]}
+              onPress={() => setEditando((v) => !v)}
+            >
+              <Ionicons
+                name={editando ? "checkmark" : "create-outline"}
+                size={16}
+                color={editando ? "#fff" : ClinicalColors.primary}
+              />
+              <Text
+                style={[
+                  styles.botaoEscanearTexto,
+                  editando && styles.botaoEscanearTextoAtivo,
+                ]}
+              >
+                {editando ? "Concluir" : "Editar"}
+              </Text>
+            </TouchableOpacity>
             <TouchableOpacity style={styles.botaoEscanear} onPress={fotografar}>
               <Ionicons name="scan-outline" size={16} color={ClinicalColors.primary} />
               <Text style={styles.botaoEscanearTexto}>Escanear</Text>
@@ -1198,7 +1322,9 @@ function SecaoExpansivel({
             <ComorbidadesUnificado
               extraido={extraido}
               anotacoes={anotacoes}
+              editando={editando}
               onExcluir={excluirAnotacao}
+              onExtraido={onExtraido}
             />
           ) : secaoId === "imagem" ? (
             <>
@@ -1210,17 +1336,23 @@ function SecaoExpansivel({
                     )}
                     <Text style={styles.anotacaoTexto}>{a.texto}</Text>
                   </View>
-                  <View style={styles.anotacaoAcoes}>
-                    <TouchableOpacity onPress={() => editarAnotacao(a)} hitSlop={8}>
-                      <Ionicons name="pencil" size={16} color={ClinicalColors.primary} />
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => excluirAnotacao(a)} hitSlop={8}>
-                      <Ionicons name="trash-outline" size={16} color={ClinicalColors.danger} />
-                    </TouchableOpacity>
-                  </View>
+                  {editando && (
+                    <View style={styles.anotacaoAcoes}>
+                      <TouchableOpacity onPress={() => editarAnotacao(a)} hitSlop={8}>
+                        <Ionicons name="pencil" size={16} color={ClinicalColors.primary} />
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => excluirAnotacao(a)} hitSlop={8}>
+                        <Ionicons name="trash-outline" size={16} color={ClinicalColors.danger} />
+                      </TouchableOpacity>
+                    </View>
+                  )}
                 </View>
               ))}
-              <ImagemSecao extraido={extraido} onChange={onExtraido} />
+              <ImagemSecao
+                extraido={extraido}
+                editando={editando}
+                onChange={onExtraido}
+              />
             </>
           ) : (
             <>
@@ -1255,14 +1387,16 @@ function SecaoExpansivel({
                         );
                       })()}
                   </View>
-                  <View style={styles.anotacaoAcoes}>
-                    <TouchableOpacity onPress={() => editarAnotacao(a)} hitSlop={8}>
-                      <Ionicons name="pencil" size={16} color={ClinicalColors.primary} />
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => excluirAnotacao(a)} hitSlop={8}>
-                      <Ionicons name="trash-outline" size={16} color={ClinicalColors.danger} />
-                    </TouchableOpacity>
-                  </View>
+                  {editando && (
+                    <View style={styles.anotacaoAcoes}>
+                      <TouchableOpacity onPress={() => editarAnotacao(a)} hitSlop={8}>
+                        <Ionicons name="pencil" size={16} color={ClinicalColors.primary} />
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => excluirAnotacao(a)} hitSlop={8}>
+                        <Ionicons name="trash-outline" size={16} color={ClinicalColors.danger} />
+                      </TouchableOpacity>
+                    </View>
+                  )}
                 </View>
               ))}
 
@@ -1272,12 +1406,13 @@ function SecaoExpansivel({
               <ConteudoExtraido
                 texto={extraido}
                 medicacao={medicacao}
+                editando={editando}
                 onChange={onExtraido}
               />
             </>
           )}
 
-          {extra}
+          {typeof extra === "function" ? extra(editando) : extra}
         </View>
       )}
     </View>
@@ -2169,9 +2304,11 @@ function ResumoRapidoSecao({
  */
 function LabEvolucao({
   resultados,
+  editando,
   onChange,
 }: {
   resultados: ResultadoLab[];
+  editando?: boolean;
   onChange: (l: ResultadoLab[]) => void;
 }) {
   const [mostrarForm, setMostrarForm] = useState(false);
@@ -2210,14 +2347,16 @@ function LabEvolucao({
 
   return (
     <View style={styles.labBox}>
-      <TouchableOpacity
-        style={styles.labAddBtn}
-        onPress={() => setMostrarForm((v) => !v)}
-      >
-        <Text style={styles.labAddTexto}>📅 Adicionar resultado por data</Text>
-      </TouchableOpacity>
+      {editando && (
+        <TouchableOpacity
+          style={styles.labAddBtn}
+          onPress={() => setMostrarForm((v) => !v)}
+        >
+          <Text style={styles.labAddTexto}>📅 Adicionar resultado por data</Text>
+        </TouchableOpacity>
+      )}
 
-      {mostrarForm && (
+      {editando && mostrarForm && (
         <View style={styles.formInline}>
           <TextInput
             style={styles.campoInput}
@@ -2258,7 +2397,9 @@ function LabEvolucao({
       )}
 
       {series.length === 0 ? (
-        <Text style={styles.vazioTexto}>Nenhum resultado por data ainda.</Text>
+        editando ? (
+          <Text style={styles.vazioTexto}>Nenhum resultado por data ainda.</Text>
+        ) : null
       ) : (
         series.map((s) => {
           const info = s.tendencia ? TENDENCIA_INFO[s.tendencia] : null;
@@ -2272,12 +2413,14 @@ function LabEvolucao({
                       {info.icone} {info.rotulo}
                     </Text>
                   )}
-                  <TouchableOpacity
-                    onPress={() => removerExame(s.exame)}
-                    hitSlop={8}
-                  >
-                    <Ionicons name="trash-outline" size={16} color={ClinicalColors.danger} />
-                  </TouchableOpacity>
+                  {editando && (
+                    <TouchableOpacity
+                      onPress={() => removerExame(s.exame)}
+                      hitSlop={8}
+                    >
+                      <Ionicons name="trash-outline" size={16} color={ClinicalColors.danger} />
+                    </TouchableOpacity>
+                  )}
                 </View>
               </View>
               <Text style={styles.labSerie}>
@@ -2470,9 +2613,11 @@ function corDaClasse(classe: string): string {
  */
 function PrescricaoSecao({
   medicamentos,
+  editando,
   onChange,
 }: {
   medicamentos: Medicamento[];
+  editando?: boolean;
   onChange: (l: Medicamento[]) => void;
 }) {
   const [texto, setTexto] = useState("");
@@ -2509,7 +2654,7 @@ function PrescricaoSecao({
         <View key={m.id} style={styles.medRow}>
           <View style={styles.medInfo}>
             <Text style={styles.medTexto}>{m.texto}</Text>
-            {editClasseId === m.id ? (
+            {editando && editClasseId === m.id ? (
               <TextInput
                 style={styles.medClasseInput}
                 value={classeDraft}
@@ -2521,6 +2666,7 @@ function PrescricaoSecao({
               />
             ) : (
               <TouchableOpacity
+                disabled={!editando}
                 onPress={() => {
                   setEditClasseId(m.id);
                   setClasseDraft(m.classe);
@@ -2541,24 +2687,30 @@ function PrescricaoSecao({
               </TouchableOpacity>
             )}
           </View>
-          <TouchableOpacity
-            onPress={() => onChange(medicamentos.filter((x) => x.id !== m.id))}
-            hitSlop={8}
-          >
-            <Ionicons name="trash-outline" size={16} color={ClinicalColors.danger} />
-          </TouchableOpacity>
+          {editando && (
+            <TouchableOpacity
+              onPress={() => onChange(medicamentos.filter((x) => x.id !== m.id))}
+              hitSlop={8}
+            >
+              <Ionicons name="trash-outline" size={16} color={ClinicalColors.danger} />
+            </TouchableOpacity>
+          )}
         </View>
       ))}
-      <TextInput
-        style={[styles.campoInput, styles.medAddInput]}
-        value={texto}
-        onChangeText={setTexto}
-        placeholder="Ex.: Ceftriaxona 1g EV 1x/dia D5/7"
-        placeholderTextColor={ClinicalColors.textMuted}
-      />
-      <TouchableOpacity style={styles.medAddBtn} onPress={adicionar}>
-        <Text style={styles.medAddBtnTexto}>+ Adicionar medicamento</Text>
-      </TouchableOpacity>
+      {editando && (
+        <>
+          <TextInput
+            style={[styles.campoInput, styles.medAddInput]}
+            value={texto}
+            onChangeText={setTexto}
+            placeholder="Ex.: Ceftriaxona 1g EV 1x/dia D5/7"
+            placeholderTextColor={ClinicalColors.textMuted}
+          />
+          <TouchableOpacity style={styles.medAddBtn} onPress={adicionar}>
+            <Text style={styles.medAddBtnTexto}>+ Adicionar medicamento</Text>
+          </TouchableOpacity>
+        </>
+      )}
     </View>
   );
 }
@@ -2762,7 +2914,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   capturaRow: { flexDirection: "row", gap: 12, marginBottom: 16 },
-  escanearRow: { flexDirection: "row", justifyContent: "flex-end", marginBottom: 12 },
+  escanearRow: { flexDirection: "row", justifyContent: "flex-end", gap: 8, marginBottom: 12 },
   botaoEscanear: {
     flexDirection: "row",
     alignItems: "center",
@@ -2772,7 +2924,9 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 16,
   },
+  botaoEscanearAtivo: { backgroundColor: ClinicalColors.primary },
   botaoEscanearTexto: { color: ClinicalColors.primary, fontSize: 14, fontWeight: "600" },
+  botaoEscanearTextoAtivo: { color: "#fff" },
   botaoCaptura: { flex: 1, marginBottom: 0 },
   extraindo: {
     color: ClinicalColors.textMuted,
@@ -2936,7 +3090,7 @@ const styles = StyleSheet.create({
     color: ClinicalColors.primary,
     marginBottom: 2,
   },
-  itemRow: { flexDirection: "row", paddingRight: 4 },
+  itemRow: { flexDirection: "row", alignItems: "center", paddingRight: 4 },
   itemBullet: {
     color: ClinicalColors.primary,
     fontSize: 15,
@@ -2949,6 +3103,15 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
   },
+  itemTocavel: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+    paddingVertical: 3,
+  },
+  itemEditInput: { flex: 1, marginVertical: 2, paddingVertical: 6 },
   chipsWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: {
     backgroundColor: ClinicalColors.border,

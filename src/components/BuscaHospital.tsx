@@ -19,6 +19,7 @@ import {
   Radius,
 } from "@/constants/clinicalTheme";
 import { buscarHospitaisCnes, localizarCidade, type HospitalCnes } from "@/lib/cnes";
+import { formatarNomeHospital } from "@/lib/formatarNomeHospital";
 
 /**
  * Modal de busca de hospital: tenta geolocalização (hospitais próximos), busca
@@ -162,7 +163,7 @@ export function BuscaHospital({
             >
               <Ionicons name="business-outline" size={22} color={C.primary} />
               <View style={{ flex: 1 }}>
-                <Text style={styles.cardNome}>{h.nomeFantasia}</Text>
+                <Text style={styles.cardNome}>{formatarNomeHospital(h.nomeFantasia)}</Text>
                 <Text style={styles.cardSub}>
                   {[h.tipo, h.cidade, h.uf].filter(Boolean).join(" · ")}
                 </Text>
