@@ -238,6 +238,7 @@ export function PacientesProvider({ children }: { children: ReactNode }) {
                 ...p,
                 nomeCompleto: cab.nomeCompleto || p.nomeCompleto,
                 idade: cab.idade ?? p.idade,
+                sexo: cab.sexo ?? p.sexo,
                 // Setor vem da IA; leito é manual, então preservamos o existente.
                 setor: cab.setor || p.setor,
                 dataEntrada: cab.dataEntrada || p.dataEntrada,
@@ -256,6 +257,7 @@ export function PacientesProvider({ children }: { children: ReactNode }) {
       id,
       nomeCompleto: cab.nomeCompleto,
       idade: cab.idade,
+      sexo: cab.sexo ?? null,
       leito: cab.leito,
       setor: cab.setor,
       dataEntrada: cab.dataEntrada,

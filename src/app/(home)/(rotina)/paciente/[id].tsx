@@ -608,10 +608,70 @@ export default function Paciente() {
               atualizarSecao(id, item.id, { anotacoes: lista })
             }
             onExtraido={(t) => atualizarSecao(id, item.id, { extraido: t })}
+            aoExtrair={(dados) => {
+              // Prescrição: cria itens na lista de medicamentos (com classe IA).
+              if (item.id === "prescricaoHospitalar") {
+                const meds = Array.isArray(dados.medicamentos)
+                  ? (dados.medicamentos as Record<string, string>[])
+                  : [];
+                if (!meds.length) return false;
+                const base = paciente?.medicamentos ?? [];
+                const novos = meds
+                  .map((m, i) => ({
+                    id: `${novoId()}-${i}`,
+                    texto: [m.nome, m.dose, m.via, m.frequencia, m.diaUso]
+                      .filter(Boolean)
+                      .join(" ")
+                      .trim(),
+                    classe: "",
+                  }))
+                  .filter((m) => m.texto);
+                if (!novos.length) return false;
+                const lista = [...base, ...novos];
+                atualizarPaciente(id, { medicamentos: lista });
+                Promise.all(
+                  novos.map((n) =>
+                    classificarMedicamento(n.texto).then((c) => ({
+                      id: n.id,
+                      classe: c || "",
+                    })),
+                  ),
+                ).then((cls) => {
+                  const mapa = Object.fromEntries(cls.map((c) => [c.id, c.classe]));
+                  atualizarPaciente(id, {
+                    medicamentos: lista.map((m) =>
+                      mapa[m.id] != null ? { ...m, classe: mapa[m.id] } : m,
+                    ),
+                  });
+                });
+                return true;
+              }
+              // Sinais vitais: preenche o formulário do dia.
+              if (item.id === "sinaisVitaisIntercorrencias") {
+                const campos = ["paSist", "paDiast", "fc", "fr", "sato2", "temp", "glicemia", "diurese"];
+                const tem = campos.some(
+                  (k) => dados[k] != null && String(dados[k]).trim() !== "",
+                );
+                if (!tem) return false;
+                const atual = paciente?.sinaisVitais?.[hoje] ?? SV_VAZIO;
+                const novo = { ...atual };
+                for (const k of campos) {
+                  if (dados[k] != null && String(dados[k]).trim() !== "") {
+                    (novo as Record<string, string>)[k] = String(dados[k]);
+                  }
+                }
+                atualizarPaciente(id, {
+                  sinaisVitais: { ...paciente?.sinaisVitais, [hoje]: novo },
+                });
+                return true;
+              }
+              return false;
+            }}
             extra={(editando) =>
               item.id === "examesLaboratoriais" ? (
                 <LabsPorData
                   resultados={paciente?.resultadosLab ?? []}
+                  sexo={paciente?.sexo ?? null}
                   onChange={(lista) =>
                     atualizarPaciente(id, { resultadosLab: lista })
                   }
@@ -1129,6 +1189,7 @@ function SecaoExpansivel({
   extra,
   onSalvarAnotacoes,
   onExtraido,
+  aoExtrair,
 }: {
   titulo: string;
   instrucao: string;
@@ -1143,6 +1204,12 @@ function SecaoExpansivel({
   extra?: React.ReactNode | ((editando: boolean) => React.ReactNode);
   onSalvarAnotacoes: (lista: Anotacao[]) => void;
   onExtraido: (texto: string) => void;
+  /**
+   * Consome o JSON estruturado da extração mapeando direto para os campos da
+   * seção (ex.: prescrição → lista de medicamentos; sinais vitais → formulário).
+   * Retorna true se consumiu (aí não grava em `extraido`).
+   */
+  aoExtrair?: (dados: Record<string, unknown>) => boolean;
 }) {
   const [aberto, setAberto] = useState(false);
   const [rascunho, setRascunho] = useState("");
@@ -1233,12 +1300,14 @@ function SecaoExpansivel({
     setErro(null);
     try {
       const base64 = await converterParaJpegBase64(uri);
-      const json = await extrairDadosImagem<{ blocos: Bloco[] }>(
-        base64,
-        `${instrucao} ${SUFIXO_JSON}`,
-        secaoId,
-      );
-      onExtraido(JSON.stringify(json.blocos ?? []));
+      const json = await extrairDadosImagem<
+        { blocos?: Bloco[] } & Record<string, unknown>
+      >(base64, `${instrucao} ${SUFIXO_JSON}`, secaoId);
+      // Mapeamento direto (prescrição/sinais vitais) consome o estruturado; as
+      // demais seções gravam os blocos derivados para exibição.
+      if (!(aoExtrair && aoExtrair(json))) {
+        onExtraido(JSON.stringify(json.blocos ?? []));
+      }
     } catch (e) {
       const mensagem = e instanceof Error ? e.message : String(e);
       console.log("Erro ao extrair seção:", e);
@@ -2344,6 +2413,53 @@ function rotuloDiaMes(iso: string): string {
 }
 
 /**
+ * Um valor de lab no painel de hoje. Busca a referência oficial (LOINC, por
+ * sexo) e colore o valor quando está fora do intervalo. A seta mostra a
+ * tendência vs. o dia anterior.
+ */
+function LabHojeChip({
+  label,
+  exameKey,
+  valor,
+  setaStr,
+  sexo,
+}: {
+  label: string;
+  exameKey: string;
+  valor: string;
+  setaStr: string | null;
+  sexo?: "M" | "F" | null;
+}) {
+  const [ref, setRef] = useState<ReferenciaLab | null>(null);
+  useEffect(() => {
+    let vivo = true;
+    buscarReferencia(exameKey, sexo ?? undefined).then((r) => {
+      if (vivo) setRef(r);
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [exameKey, sexo]);
+
+  const num = valorNumerico(valor);
+  const status = ref ? statusReferencia(num, ref) : "normal";
+  const cor =
+    status === "atencao"
+      ? "#E65100"
+      : status === "fora"
+        ? "#C77700"
+        : ClinicalColors.text;
+
+  return (
+    <View style={styles.labHojeChip}>
+      <Text style={styles.labHojeLabel}>{label} </Text>
+      <Text style={[styles.labHojeValor, { color: cor }]}>{num ?? valor}</Text>
+      {!!setaStr && <Text style={styles.labHojeSeta}> {setaStr}</Text>}
+    </View>
+  );
+}
+
+/**
  * Exames laboratoriais com HISTÓRICO POR DATA. O store continua sendo
  * resultadosLab (lista plana exame/data/valor) — compatível com timeline,
  * alertas e snapshot —, mas a UI é organizada por dia: painel de hoje em
@@ -2351,10 +2467,12 @@ function rotuloDiaMes(iso: string): string {
  */
 function LabsPorData({
   resultados,
+  sexo,
   onChange,
   onAposSalvar,
 }: {
   resultados: ResultadoLab[];
+  sexo?: "M" | "F" | null;
   onChange: (l: ResultadoLab[]) => void;
   onAposSalvar?: (novos: ResultadoLab[]) => void;
 }) {
@@ -2517,17 +2635,19 @@ function LabsPorData({
           <Text style={styles.labHojeData}>Hoje · {rotuloDiaMes(hoje)}</Text>
           <View style={styles.labHojeWrap}>
             {entradasHoje.map((e) => (
-              <View key={e.key} style={styles.labHojeChip}>
-                <Text style={styles.labHojeLabel}>{e.label} </Text>
-                <Text style={styles.labHojeValor}>
-                  {valorNumerico(e.valor) ?? e.valor}
-                </Text>
-                {!!seta(e.key, e.valor) && (
-                  <Text style={styles.labHojeSeta}> {seta(e.key, e.valor)}</Text>
-                )}
-              </View>
+              <LabHojeChip
+                key={e.key}
+                label={e.label}
+                exameKey={e.key}
+                valor={e.valor}
+                setaStr={seta(e.key, e.valor)}
+                sexo={sexo}
+              />
             ))}
           </View>
+          <Text style={styles.labRefFonte}>
+            Referências: LOINC{sexo ? " · ajustadas por sexo" : ""} · avalie clinicamente
+          </Text>
         </View>
       )}
 

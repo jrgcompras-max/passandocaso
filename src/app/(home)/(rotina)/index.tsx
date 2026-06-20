@@ -139,7 +139,7 @@ const INSTRUCAO_CABECALHO =
   "Esta é uma foto do cabeçalho de um prontuário do sistema hospitalar Tasy. " +
   "Extraia os dados de identificação do paciente e responda APENAS com um JSON, " +
   "sem texto adicional, com exatamente os campos: " +
-  "nomeCompleto (string), idade (número ou null), setor (string com a unidade/setor de internação, ex.: 'Unidade 09 – São Francisco'), " +
+  "nomeCompleto (string), idade (número ou null), sexo ('M', 'F' ou null), setor (string com a unidade/setor de internação, ex.: 'Unidade 09 – São Francisco'), " +
   "dataEntrada (string, data de entrada/internação), numeroProntuario (string). " +
   "Não extraia o número do leito (ele será preenchido manualmente). " +
   "Se algum campo não estiver visível, use string vazia (ou null para idade).";
@@ -467,7 +467,7 @@ export default function Index() {
               hitSlop={6}
             >
               <Ionicons name="arrow-redo-outline" size={15} color={ClinicalColors.primary} />
-              <Text style={styles.passarTxt}>Passar plantão</Text>
+              <Text style={styles.passarTxt}>Passar pacientes</Text>
             </TouchableOpacity>
           )}
         </View>

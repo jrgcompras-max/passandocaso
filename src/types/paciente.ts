@@ -17,6 +17,8 @@ export type Hospital = {
 export type CabecalhoProntuario = {
   nomeCompleto: string;
   idade: number | null;
+  /** Sexo biológico (para ajustar referências laboratoriais por sexo). */
+  sexo?: "M" | "F" | null;
   /** Número do leito — preenchido manualmente (não aparece na foto do sistema). */
   leito: string;
   /** Setor/unidade — extraído da foto do cabeçalho pela IA. */
