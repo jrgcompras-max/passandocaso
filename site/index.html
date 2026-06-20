@@ -57,8 +57,9 @@
 
       /* HERO */
       .hero { position: relative; color: #fff; text-align: center; overflow: hidden; }
-      .hero video, .hero .hero-fallback { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; }
-      .hero .hero-fallback { background: linear-gradient(160deg, #0f2d52, #1a6b8a); }
+      .hero video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; }
+      /* Fallback de gradiente ATRÁS do vídeo (z-index -1): só aparece se o vídeo não carregar. */
+      .hero .hero-fallback { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1; background: linear-gradient(160deg, #0f2d52, #1a6b8a); }
       .hero .overlay { position: absolute; inset: 0; background: rgba(15, 45, 82, 0.7); z-index: 1; }
       .hero .container { position: relative; z-index: 2; padding: 130px 24px; }
       .hero .logo-hero { display: inline-flex; align-items: center; gap: 10px; font-size: 22px; font-weight: 800; letter-spacing: 0.3px; margin-bottom: 30px; }
