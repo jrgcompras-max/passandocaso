@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
@@ -457,9 +458,12 @@ export default function Index() {
             {modoModal === "escolha" ? (
               <View style={styles.modalOpcoes}>
                 <TouchableOpacity style={styles.opcaoBtn} onPress={escolherFoto}>
-                  <Text style={styles.opcaoBtnTexto}>
-                    Fotografar prontuário
-                  </Text>
+                  <Ionicons
+                    name="camera-outline"
+                    size={20}
+                    color={ClinicalColors.textOnPrimary}
+                  />
+                  <Text style={styles.opcaoBtnTexto}>Fotografar prontuário</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.opcaoBtn, styles.opcaoBtnSecundaria]}
@@ -674,7 +678,7 @@ const styles = StyleSheet.create({
   },
   erroTexto: { color: StatusColors.pendente.text, fontSize: 13, lineHeight: 18 },
   vazioContainer: { flexGrow: 1, justifyContent: "center" },
-  listaConteudo: { paddingBottom: 24 },
+  listaConteudo: { paddingBottom: 110 },
   separador: {
     color: ClinicalColors.textMuted,
     fontSize: 11,
@@ -836,7 +840,10 @@ const styles = StyleSheet.create({
     backgroundColor: ClinicalColors.buttonPrimary,
     borderRadius: Radius.card,
     paddingVertical: 16,
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
     borderWidth: BorderWidth.hairline,
     borderColor: ClinicalColors.buttonPrimary,
   },

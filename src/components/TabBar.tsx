@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { BlurView } from "expo-blur";
 import { useRouter, useSegments } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -7,9 +8,10 @@ import { ClinicalColors as C } from "@/constants/clinicalTheme";
 import { useAcoes } from "@/store/AcoesContext";
 
 /**
- * Bottom tab bar customizada: [🏥 Hospitais] [➕] [👤 Perfil]. O botão central
- * (verde, elevado) abre o modal de adicionar paciente na Rotina; os laterais
- * navegam para as telas de hospitais e perfil. Respeita o safe area inferior.
+ * Bottom tab bar estilo iOS: [Hospitais] [+] [Perfil]. Fundo "frosted glass"
+ * (BlurView) sobreposto ao conteúdo; botão central azul elevado. Fica absoluta
+ * no rodapé — as telas roláveis reservam padding inferior para não esconder
+ * conteúdo atrás dela.
  */
 export function TabBar() {
   const router = useRouter();
@@ -27,9 +29,13 @@ export function TabBar() {
   };
 
   return (
-    <View style={[styles.barra, { height: 64 + insets.bottom, paddingBottom: insets.bottom }]}>
+    <BlurView
+      intensity={80}
+      tint="light"
+      style={[styles.barra, { height: 64 + insets.bottom, paddingBottom: insets.bottom }]}
+    >
       <Pressable style={styles.item} onPress={() => router.navigate("/hospitais")} hitSlop={6}>
-        <Ionicons name="medkit-outline" size={24} color={corHosp} />
+        <Ionicons name="business-outline" size={24} color={corHosp} />
         <Text style={[styles.label, { color: corHosp }]}>Hospitais</Text>
       </Pressable>
 
@@ -47,18 +53,22 @@ export function TabBar() {
         <Ionicons name="person-outline" size={24} color={corPerfil} />
         <Text style={[styles.label, { color: corPerfil }]}>Perfil</Text>
       </Pressable>
-    </View>
+    </BlurView>
   );
 }
 
 const styles = StyleSheet.create({
   barra: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
     flexDirection: "row",
     alignItems: "flex-start",
-    backgroundColor: "#FFFFFF",
-    borderTopWidth: 0.5,
+    borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: C.border,
     paddingTop: 10,
+    overflow: "visible",
   },
   item: { flex: 1, alignItems: "center", justifyContent: "center", gap: 3, paddingTop: 4 },
   label: { fontSize: 10, fontWeight: "600" },

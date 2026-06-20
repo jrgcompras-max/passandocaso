@@ -90,7 +90,7 @@ export default function HospitaisScreen() {
         </View>
       )}
 
-      <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
+      <ScrollView contentContainerStyle={{ paddingBottom: 110 }}>
         {hospitais.map((h) => {
           const ativo = h.id === hospitalAtivo;
           return (

@@ -942,12 +942,14 @@ function SecaoExpansivel({
               style={[styles.botaoFoto, styles.botaoCaptura]}
               onPress={fotografar}
             >
+              <Ionicons name="camera-outline" size={18} color={ClinicalColors.textOnPrimary} />
               <Text style={styles.botaoFotoTexto}>Fotografar</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.botaoFoto, styles.botaoCaptura]}
               onPress={escolherArquivo}
             >
+              <Ionicons name="images-outline" size={18} color={ClinicalColors.textOnPrimary} />
               <Text style={styles.botaoFotoTexto}>Arquivo</Text>
             </TouchableOpacity>
           </View>
@@ -2559,7 +2561,10 @@ const styles = StyleSheet.create({
     backgroundColor: ClinicalColors.buttonPrimary,
     borderRadius: Radius.card,
     padding: 16,
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
     marginBottom: 16,
   },
   botaoFotoTexto: {
