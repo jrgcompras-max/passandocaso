@@ -28,7 +28,9 @@ const PROMPTS = {
     "Extraia APENAS as medicações de uso contínuo (MUC) que o paciente já usava em casa. " +
     "Ignore COMPLETAMENTE: comorbidades, medicamentos iniciados nesta internação " +
     "(prescrição hospitalar), história atual, exames. " +
-    'Formato: {"medicacoesUsoContinuo":[{"nome":"Metformina","dose":"500mg","frequencia":"2x/dia"}],"alergias":["Dipirona"]}. ' +
+    "Quando a dose ou a frequência NÃO constarem no documento, use null — NUNCA escreva " +
+    "'não informada', 'não informado' ou texto similar. " +
+    'Formato: {"medicacoesUsoContinuo":[{"nome":"Metformina","dose":"500mg ou null","frequencia":"2x/dia ou null"}],"alergias":["Dipirona"]}. ' +
     REGRA,
   historia:
     "Extraia APENAS a história da doença atual (HDA/HMA), como TEXTO DISSERTATIVO. " +
@@ -58,7 +60,9 @@ const PROMPTS = {
     "exames laboratoriais/imagem nem sinais vitais. " +
     "Se a imagem só tiver diagnósticos/comorbidades e NENHUM medicamento prescrito, " +
     'retorne {"medicamentos":[]}. ' +
-    'Formato: {"medicamentos":[{"nome":"Ceftriaxona","dose":"1g","via":"EV","frequencia":"1x/dia","diaUso":"D5 ou null"}]}. ' +
+    "Quando dose, via, frequência ou dia de uso NÃO constarem, use null — NUNCA escreva " +
+    "'não informada' ou texto similar. " +
+    'Formato: {"medicamentos":[{"nome":"Ceftriaxona","dose":"1g ou null","via":"EV ou null","frequencia":"1x/dia ou null","diaUso":"D5 ou null"}]}. ' +
     REGRA,
   sinaisVitaisIntercorrencias:
     "Extraia APENAS os sinais vitais mais recentes. Use null quando ausente. " +
@@ -76,6 +80,13 @@ const LAB_LABELS = {
 
 function naoVazio(v) {
   return v !== null && v !== undefined && String(v).trim() !== "";
+}
+
+// Placeholders que a IA às vezes devolve para campos ausentes (ex.: dose) — não
+// devem ser concatenados ("Losartana não informada não informada").
+const RE_PLACEHOLDER = /^(n[ãa]o\s*informad[oa]?|sem\s*informa\w*|nenhum[oa]?|n\/?a|null|undefined|[-—.]+|\?+)$/i;
+function campoValido(v) {
+  return naoVazio(v) && !RE_PLACEHOLDER.test(String(v).trim());
 }
 
 /** Limpa data malformada da IA: "31/05/null" → "31/05"; sem dia/mês → "". */
@@ -97,7 +108,7 @@ function deriveBlocos(secao, d) {
 
   if (secao === "comorbidadesMedicacoes") {
     const meds = (d.medicacoesUsoContinuo || []).map((m) =>
-      [m.nome, m.dose, m.frequencia].filter(naoVazio).join(" "),
+      [m.nome, m.dose, m.frequencia].filter(campoValido).join(" "),
     );
     return [
       ...bloco("Comorbidades", (d.comorbidades || []).filter(naoVazio)),
@@ -110,7 +121,7 @@ function deriveBlocos(secao, d) {
   }
   if (secao === "medicacoesUsoContinuo") {
     const meds = (d.medicacoesUsoContinuo || []).map((m) =>
-      [m.nome, m.dose, m.frequencia].filter(naoVazio).join(" "),
+      [m.nome, m.dose, m.frequencia].filter(campoValido).join(" "),
     );
     return [
       ...bloco("Medicações de uso contínuo", meds.filter(naoVazio)),
@@ -149,7 +160,7 @@ function deriveBlocos(secao, d) {
   }
   if (secao === "prescricaoHospitalar") {
     const itens = (d.medicamentos || []).map((m) =>
-      [m.nome, m.dose, m.via, m.frequencia, m.diaUso].filter(naoVazio).join(" "),
+      [m.nome, m.dose, m.via, m.frequencia, m.diaUso].filter(campoValido).join(" "),
     );
     return bloco("Prescrição hospitalar", itens.filter(naoVazio));
   }

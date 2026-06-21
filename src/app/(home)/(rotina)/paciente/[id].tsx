@@ -125,6 +125,15 @@ function novoId(): string {
   return String(Date.now());
 }
 
+// Placeholders que a IA às vezes devolve para campos ausentes (dose/via/freq) —
+// não devem ser concatenados ("Losartana não informada não informada").
+const RE_PLACEHOLDER_MED =
+  /^(n[ãa]o\s*informad[oa]?|sem\s*informa\w*|nenhum[oa]?|n\/?a|null|undefined|[-—.]+|\?+)$/i;
+function campoMedValido(v?: string | null): boolean {
+  const t = String(v ?? "").trim();
+  return !!t && !RE_PLACEHOLDER_MED.test(t);
+}
+
 /** Sufixo comum: força a resposta da IA a vir como JSON estruturado em blocos. */
 const SUFIXO_JSON =
   'Responda APENAS com JSON no formato {"blocos": [{"titulo": "<rótulo curto, ou string vazia>", "itens": ["<item curto>", ...]}]}, sem texto adicional. ' +
@@ -718,7 +727,7 @@ export default function Paciente() {
                   .map((m, i) => ({
                     id: `${novoId()}-${i}`,
                     texto: [m.nome, m.dose, m.via, m.frequencia, m.diaUso]
-                      .filter(Boolean)
+                      .filter(campoMedValido)
                       .join(" ")
                       .trim(),
                     classe: "",
