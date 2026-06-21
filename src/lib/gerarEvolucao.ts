@@ -107,12 +107,52 @@ function comorbidadesMUC(p: Paciente): { comorb: string[]; muc: string[] } {
   return { comorb, muc };
 }
 
-/** Antibióticos da prescrição (medicamentos classificados como antibiótico). */
-function antibioticos(p: Paciente): string[] {
-  return (p.medicamentos || [])
-    .filter((m) => /antibi|\batb\b/i.test(m.classe || ""))
-    .map((m) => (m.texto || "").trim())
-    .filter(Boolean);
+const RE_ATB_CLASSE = /antibi|antimicro|\batb\b/i;
+// Palavras-chave para reconhecer antibióticos no texto livre (anotações/scan),
+// quando não há classe/categoria atribuída.
+const KW_ATB =
+  /ceftriaxona|cefepime|cefalexina|cefazolina|ceftazidima|cefuroxima|amoxicilina|ampicilina|azitromicina|claritromicina|ciprofloxac|levofloxac|moxifloxac|piperacilina|tazobactam|imipenem|meropen|ertapen|vancomicina|teicoplanina|oxacilina|metronidazol|clindamicina|gentamicina|amicacina|sulfametoxazol|bactrim|polimixina|penicilina|clavulanato|sulbactam|linezolida|daptomicina|tigeciclina|aztreonam|nitrofurantoína|nitrofurantoina|fosfomicina|rifampicina|rocefin|tazocin|unasyn|clavulin/i;
+
+/** Um item da prescrição é antibiótico? (categoria do badge, classe IA ou nome) */
+function ehAtb(texto: string, categoria?: string, classe?: string): boolean {
+  if (categoria === "atb") return true;
+  if (RE_ATB_CLASSE.test(classe || "")) return true;
+  return KW_ATB.test(texto || "");
+}
+
+/** Remove duplicados preservando a ordem (case-insensitive). */
+function semDuplicar(itens: string[]): string[] {
+  const vistos = new Set<string>();
+  const out: string[] = [];
+  for (const it of itens) {
+    const chave = it.trim().toLowerCase();
+    if (!chave || vistos.has(chave)) continue;
+    vistos.add(chave);
+    out.push(it.trim());
+  }
+  return out;
+}
+
+/**
+ * Itens da prescrição hospitalar, de TODAS as fontes: lista estruturada
+ * (`medicamentos`), anotações timestampadas da seção (com categoria do badge) e
+ * conteúdo extraído por foto. Separa antibióticos dos demais ("em uso").
+ */
+function prescricao(p: Paciente): { atb: string[]; emUso: string[] } {
+  const atb: string[] = [];
+  const emUso: string[] = [];
+  const add = (texto: string, isAtb: boolean) => {
+    const t = (texto || "").trim();
+    if (t) (isAtb ? atb : emUso).push(t);
+  };
+
+  for (const m of p.medicamentos || []) add(m.texto, ehAtb(m.texto, "", m.classe));
+
+  const sec = p.secoes?.prescricaoHospitalar;
+  for (const a of (sec?.anotacoes as Anotacao[]) || []) add(a.texto, ehAtb(a.texto, a.categoria));
+  for (const b of parseBlocos(sec?.extraido)) for (const it of b.itens) add(it, ehAtb(it));
+
+  return { atb: semDuplicar(atb), emUso: semDuplicar(emUso) };
 }
 
 /** Culturas pendentes (pendências não-feitas que mencionam cultura). */
@@ -155,13 +195,16 @@ export function montarTextoEvolucao(paciente: Paciente, hoje: string): string {
       );
   const blocoAtual = atual.length ? `- Atual: ${atual.join("\n")}` : null;
 
-  // — Antibióticos / Culturais (com padrões -- / ---) —
-  const atb = antibioticos(paciente);
+  // — Antibióticos / Culturais / Medicamentos em uso (com padrões -- / ---) —
+  const { atb, emUso } = prescricao(paciente);
   const culturas = culturasPendentes(paciente);
   const blocoTrat = [
     `- Antibióticos: ${atb.length ? atb.join(", ") : "--"}`,
     `- Culturais: ${culturas.length ? culturas.join(", ") : "---"}`,
-  ].join("\n");
+    emUso.length ? `- Medicamentos em uso: ${emUso.join(", ")}` : null,
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   // — Comorbidades / MUC / Alergias —
   const { comorb, muc } = comorbidadesMUC(paciente);
@@ -199,6 +242,16 @@ export function montarTextoEvolucao(paciente: Paciente, hoje: string): string {
   ].filter(Boolean);
   const ssvv = ssvvPartes.length ? `SSVV: ${ssvvPartes.join(" | ")}` : null;
 
+  // — Intercorrências (campo do SSVV + anotações da seção) —
+  const svSec = paciente.secoes?.sinaisVitaisIntercorrencias;
+  const intercorrLista = [
+    sv?.intercorrencias?.trim() || "",
+    ...((svSec?.anotacoes as Anotacao[]) || []).map((x) => (x.texto || "").trim()),
+  ].filter(Boolean);
+  const intercorrencias = intercorrLista.length
+    ? `*Intercorrências: ${intercorrLista.join("; ")}`
+    : null;
+
   // — Objetivo: estado geral (REG/BEG/MEG) + aparelhos (sem consciência/orientação) —
   const oCorpo = [
     evo?.estadoGeralExame?.trim() || null,
@@ -211,9 +264,20 @@ export function montarTextoEvolucao(paciente: Paciente, hoje: string): string {
   ].filter(Boolean);
   const o = oCorpo.length ? `*O: ${oCorpo.join("\n")}` : null;
 
-  // — Exames —
+  // — Exames laboratoriais (estruturado + anotações da seção; extraído como
+  //   fallback quando não há valores estruturados) —
   const lab = laboratorioLinha(paciente);
-  const exames = lab ? `Exames laboratoriais:\n${lab}` : null;
+  const labSec = paciente.secoes?.examesLaboratoriais;
+  const labAnots = ((labSec?.anotacoes as Anotacao[]) || [])
+    .map((x) => (x.texto || "").trim())
+    .filter(Boolean);
+  const labFallback = lab
+    ? []
+    : parseBlocos(labSec?.extraido)
+        .flatMap((b) => b.itens.map((i) => i.trim()))
+        .filter(Boolean);
+  const exameLinhas = [lab, ...labFallback, ...labAnots].filter(Boolean);
+  const exames = exameLinhas.length ? `Exames laboratoriais:\n${exameLinhas.join("\n")}` : null;
   const img = imagemLinhas(paciente);
   // Cada exame é um bloco; linha em branco entre eles (não vira parágrafo).
   const imagem = img.length ? `Exames de imagem:\n${img.join("\n\n")}` : null;
@@ -242,6 +306,7 @@ export function montarTextoEvolucao(paciente: Paciente, hoje: string): string {
     hma,
     s,
     ssvv,
+    intercorrencias,
     o,
     exames,
     imagem,

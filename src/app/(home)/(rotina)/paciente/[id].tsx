@@ -1628,9 +1628,13 @@ function SecaoExpansivel({
                 </View>
               ))}
 
-              {/* SSVV: o display estruturado (extra) é a fonte; o conteúdo extraído
-                  só aparece se houver texto legado (retrocompatibilidade). */}
-              {!(secaoId === "sinaisVitaisIntercorrencias" && !extraido.trim()) && (
+              {/* SSVV/Prescrição: o componente estruturado (extra) é a fonte; o
+                  conteúdo extraído só aparece se houver texto (retrocompat). */}
+              {!(
+                (secaoId === "sinaisVitaisIntercorrencias" ||
+                  secaoId === "prescricaoHospitalar") &&
+                !extraido.trim()
+              ) && (
                 <>
                   <Text style={[styles.campoLabel, styles.campoLabelEspacado]}>
                     Informações do sistema
