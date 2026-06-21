@@ -800,7 +800,6 @@ export default function Paciente() {
               ) : item.id === "sinaisVitaisIntercorrencias" ? (
                 <SinaisVitaisSecao
                   sv={paciente?.sinaisVitais?.[hoje] ?? SV_VAZIO}
-                  editando={editando}
                   onChange={(v) =>
                     atualizarPaciente(id, {
                       sinaisVitais: { ...paciente?.sinaisVitais, [hoje]: v },
@@ -3169,34 +3168,11 @@ function LabSerieLinha({
  * clínica gerada automaticamente (usada também no "Passar o Caso"). Persiste ao
  * perder o foco / ao alternar o O2.
  */
-/** Linhas variável→valor dos sinais vitais estruturados (omite vazios). */
-function svLinhas(sv: SinaisVitaisDia): { label: string; valor: string }[] {
-  const v = (s?: string) => (s || "").trim();
-  const linhas: { label: string; valor: string }[] = [];
-  if (v(sv.paSist) && v(sv.paDiast)) linhas.push({ label: "PA", valor: `${v(sv.paSist)}/${v(sv.paDiast)} mmHg` });
-  if (v(sv.fc)) linhas.push({ label: "FC", valor: `${v(sv.fc)} bpm` });
-  if (v(sv.fr)) linhas.push({ label: "FR", valor: `${v(sv.fr)} irpm` });
-  if (v(sv.sato2)) {
-    const modo = O2_OPCOES.find((o) => o.valor === sv.o2)?.rotulo;
-    linhas.push({ label: "SatO₂", valor: `${v(sv.sato2)}%${modo ? ` (${modo})` : ""}` });
-  } else if (sv.o2) {
-    const modo = O2_OPCOES.find((o) => o.valor === sv.o2)?.rotulo;
-    if (modo) linhas.push({ label: "O₂", valor: modo });
-  }
-  if (v(sv.temp)) linhas.push({ label: "Tax", valor: `${v(sv.temp)}°C` });
-  if (v(sv.glasgow)) linhas.push({ label: "Glasgow", valor: v(sv.glasgow) });
-  if (v(sv.glicemia)) linhas.push({ label: "Glicemia", valor: `${v(sv.glicemia)} mg/dL` });
-  if (v(sv.diurese)) linhas.push({ label: "Diurese", valor: `${v(sv.diurese)} mL/24h` });
-  return linhas;
-}
-
 function SinaisVitaisSecao({
   sv,
-  editando,
   onChange,
 }: {
   sv: SinaisVitaisDia;
-  editando?: boolean;
   onChange: (v: SinaisVitaisDia) => void;
 }) {
   const set = (campo: CampoNum) => (t: string) => onChange({ ...sv, [campo]: t });
@@ -3210,26 +3186,6 @@ function SinaisVitaisSecao({
     { k: "glicemia", label: "Glicemia (mg/dL)", ph: "—" },
     { k: "diurese", label: "Diurese (mL/24h)", ph: "—" },
   ];
-
-  // Modo leitura: lista limpa variável→valor (omite campos vazios).
-  if (!editando) {
-    const linhas = svLinhas(sv);
-    if (!linhas.length && !(sv.intercorrencias || "").trim()) return null;
-    return (
-      <View style={styles.svBox}>
-        <Text style={[styles.campoLabel, styles.campoLabelEspacado]}>SSVV</Text>
-        {linhas.map((l) => (
-          <View key={l.label} style={styles.svDisplayRow}>
-            <Text style={styles.svDisplayLabel}>{l.label}</Text>
-            <Text style={styles.svDisplayValor}>{l.valor}</Text>
-          </View>
-        ))}
-        {!!(sv.intercorrencias || "").trim() && (
-          <Text style={styles.svIntercorr}>{sv.intercorrencias.trim()}</Text>
-        )}
-      </View>
-    );
-  }
 
   return (
     <View style={styles.svBox}>

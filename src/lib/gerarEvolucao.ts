@@ -178,22 +178,14 @@ export function montarTextoEvolucao(paciente: Paciente, hoje: string): string {
   const evo = paciente.evolucoes?.[hoje];
   const sv = paciente.sinaisVitais?.[hoje];
 
-  // — Atual: problemas ativos/resolvendo (diagnósticos), um por linha. Sem
-  //   problemas, cai no motivo da internação / diagnóstico principal. —
+  // — Problemas ativos: viram a Avaliação (*A:). Sem problemas, cai no motivo da
+  //   internação / diagnóstico principal (hipótese diagnóstica). —
   const ativos = (paciente.problemas || [])
     .filter((x) => x.status === "ativo")
     .map((x) => x.titulo.trim())
     .filter(Boolean);
-  const atualProblemas = (paciente.problemas || [])
-    .filter((x) => x.status === "ativo" || x.status === "resolvendo")
-    .map((x) => x.titulo.trim())
-    .filter(Boolean);
-  const atual = atualProblemas.length
-    ? atualProblemas
-    : [paciente.motivoInternacao?.trim() || paciente.diagnosticoPrincipal?.trim()].filter(
-        Boolean,
-      );
-  const blocoAtual = atual.length ? `- Atual: ${atual.join("\n")}` : null;
+  const fallbackHipotese =
+    paciente.motivoInternacao?.trim() || paciente.diagnosticoPrincipal?.trim() || "";
 
   // — Antibióticos / Culturais / Medicamentos em uso (com padrões -- / ---) —
   const { atb, emUso } = prescricao(paciente);
@@ -214,9 +206,9 @@ export function montarTextoEvolucao(paciente: Paciente, hoje: string): string {
     `* Alergias: --`,
   ].join("\n");
 
-  // — HMA —
-  const hda = secaoLinhas(paciente, "historia");
-  const hma = hda.length ? `*HMA: ${hda.join(" ")}` : null;
+  // — HDA (História da Doença Atual) —
+  const hdaLinhas = secaoLinhas(paciente, "historia");
+  const hda = hdaLinhas.length ? `*HDA: ${hdaLinhas.join(" ")}` : null;
 
   // — Subjetivo: consciência/orientação (minúsculas) + queixas (estadoGeral) —
   const sConsc = [
@@ -282,11 +274,12 @@ export function montarTextoEvolucao(paciente: Paciente, hoje: string): string {
   // Cada exame é um bloco; linha em branco entre eles (não vira parágrafo).
   const imagem = img.length ? `Exames de imagem:\n${img.join("\n\n")}` : null;
 
-  // — Avaliação (problemas ativos, um por linha) / Plano (conduta do dia) —
-  const a = ativos.length ? `*A: ${ativos.join("\n")}` : null;
+  // — Avaliação (hipótese diagnóstica): problemas ativos; senão motivo/diagnóstico. —
+  const avaliacao = ativos.length ? ativos.join("\n") : fallbackHipotese;
+  const a = avaliacao ? `*A: ${avaliacao}` : null;
   const plano = evo?.condutaDoDia?.trim() ? `*P: ${evo.condutaDoDia.trim()}` : null;
 
-  // — Escores clínicos (entre A e P) — apenas os calculáveis, formato compacto.
+  // — Escores clínicos (ao final) — apenas os calculáveis, formato compacto.
   //   O número e a classificação são da própria escala (sem interpretação extra).
   const escores = escoresCalculaveis(paciente, hoje);
   const escoresTxt = escores.length
@@ -298,21 +291,23 @@ export function montarTextoEvolucao(paciente: Paciente, hoje: string): string {
         .join("\n")}`
     : null;
 
+  // Ordem: HDA → Antecedentes/Comorbidades/MUC → Labs → Imagem → SSVV →
+  // Exame físico (*O) → Avaliação (*A) → Conduta (*P) → Antibióticos/em uso →
+  // Escores. (*S subjetivo logo após a HDA.)
   return [
     "                    Evolução Médica",
-    blocoAtual,
-    blocoTrat,
-    blocoComorb,
-    hma,
+    hda,
     s,
+    blocoComorb,
+    exames,
+    imagem,
     ssvv,
     intercorrencias,
     o,
-    exames,
-    imagem,
     a,
-    escoresTxt,
     plano,
+    blocoTrat,
+    escoresTxt,
   ]
     .filter(Boolean)
     .join("\n\n");
