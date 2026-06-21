@@ -1987,6 +1987,120 @@ function CampoLeitura({
   );
 }
 
+/** Campos de exame físico que usam chips. */
+type CampoExame =
+  | "estadoGeralExame"
+  | "neurologico"
+  | "cardiovascular"
+  | "respiratorio"
+  | "abdominal"
+  | "mmii"
+  | "pele";
+
+/**
+ * Chips do exame físico por seção (os 4 primeiros aparecem por padrão; "ver mais"
+ * revela o restante). `secao` é o identificador usado no aprendizado de chips.
+ */
+const CHIPS_EXAME: { secao: string; campo: CampoExame; label: string; chips: string[] }[] = [
+  {
+    secao: "estado_geral", campo: "estadoGeralExame", label: "Estado geral",
+    chips: ["BEG", "consciente", "orientado", "afebril", "REG", "MEG", "hipocorado", "ictérico", "desidratado", "prostrado"],
+  },
+  {
+    secao: "neurologico", campo: "neurologico", label: "Neurológico",
+    chips: ["Glasgow 15", "sem déficit focal", "pupilas isocóricas fotorreativas", "orientado", "sonolento", "torporoso", "desorientado", "pupilas anisocóricas", "força preservada nos 4 membros", "rigidez de nuca"],
+  },
+  {
+    secao: "cardiovascular", campo: "cardiovascular", label: "Cardiovascular",
+    chips: ["AC RR 2T BNF sem sopros", "taquicárdico", "bulhas normofonéticas", "TEC < 2s", "bradicárdico", "ritmo irregular", "sopro sistólico", "B3 presente", "pulsos cheios e simétricos", "turgência jugular"],
+  },
+  {
+    secao: "respiratorio", campo: "respiratorio", label: "Respiratório",
+    chips: ["AP MV+ bilat simétrico sem RA", "eupneico", "sem ruídos adventícios", "taquipneico", "dispneico", "estertores crepitantes", "sibilos difusos", "roncos", "MV reduzido em base", "uso de musculatura acessória"],
+  },
+  {
+    secao: "abdominal", campo: "abdominal", label: "Abdominal",
+    chips: ["flácido", "indolor à palpação", "RHA+", "sem visceromegalias", "doloroso à palpação", "distendido", "ascite", "hepatomegalia", "RHA diminuídos", "descompressão brusca negativa"],
+  },
+  {
+    secao: "membros", campo: "mmii", label: "Membros e extremidades",
+    chips: ["MMII sem edema", "panturrilhas livres", "perfusão periférica preservada", "extremidades quentes", "edema MMII +/4", "edema MMII ++/4", "extremidades frias", "cianose periférica", "empastamento de panturrilha", "pulsos pediosos presentes"],
+  },
+  {
+    secao: "pele", campo: "pele", label: "Pele e mucosas",
+    chips: ["mucosas normocoradas e úmidas", "pele íntegra", "acianótico", "anictérico", "mucosas hipocoradas", "mucosas desidratadas", "ictérico", "cianótico", "lesões de pele", "petéquias"],
+  },
+];
+
+/**
+ * Campo de exame físico com chips clicáveis (top 4 + "ver mais") e caixa de texto
+ * para achados não listados. Os chips inserem/removem seu texto no conteúdo do
+ * campo; o resultado já é o texto clínico usado no Passar o Caso. (Feature 1)
+ */
+function ExameComChips({
+  label,
+  valor,
+  chips,
+  onChange,
+  onBlur,
+  onLivre,
+}: {
+  label: string;
+  valor: string;
+  chips: string[];
+  onChange: (t: string) => void;
+  onBlur: () => void;
+  onLivre?: (texto: string) => void;
+}) {
+  const [verMais, setVerMais] = useState(false);
+  const tokens = valor.split(/\s*[,;]\s*/).map((t) => t.trim()).filter(Boolean);
+  const selecionados = new Set(tokens.map(normMerge));
+  const visiveis = verMais ? chips : chips.slice(0, 4);
+  const toggle = (chip: string) => {
+    if (selecionados.has(normMerge(chip))) {
+      onChange(tokens.filter((t) => normMerge(t) !== normMerge(chip)).join(", "));
+    } else {
+      onChange(valor.trim() ? `${valor.trim()}, ${chip}` : chip);
+    }
+  };
+  return (
+    <View style={styles.exameBox}>
+      <Text style={styles.evoLabel}>{label}</Text>
+      <View style={styles.chipsWrap}>
+        {visiveis.map((chip) => {
+          const ativo = selecionados.has(normMerge(chip));
+          return (
+            <TouchableOpacity
+              key={chip}
+              onPress={() => toggle(chip)}
+              style={[styles.exameChip, ativo && styles.exameChipAtivo]}
+            >
+              <Text style={[styles.exameChipTxt, ativo && styles.exameChipTxtAtivo]}>{chip}</Text>
+            </TouchableOpacity>
+          );
+        })}
+        {chips.length > 4 && (
+          <TouchableOpacity onPress={() => setVerMais((v) => !v)} style={styles.verMaisChip}>
+            <Text style={styles.verMaisTxt}>{verMais ? "− ver menos" : "+ ver mais"}</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+      <TextInput
+        style={[styles.campoInput, styles.exameLivre]}
+        value={valor}
+        onChangeText={onChange}
+        onBlur={() => {
+          onBlur();
+          if (onLivre) onLivre(valor);
+        }}
+        placeholder="Achados adicionais…"
+        placeholderTextColor={ClinicalColors.textMuted}
+        multiline
+      />
+    </View>
+  );
+}
+
 /**
  * Seção "Evolução Beira-Leito" — formulário estruturado, 100% manual (sem foto).
  * Toggles persistem na hora; campos de texto persistem ao perder o foco.
@@ -2118,55 +2232,16 @@ function EvolucaoBeiraLeitoSecao({
           ))}
 
           <Text style={styles.evoGrupo}>Exame Físico</Text>
-          <CampoTexto
-            label="Estado geral (objetivo)"
-            value={evo.estadoGeralExame ?? ""}
-            placeholder="Ex: REG, LOC, MUC, AAA"
-            onChangeText={(t) => aplicar({ estadoGeralExame: t }, false)}
-            onBlur={() => onSalvar(evo)}
-          />
-          <CampoTexto
-            label="Neurológico"
-            value={evo.neurologico ?? ""}
-            placeholder="Ex: Glasgow 15, PIRF, sem déficits focais"
-            onChangeText={(t) => aplicar({ neurologico: t }, false)}
-            onBlur={() => onSalvar(evo)}
-          />
-          <CampoTexto
-            label="Cardiovascular"
-            value={evo.cardiovascular ?? ""}
-            placeholder="Ex: AC RR 2T BNF, sem sopros"
-            onChangeText={(t) => aplicar({ cardiovascular: t }, false)}
-            onBlur={() => onSalvar(evo)}
-          />
-          <CampoTexto
-            label="Respiratório"
-            value={evo.respiratorio ?? ""}
-            placeholder="Ex: AP MV+ bilat simétrico, sem RA"
-            onChangeText={(t) => aplicar({ respiratorio: t }, false)}
-            onBlur={() => onSalvar(evo)}
-          />
-          <CampoTexto
-            label="Abdominal"
-            value={evo.abdominal ?? ""}
-            placeholder="Ex: Abdome flácido, indolor, RHA+"
-            onChangeText={(t) => aplicar({ abdominal: t }, false)}
-            onBlur={() => onSalvar(evo)}
-          />
-          <CampoTexto
-            label="Membros inferiores"
-            value={evo.mmii ?? ""}
-            placeholder="Ex: MMII sem edema, panturrilhas livres"
-            onChangeText={(t) => aplicar({ mmii: t }, false)}
-            onBlur={() => onSalvar(evo)}
-          />
-          <CampoTexto
-            label="Extremidades"
-            value={evo.extremidades ?? ""}
-            placeholder="Ex: Extremidades aquecidas, TEC < 3s"
-            onChangeText={(t) => aplicar({ extremidades: t }, false)}
-            onBlur={() => onSalvar(evo)}
-          />
+          {CHIPS_EXAME.map((cfg) => (
+            <ExameComChips
+              key={cfg.campo}
+              label={cfg.label}
+              chips={cfg.chips}
+              valor={(evo[cfg.campo] as string) ?? ""}
+              onChange={(t) => aplicar({ [cfg.campo]: t } as Partial<EvolucaoBeiraLeito>, false)}
+              onBlur={() => onSalvar(evo)}
+            />
+          ))}
         </View>
       )}
     </View>
@@ -4235,6 +4310,22 @@ const styles = StyleSheet.create({
   toggleChipAtivo: { backgroundColor: ClinicalColors.buttonPrimary },
   toggleChipTexto: { color: ClinicalColors.text, fontSize: 14 },
   toggleChipTextoAtivo: { color: ClinicalColors.textOnPrimary },
+  // Exame físico com chips (Feature 1)
+  exameBox: { marginBottom: 14 },
+  exameChip: {
+    backgroundColor: ClinicalColors.background,
+    borderRadius: Radius.pill,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderWidth: BorderWidth.hairline,
+    borderColor: ClinicalColors.border,
+  },
+  exameChipAtivo: { backgroundColor: ClinicalColors.primary, borderColor: ClinicalColors.primary },
+  exameChipTxt: { color: ClinicalColors.text, fontSize: 13 },
+  exameChipTxtAtivo: { color: "#FFFFFF", fontWeight: "600" },
+  verMaisChip: { paddingVertical: 7, paddingHorizontal: 10 },
+  verMaisTxt: { color: ClinicalColors.primary, fontSize: 13, fontWeight: "600" },
+  exameLivre: { marginTop: 8, minHeight: 40 },
   evoInput: {
     backgroundColor: ClinicalColors.background,
     borderColor: ClinicalColors.border,

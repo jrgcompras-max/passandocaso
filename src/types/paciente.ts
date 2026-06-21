@@ -169,6 +169,8 @@ export type EvolucaoBeiraLeito = {
   abdominal?: string;
   mmii?: string;
   extremidades?: string;
+  /** Pele e mucosas (exame físico). */
+  pele?: string;
   condutaDoDia: string;
 };
 

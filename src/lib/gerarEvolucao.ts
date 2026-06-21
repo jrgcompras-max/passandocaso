@@ -258,6 +258,7 @@ export function montarTextoEvolucao(
     evo?.abdominal?.trim() ? `Abdome ${evo.abdominal.trim()}` : null,
     evo?.mmii?.trim() ? `MMII ${evo.mmii.trim()}` : null,
     evo?.extremidades?.trim() ? `Extremidades ${evo.extremidades.trim()}` : null,
+    evo?.pele?.trim() ? `Pele ${evo.pele.trim()}` : null,
   ].filter(Boolean);
   const o = oCorpo.length ? `*O: ${oCorpo.join("\n")}` : null;
 

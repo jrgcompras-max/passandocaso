@@ -57,6 +57,7 @@ export const EVOLUCAO_VAZIA: EvolucaoBeiraLeito = {
   abdominal: "",
   mmii: "",
   extremidades: "",
+  pele: "",
   condutaDoDia: "",
 };
 
