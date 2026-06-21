@@ -1509,8 +1509,8 @@ function SecaoExpansivel({
                 style={[styles.botaoEscanear, styles.botaoAdicionarSecao]}
                 onPress={onAdicionar}
               >
-                <Ionicons name="add" size={18} color="#fff" />
-                <Text style={[styles.botaoEscanearTexto, styles.botaoEscanearTextoAtivo]}>
+                <Ionicons name="add" size={18} color="#34C759" />
+                <Text style={[styles.botaoEscanearTexto, styles.botaoAdicionarTexto]}>
                   {rotuloAdicionar || "Adicionar"}
                 </Text>
               </TouchableOpacity>
@@ -3910,7 +3910,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   botaoEscanearAtivo: { backgroundColor: ClinicalColors.primary },
-  botaoAdicionarSecao: { backgroundColor: ClinicalColors.accent, paddingHorizontal: 14 },
+  botaoAdicionarSecao: { backgroundColor: "#E5F7EE", paddingHorizontal: 14 },
+  botaoAdicionarTexto: { color: "#34C759" },
   botaoEscanearTexto: { color: ClinicalColors.primary, fontSize: 14, fontWeight: "600" },
   botaoEscanearTextoAtivo: { color: "#fff" },
   botaoCaptura: { flex: 1, marginBottom: 0 },
