@@ -905,19 +905,34 @@ export default function Paciente() {
               onChange={(c) => atualizarPaciente(id, { checklistAlta: c })}
             />
           )}
-          <TouchableOpacity
-            style={styles.botaoPassarCaso}
-            activeOpacity={0.85}
-            onPress={() => {
-              if (paciente) salvarSnapshotDiario(paciente);
-              router.push({ pathname: "/evolucao/[id]", params: { id } });
-            }}
-          >
-            <View style={styles.passarCasoIcone}>
-              <Ionicons name="document-text-outline" size={15} color="#0E7A5A" />
-            </View>
-            <Text style={styles.botaoPassarCasoTexto}>Evolução Médica</Text>
-          </TouchableOpacity>
+          <View style={styles.botoesCasoRow}>
+            <TouchableOpacity
+              style={styles.botaoPassarCaso}
+              activeOpacity={0.85}
+              onPress={() => {
+                if (paciente) salvarSnapshotDiario(paciente);
+                router.push({ pathname: "/evolucao/[id]", params: { id } });
+              }}
+            >
+              <View style={styles.passarCasoIcone}>
+                <Ionicons name="document-text-outline" size={15} color="#0E7A5A" />
+              </View>
+              <Text style={styles.botaoPassarCasoTexto}>Evolução Médica</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.botaoPassarCaso}
+              activeOpacity={0.85}
+              onPress={() => {
+                if (paciente) salvarSnapshotDiario(paciente);
+                router.push({ pathname: "/passar-caso/[id]", params: { id } });
+              }}
+            >
+              <View style={styles.passarCasoIcone}>
+                <Ionicons name="albums-outline" size={15} color="#0E7A5A" />
+              </View>
+              <Text style={styles.botaoPassarCasoTexto}>Passar o Caso</Text>
+            </TouchableOpacity>
+          </View>
         </>
       )}
     </KeyboardAwareScrollView>
@@ -4104,18 +4119,19 @@ const styles = StyleSheet.create({
   },
   verEvolucaoTxt: { color: ClinicalColors.primary, fontSize: 15, fontWeight: "600" },
   verEvolucaoBadge: { flex: 1, textAlign: "right", color: ClinicalColors.textMuted, fontSize: 13 },
+  botoesCasoRow: { flexDirection: "row", gap: 10, marginTop: 4, marginBottom: 24 },
   botaoPassarCaso: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 10,
+    gap: 8,
     backgroundColor: "#ECFAF1",
     borderWidth: 1,
     borderColor: "#B6E8C9",
     borderRadius: Radius.pill,
     paddingVertical: 15,
-    marginTop: 4,
-    marginBottom: 24,
+    paddingHorizontal: 8,
   },
   passarCasoIcone: {
     width: 24,
