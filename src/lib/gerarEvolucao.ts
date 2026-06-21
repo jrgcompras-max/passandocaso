@@ -174,7 +174,12 @@ function laboratorioLinha(p: Paciente): string {
  * identificação (já está no título da tela) e sem assinatura. Linhas sem
  * conteúdo são omitidas (salvo os padrões "nega"/"---"/"--" do modelo).
  */
-export function montarTextoEvolucao(paciente: Paciente, hoje: string): string {
+export function montarTextoEvolucao(
+  paciente: Paciente,
+  hoje: string,
+  opcoes?: { escores?: boolean },
+): string {
+  const incluirEscores = opcoes?.escores !== false;
   const evo = paciente.evolucoes?.[hoje];
   const sv = paciente.sinaisVitais?.[hoje];
 
@@ -281,7 +286,7 @@ export function montarTextoEvolucao(paciente: Paciente, hoje: string): string {
 
   // — Escores clínicos (ao final) — apenas os calculáveis, formato compacto.
   //   O número e a classificação são da própria escala (sem interpretação extra).
-  const escores = escoresCalculaveis(paciente, hoje);
+  const escores = incluirEscores ? escoresCalculaveis(paciente, hoje) : [];
   const escoresTxt = escores.length
     ? `*Escores:\n${escores
         .map(

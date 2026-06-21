@@ -28,6 +28,8 @@ export type Usuario = {
   nome_exibicao?: string | null;
   especialidade_definida?: boolean;
   onboarding_completo?: boolean;
+  /** Funcionalidades clínicas opcionais (toggles). Ex.: { escores: false }. */
+  features_ativas?: Record<string, boolean> | null;
 };
 
 const USUARIO_KEY = "@passandocaso/usuario";

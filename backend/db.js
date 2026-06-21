@@ -80,6 +80,7 @@ async function initDB() {
     "nome_exibicao TEXT",
     "onboarding_completo BOOLEAN DEFAULT FALSE",
     "especialidade_definida BOOLEAN DEFAULT FALSE",
+    "features_ativas JSONB DEFAULT '{}'::jsonb",
   ];
   for (const col of colsUsuarios) {
     await pool.query(`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS ${col};`);

@@ -5,6 +5,7 @@ import {
   Alert,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -51,6 +52,24 @@ export default function PerfilScreen() {
 
   const categoria = usuario?.categoria || "medico";
   const cor = CATEGORIA_COR[categoria] || CATEGORIA_COR.outro;
+
+  // Funcionalidades clínicas (toggles). Default ATIVADO (escores !== false).
+  const escoresAtivado = usuario?.features_ativas?.escores !== false;
+  const [salvandoFeature, setSalvandoFeature] = useState(false);
+  const alternarEscores = async (valor: boolean) => {
+    if (salvandoFeature) return;
+    setSalvandoFeature(true);
+    const base = usuario?.features_ativas || {};
+    atualizarUsuario({ features_ativas: { ...base, escores: valor } });
+    try {
+      await rede.atualizarFeatures({ escores: valor });
+    } catch {
+      atualizarUsuario({ features_ativas: { ...base, escores: !valor } });
+      Alert.alert("Não foi possível salvar", "Verifique a conexão e tente novamente.");
+    } finally {
+      setSalvandoFeature(false);
+    }
+  };
 
   useEffect(() => {
     Promise.all([
@@ -200,6 +219,25 @@ export default function PerfilScreen() {
             )}
           </View>
         </View>
+        {/* FUNCIONALIDADES CLÍNICAS */}
+        <Text style={styles.secaoLabel}>Funcionalidades clínicas</Text>
+        <View style={styles.cardCampos}>
+          <View style={styles.featureRow}>
+            <View style={styles.featureInfo}>
+              <Text style={styles.featureTitulo}>Escores clínicos</Text>
+              <Text style={styles.featureSub}>
+                Exibe CURB-65, SOFA, Child-Pugh e CHA₂DS₂-VASc na ficha do paciente.
+              </Text>
+            </View>
+            <Switch
+              value={escoresAtivado}
+              onValueChange={alternarEscores}
+              disabled={salvandoFeature}
+              trackColor={{ true: C.accent, false: "#E5E5EA" }}
+            />
+          </View>
+        </View>
+
         <TouchableOpacity style={styles.sairBtn} onPress={() => void sair()}>
           <Text style={styles.sairTxt}>Sair da conta</Text>
         </TouchableOpacity>
@@ -262,6 +300,15 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5, marginTop: 20, marginBottom: 8, marginLeft: 4,
   },
   cardCampos: { backgroundColor: C.surface, borderRadius: Radius.card, paddingHorizontal: 14 },
+  featureRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 12,
+  },
+  featureInfo: { flex: 1, paddingRight: 12 },
+  featureTitulo: { fontSize: 15, fontWeight: "600", color: C.text },
+  featureSub: { fontSize: 12.5, color: C.textMuted, marginTop: 3, lineHeight: 17 },
   sep: { height: 0.5, backgroundColor: C.border },
   campoLeitura: { paddingVertical: 12 },
   campoToque: { paddingVertical: 12, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },

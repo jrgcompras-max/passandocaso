@@ -62,6 +62,13 @@ export function atualizarPerfil(dados: Record<string, unknown>) {
     body: JSON.stringify(dados),
   });
 }
+/** Atualiza as funcionalidades clínicas (toggles); retorna o usuário completo. */
+export function atualizarFeatures(features: Record<string, boolean>) {
+  return req<{ usuario: Record<string, unknown> }>("/api/perfil/features", {
+    method: "PUT",
+    body: JSON.stringify({ features_ativas: features }),
+  });
+}
 export function definirEspecialidade(especialidade: string, hospitalCnes?: string) {
   return put("/api/perfil/especialidade", {
     especialidade,

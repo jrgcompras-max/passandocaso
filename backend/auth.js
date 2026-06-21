@@ -89,6 +89,8 @@ function usuarioPublico(u) {
     nome_exibicao: u.nome_exibicao || u.nome,
     especialidade_definida: !!u.especialidade_definida,
     onboarding_completo: !!u.onboarding_completo,
+    // Funcionalidades clínicas opcionais (toggles sincronizados entre dispositivos).
+    features_ativas: u.features_ativas || {},
   };
 }
 

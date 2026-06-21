@@ -15,6 +15,7 @@ import { diaDeInternacao, hojeISO } from "@/lib/datas";
 import { formatarNome } from "@/lib/formatarNome";
 import { montarTextoEvolucao } from "@/lib/gerarEvolucao";
 import { salvarEvolucao } from "@/lib/salvarEvolucao";
+import { useAuth } from "@/store/AuthContext";
 import { usePacientes } from "@/store/PacientesContext";
 import { type Paciente } from "@/types/paciente";
 
@@ -36,6 +37,7 @@ function identificacaoLinha(p: Paciente): string {
 export default function Evolucao() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { carregado, getPaciente } = usePacientes();
+  const { usuario } = useAuth();
   const paciente = getPaciente(id);
 
   const [texto, setTexto] = useState("");
@@ -59,7 +61,9 @@ export default function Evolucao() {
     if (!paciente) return;
     setGerando(true);
     // Texto determinístico no formato exato — sem passar pela IA (que reformata).
-    const base = montarTextoEvolucao(paciente, hojeISO());
+    const base = montarTextoEvolucao(paciente, hojeISO(), {
+      escores: usuario?.features_ativas?.escores !== false,
+    });
     setTexto(base);
     setGerando(false);
     persistir(base);

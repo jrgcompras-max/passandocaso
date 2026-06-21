@@ -93,6 +93,32 @@ router.put("/perfil/atualizar", async (req, res) => {
   }
 });
 
+/**
+ * Atualiza as funcionalidades clínicas opcionais (toggles) do usuário.
+ * Body: { features_ativas: { escores?: boolean, ... } } — merge no que já existe.
+ * Devolve o usuário público completo (inclui features_ativas) para o app sincronizar.
+ */
+router.put("/perfil/features", async (req, res) => {
+  const novas = (req.body || {}).features_ativas;
+  if (!novas || typeof novas !== "object" || Array.isArray(novas)) {
+    return res.status(400).json({ erro: "features_ativas (objeto) obrigatório." });
+  }
+  try {
+    const atual = await db.query("SELECT features_ativas FROM usuarios WHERE id = $1", [
+      req.usuario.id,
+    ]);
+    const merge = { ...(atual.rows[0]?.features_ativas || {}), ...novas };
+    const r = await db.query(
+      "UPDATE usuarios SET features_ativas = $1 WHERE id = $2 RETURNING *",
+      [JSON.stringify(merge), req.usuario.id],
+    );
+    res.json({ usuario: auth.usuarioPublico(r.rows[0]) });
+  } catch (e) {
+    console.error("Erro perfil/features:", e);
+    res.status(500).json({ erro: e.message });
+  }
+});
+
 router.put("/perfil/especialidade", async (req, res) => {
   const especialidade = String((req.body || {}).especialidade || "").trim();
   if (!especialidade) return res.status(400).json({ erro: "especialidade obrigatória." });

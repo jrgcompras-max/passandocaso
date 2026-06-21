@@ -76,6 +76,7 @@ import {
 } from "@/lib/alertasTendencia";
 import { listarEvolucaoDiaria, salvarSnapshotDiario } from "@/lib/salvarEvolucaoDiaria";
 import { fraseSinaisVitais, O2_OPCOES, SV_VAZIO } from "@/lib/sinaisVitais";
+import { useAuth } from "@/store/AuthContext";
 import { usePacientes } from "@/store/PacientesContext";
 import {
   type Anotacao,
@@ -238,6 +239,9 @@ export default function Paciente() {
     atualizarPendencias,
     atualizarEvolucao,
   } = usePacientes();
+  const { usuario } = useAuth();
+  // Escores clínicos podem ser desativados em Perfil → Funcionalidades (default ON).
+  const escoresAtivado = usuario?.features_ativas?.escores !== false;
   const paciente = getPaciente(id);
   const diaInternacao = paciente ? diaDeInternacao(paciente.dataEntrada) : null;
 
@@ -645,11 +649,13 @@ export default function Paciente() {
                 problemas={paciente.problemas ?? []}
                 onChange={(lista) => atualizarProblemas(id, lista)}
               />
-              <EscoresClinicosSecao
-                paciente={paciente}
-                pacienteId={id}
-                hoje={hojeISO()}
-              />
+              {escoresAtivado && (
+                <EscoresClinicosSecao
+                  paciente={paciente}
+                  pacienteId={id}
+                  hoje={hojeISO()}
+                />
+              )}
               <PendenciasSecao
                 pendencias={paciente.pendencias ?? []}
                 onChange={(lista) => atualizarPendencias(id, lista)}
