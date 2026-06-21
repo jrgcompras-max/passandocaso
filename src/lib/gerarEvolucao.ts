@@ -10,7 +10,6 @@ import {
 } from "@/types/paciente";
 
 import { limparDataEmTexto } from "./datas";
-import { escoresCalculaveis } from "./escoresClinicos";
 import { agruparPorExame } from "./lab";
 
 type Bloco = { titulo: string; itens: string[] };
@@ -174,12 +173,18 @@ function laboratorioLinha(p: Paciente): string {
  * identificação (já está no título da tela) e sem assinatura. Linhas sem
  * conteúdo são omitidas (salvo os padrões "nega"/"---"/"--" do modelo).
  */
-export function montarTextoEvolucao(
-  paciente: Paciente,
-  hoje: string,
-  opcoes?: { escores?: boolean },
-): string {
-  const incluirEscores = opcoes?.escores !== false;
+/** Indenta linhas de continuação para alinhar sob um prefixo (ex.: "- Atual: "). */
+function alinhar(itens: string[], prefixo: string): string {
+  const pad = " ".repeat(prefixo.length);
+  return prefixo + itens.map((t, i) => (i === 0 ? t : pad + t)).join("\n");
+}
+
+/**
+ * Texto "Evolução Médica" (vai para o Tasy). Formato canônico em
+ * backend/templates/evolucao-medica.template.js — manter em sincronia.
+ * Texto puro (sem emoji/markdown). Escores NÃO entram aqui (só no Passar o Caso).
+ */
+export function montarTextoEvolucao(paciente: Paciente, hoje: string): string {
   const evo = paciente.evolucoes?.[hoje];
   const sv = paciente.sinaisVitais?.[hoje];
 
@@ -192,18 +197,25 @@ export function montarTextoEvolucao(
   const fallbackHipotese =
     paciente.motivoInternacao?.trim() || paciente.diagnosticoPrincipal?.trim() || "";
 
-  // — Antibióticos / Culturais / Medicamentos em uso (com padrões -- / ---) —
-  const { atb, emUso } = prescricao(paciente);
+  // — Atual: diagnóstico principal + outros problemas ativos (um por linha). —
+  const diagPrincipal = paciente.diagnosticoPrincipal?.trim() || "";
+  const norm = (x: string) => x.toLowerCase().trim();
+  const atualItens = diagPrincipal
+    ? [diagPrincipal, ...ativos.filter((t) => norm(t) !== norm(diagPrincipal))]
+    : ativos.length
+      ? ativos
+      : ([paciente.motivoInternacao?.trim()].filter(Boolean) as string[]);
+  const blocoAtual = atualItens.length ? alinhar(atualItens, "- Atual: ") : null;
+
+  // — Antibióticos / Culturais (ATB só se cadastrado; senão --). —
+  const { atb } = prescricao(paciente);
   const culturas = culturasPendentes(paciente);
   const blocoTrat = [
     `- Antibióticos: ${atb.length ? atb.join(", ") : "--"}`,
     `- Culturais: ${culturas.length ? culturas.join(", ") : "---"}`,
-    emUso.length ? `- Medicamentos em uso: ${emUso.join(", ")}` : null,
-  ]
-    .filter(Boolean)
-    .join("\n");
+  ].join("\n");
 
-  // — Comorbidades / MUC / Alergias —
+  // — Comorbidades / MUC / Alergias (blocos separados). —
   const { comorb, muc } = comorbidadesMUC(paciente);
   const blocoComorb = [
     `* Comorbidades: ${comorb.length ? comorb.join(", ") : "nega"}`,
@@ -222,11 +234,13 @@ export function montarTextoEvolucao(
   ]
     .filter(Boolean)
     .join(", ");
-  const sQueixa = evo?.estadoGeral?.trim() || "";
-  const sConteudo = [sConsc, sQueixa]
-    .filter(Boolean)
-    .join(sConsc && sQueixa ? ". " : "");
-  const s = sConteudo ? `*S: ${sConteudo}` : null;
+  const svSec = paciente.secoes?.sinaisVitaisIntercorrencias;
+  const intercorr = [
+    sv?.intercorrencias?.trim() || "",
+    ...((svSec?.anotacoes as Anotacao[]) || []).map((x) => (x.texto || "").trim()),
+  ].filter(Boolean);
+  const sPartes = [sConsc, evo?.estadoGeral?.trim() || "", ...intercorr].filter(Boolean);
+  const s = sPartes.length ? `*S: ${sPartes.join(". ")}` : null;
 
   // — Sinais vitais (omite campos vazios; some se não houver nenhum) —
   const ssvvPartes = [
@@ -238,16 +252,6 @@ export function montarTextoEvolucao(
     sv?.glasgow ? `Glasgow ${sv.glasgow}` : null,
   ].filter(Boolean);
   const ssvv = ssvvPartes.length ? `SSVV: ${ssvvPartes.join(" | ")}` : null;
-
-  // — Intercorrências (campo do SSVV + anotações da seção) —
-  const svSec = paciente.secoes?.sinaisVitaisIntercorrencias;
-  const intercorrLista = [
-    sv?.intercorrencias?.trim() || "",
-    ...((svSec?.anotacoes as Anotacao[]) || []).map((x) => (x.texto || "").trim()),
-  ].filter(Boolean);
-  const intercorrencias = intercorrLista.length
-    ? `*Intercorrências: ${intercorrLista.join("; ")}`
-    : null;
 
   // — Objetivo: estado geral (REG/BEG/MEG) + aparelhos (sem consciência/orientação) —
   const oCorpo = [
@@ -280,40 +284,30 @@ export function montarTextoEvolucao(
   // Cada exame é um bloco; linha em branco entre eles (não vira parágrafo).
   const imagem = img.length ? `Exames de imagem:\n${img.join("\n\n")}` : null;
 
-  // — Avaliação (hipótese diagnóstica): problemas ativos; senão motivo/diagnóstico. —
-  const avaliacao = ativos.length ? ativos.join("\n") : fallbackHipotese;
-  const a = avaliacao ? `*A: ${avaliacao}` : null;
-  const plano = evo?.condutaDoDia?.trim() ? `*P: ${evo.condutaDoDia.trim()}` : null;
+  // — Avaliação (*A:) hipóteses diagnósticas; Plano (*P:) condutas, uma por linha. —
+  const avaliacaoItens = ativos.length ? ativos : fallbackHipotese ? [fallbackHipotese] : [];
+  const a = avaliacaoItens.length ? alinhar(avaliacaoItens, "*A: ") : null;
+  const planoItens = (evo?.condutaDoDia || "")
+    .split(/\n+/)
+    .map((t) => t.trim())
+    .filter(Boolean);
+  const plano = planoItens.length ? alinhar(planoItens, "*P: ") : null;
 
-  // — Escores clínicos (ao final) — apenas os calculáveis, formato compacto.
-  //   O número e a classificação são da própria escala (sem interpretação extra).
-  const escores = incluirEscores ? escoresCalculaveis(paciente, hoje) : [];
-  const escoresTxt = escores.length
-    ? `*Escores:\n${escores
-        .map(
-          (e) =>
-            `${e.sigla}: ${e.pontos}/${e.maxPontos} (${e.classificacao.split(" · ")[0].toLowerCase()})`,
-        )
-        .join("\n")}`
-    : null;
-
-  // Ordem: HDA → Antecedentes/Comorbidades/MUC → Labs → Imagem → SSVV →
-  // Exame físico (*O) → Avaliação (*A) → Conduta (*P) → Antibióticos/em uso →
-  // Escores. (*S subjetivo logo após a HDA.)
+  // Ordem canônica (template evolucao-medica): Atual → Antibióticos/Culturais →
+  // Comorbidades/MUC/Alergias → HDA → S → SSVV → O → Labs → Imagem → A → P.
   return [
     "                    Evolução Médica",
+    blocoAtual,
+    blocoTrat,
+    blocoComorb,
     hda,
     s,
-    blocoComorb,
+    ssvv,
+    o,
     exames,
     imagem,
-    ssvv,
-    intercorrencias,
-    o,
     a,
     plano,
-    blocoTrat,
-    escoresTxt,
   ]
     .filter(Boolean)
     .join("\n\n");

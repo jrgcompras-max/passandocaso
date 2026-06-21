@@ -33,7 +33,7 @@ const PROMPTS = {
     'Formato: {"medicacoesUsoContinuo":[{"nome":"Metformina","dose":"500mg ou null","frequencia":"2x/dia ou null"}],"alergias":["Dipirona"]}. ' +
     REGRA,
   historia:
-    "Extraia APENAS a história da doença atual (HDA/HMA), como TEXTO DISSERTATIVO. " +
+    "Extraia APENAS a história da doença atual (HDA), como TEXTO DISSERTATIVO. " +
     "NÃO inclua: listas de comorbidades, medicações, resultados de exames (labs/imagem), " +
     "condutas/prescrição, sinais vitais nem dados de identificação. " +
     "O campo 'hda' deve ser UM PARÁGRAFO CORRIDO (texto dissertado), NUNCA uma lista " +

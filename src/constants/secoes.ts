@@ -53,7 +53,7 @@ const DEFS: SecaoDef[] = [
     id: "historia",
     titulo: "História da Doença Atual",
     prosa: true,
-    escopo: "a história da doença atual (HDA/HMA): o relato do quadro que motivou a internação",
+    escopo: "a história da doença atual (HDA): o relato do quadro que motivou a internação",
     especifico:
       "Devolva a HDA como UM TEXTO DISSERTATIVO em parágrafo corrido (não em tópicos/itens isolados). " +
       "Aplique apenas correção de gramática, concordância e pontuação; preserve o conteúdo. " +

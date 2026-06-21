@@ -15,7 +15,6 @@ import { diaDeInternacao, hojeISO } from "@/lib/datas";
 import { formatarNome } from "@/lib/formatarNome";
 import { montarTextoEvolucao } from "@/lib/gerarEvolucao";
 import { salvarEvolucao } from "@/lib/salvarEvolucao";
-import { useAuth } from "@/store/AuthContext";
 import { usePacientes } from "@/store/PacientesContext";
 import { type Paciente } from "@/types/paciente";
 
@@ -37,7 +36,6 @@ function identificacaoLinha(p: Paciente): string {
 export default function Evolucao() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { carregado, getPaciente } = usePacientes();
-  const { usuario } = useAuth();
   const paciente = getPaciente(id);
 
   const [texto, setTexto] = useState("");
@@ -61,9 +59,7 @@ export default function Evolucao() {
     if (!paciente) return;
     setGerando(true);
     // Texto determinístico no formato exato — sem passar pela IA (que reformata).
-    const base = montarTextoEvolucao(paciente, hojeISO(), {
-      escores: usuario?.features_ativas?.escores !== false,
-    });
+    const base = montarTextoEvolucao(paciente, hojeISO());
     setTexto(base);
     setGerando(false);
     persistir(base);
@@ -86,7 +82,7 @@ export default function Evolucao() {
   return (
     <View style={styles.container}>
 
-      <Text style={styles.titulo}>Passar o Caso</Text>
+      <Text style={styles.titulo}>Evolução Médica</Text>
       <Text style={styles.subtitulo}>
         {paciente
           ? identificacaoLinha(paciente)
@@ -156,7 +152,7 @@ export default function Evolucao() {
 const MARCADORES = [
   "- Atual:", "- Antibióticos:", "- Culturais:",
   "* Comorbidades:", "* MUC:", "* Alergias:",
-  "*HMA:", "*S:", "SSVV:", "*O:", "*A:", "*P:",
+  "*HDA:", "*S:", "SSVV:", "*O:", "*A:", "*P:",
   "Exames laboratoriais:", "Exames de imagem:",
 ];
 

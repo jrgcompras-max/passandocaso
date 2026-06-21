@@ -552,7 +552,7 @@
         ].join("\n");
 
         const hda = secaoLinhas(p, "historia");
-        const hma = hda.length ? `*HMA: ${hda.join(" ")}` : null;
+        const hda = hda.length ? `*HDA: ${hda.join(" ")}` : null;
         const sConsc = [
           e && e.nivelConsciencia ? rotulo("consciencia", e.nivelConsciencia).toLowerCase() : null,
           e && e.orientacao ? rotulo("orientacao", e.orientacao).toLowerCase() : null,
@@ -589,7 +589,7 @@
         const a = ativos.length ? `*A: ${ativos.join("\n")}` : null;
         const plano = e && (e.condutaDoDia || "").trim() ? `*P: ${e.condutaDoDia.trim()}` : null;
 
-        return ["                    Evolução Médica", blocoAtual, blocoTrat, blocoComorb, hma, s, ssvv, o, exames, imagem, a, plano].filter(Boolean).join("\n\n");
+        return ["                    Evolução Médica", blocoAtual, blocoTrat, blocoComorb, hda, s, ssvv, o, exames, imagem, a, plano].filter(Boolean).join("\n\n");
       }
 
       // ======== API ========
@@ -1198,7 +1198,7 @@
       const PC_MARCADORES = [
         "- Atual:", "- Antibióticos:", "- Culturais:",
         "* Comorbidades:", "* MUC:", "* Alergias:",
-        "*HMA:", "*S:", "SSVV:", "*O:", "*A:", "*P:",
+        "*HDA:", "*S:", "SSVV:", "*O:", "*A:", "*P:",
         "Exames laboratoriais:", "Exames de imagem:",
       ];
       // Converte o texto em HTML com os marcadores em <strong> (via regex por linha).
@@ -1244,7 +1244,7 @@
         "corrija ortografia, acentuação, pontuação, espaçamento e capitalização. " +
         "REGRAS ABSOLUTAS: " +
         "1) Preserve EXATAMENTE a estrutura: as mesmas linhas, na mesma ordem, com as MESMAS quebras de linha. " +
-        "2) NUNCA altere, traduza, mova ou remova os marcadores/títulos: 'Evolução Médica', '- Atual:', '- Antibióticos:', '- Culturais:', '* Comorbidades:', '* MUC:', '* Alergias:', '*HMA:', '*S:', 'SSVV:', '*O:', 'Exames laboratoriais:', 'Exames de imagem:', '*A:', '*P:'. " +
+        "2) NUNCA altere, traduza, mova ou remova os marcadores/títulos: 'Evolução Médica', '- Atual:', '- Antibióticos:', '- Culturais:', '* Comorbidades:', '* MUC:', '* Alergias:', '*HDA:', '*S:', 'SSVV:', '*O:', 'Exames laboratoriais:', 'Exames de imagem:', '*A:', '*P:'. " +
         "3) NÃO junte linhas nem crie linhas novas; cada item permanece na sua própria linha. " +
         "4) NÃO adicione, infira, interprete, diagnostique nem sugira conduta; não invente valores; não expanda nem traduza siglas clínicas (ex.: REG, BEG, MEG, PIRF, RR 2T BNF, MV+, RHA+, TEC). " +
         "Responda SOMENTE com o texto final, sem comentários nem marcações de código.";

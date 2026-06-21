@@ -914,9 +914,9 @@ export default function Paciente() {
             }}
           >
             <View style={styles.passarCasoIcone}>
-              <Ionicons name="arrow-redo" size={15} color="#0E7A5A" />
+              <Ionicons name="document-text-outline" size={15} color="#0E7A5A" />
             </View>
-            <Text style={styles.botaoPassarCasoTexto}>Passar o Caso</Text>
+            <Text style={styles.botaoPassarCasoTexto}>Evolução Médica</Text>
           </TouchableOpacity>
         </>
       )}
