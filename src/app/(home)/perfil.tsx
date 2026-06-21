@@ -14,8 +14,25 @@ import {
 
 import { ModalEspecialidade } from "@/components/ModalEspecialidade";
 import { ClinicalColors as C, Radius } from "@/constants/clinicalTheme";
+import {
+  type ChipPessoal,
+  fixarChip,
+  listarPessoais,
+  removerChip,
+} from "@/lib/chips";
 import * as rede from "@/lib/rede";
 import { useAuth } from "@/store/AuthContext";
+
+/** Rótulos das seções do exame físico (chips aprendidos). */
+const SECAO_CHIP_LABEL: Record<string, string> = {
+  estado_geral: "Estado geral",
+  neurologico: "Neurológico",
+  cardiovascular: "Cardiovascular",
+  respiratorio: "Respiratório",
+  abdominal: "Abdominal",
+  membros: "Membros e extremidades",
+  pele: "Pele e mucosas",
+};
 
 const CATEGORIA_LABEL: Record<string, string> = {
   medico: "Médico",
@@ -56,6 +73,30 @@ export default function PerfilScreen() {
   // Funcionalidades clínicas (toggles). Default ATIVADO (escores !== false).
   const escoresAtivado = usuario?.features_ativas?.escores !== false;
   const [salvandoFeature, setSalvandoFeature] = useState(false);
+
+  // Chips do exame físico aprendidos (Feature 2): fixar / remover.
+  const [chipsPessoais, setChipsPessoais] = useState<Record<string, ChipPessoal[]>>({});
+  const recarregarChips = () => listarPessoais().then(setChipsPessoais);
+  useEffect(() => {
+    void recarregarChips();
+  }, []);
+  const removerChipPessoal = async (secao: string, texto: string) => {
+    setChipsPessoais((m) => ({
+      ...m,
+      [secao]: (m[secao] || []).filter((c) => c.texto !== texto),
+    }));
+    await removerChip(secao, texto);
+  };
+  const fixarChipPessoal = async (secao: string, texto: string, fixado: boolean) => {
+    setChipsPessoais((m) => ({
+      ...m,
+      [secao]: (m[secao] || []).map((c) => (c.texto === texto ? { ...c, fixado } : c)),
+    }));
+    await fixarChip(secao, texto, fixado);
+  };
+  const secoesComChips = Object.keys(chipsPessoais).filter(
+    (s) => (chipsPessoais[s] || []).length > 0,
+  );
   const alternarEscores = async (valor: boolean) => {
     if (salvandoFeature) return;
     setSalvandoFeature(true);
@@ -238,6 +279,46 @@ export default function PerfilScreen() {
           </View>
         </View>
 
+        {/* CHIPS DO EXAME FÍSICO (aprendidos) */}
+        {secoesComChips.length > 0 && (
+          <>
+            <Text style={styles.secaoLabel}>Chips do exame físico</Text>
+            <View style={styles.cardCampos}>
+              {secoesComChips.map((secao, idx) => (
+                <View key={secao}>
+                  {idx > 0 && <View style={styles.sep} />}
+                  <View style={styles.chipSecaoBox}>
+                    <Text style={styles.chipSecaoTitulo}>
+                      {SECAO_CHIP_LABEL[secao] || secao}
+                    </Text>
+                    {(chipsPessoais[secao] || []).map((c) => (
+                      <View key={c.texto} style={styles.chipLinha}>
+                        <TouchableOpacity
+                          onPress={() => fixarChipPessoal(secao, c.texto, !c.fixado)}
+                          hitSlop={6}
+                        >
+                          <Ionicons
+                            name={c.fixado ? "star" : "star-outline"}
+                            size={18}
+                            color={c.fixado ? "#FF9500" : C.textMuted}
+                          />
+                        </TouchableOpacity>
+                        <Text style={styles.chipLinhaTxt}>{c.texto}</Text>
+                        <TouchableOpacity
+                          onPress={() => void removerChipPessoal(secao, c.texto)}
+                          hitSlop={6}
+                        >
+                          <Ionicons name="trash-outline" size={17} color="#FF3B30" />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              ))}
+            </View>
+          </>
+        )}
+
         <TouchableOpacity style={styles.sairBtn} onPress={() => void sair()}>
           <Text style={styles.sairTxt}>Sair da conta</Text>
         </TouchableOpacity>
@@ -309,6 +390,10 @@ const styles = StyleSheet.create({
   featureInfo: { flex: 1, paddingRight: 12 },
   featureTitulo: { fontSize: 15, fontWeight: "600", color: C.text },
   featureSub: { fontSize: 12.5, color: C.textMuted, marginTop: 3, lineHeight: 17 },
+  chipSecaoBox: { paddingVertical: 12 },
+  chipSecaoTitulo: { fontSize: 13, fontWeight: "700", color: C.textMuted, marginBottom: 6 },
+  chipLinha: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 6 },
+  chipLinhaTxt: { flex: 1, fontSize: 14, color: C.text },
   sep: { height: 0.5, backgroundColor: C.border },
   campoLeitura: { paddingVertical: 12 },
   campoToque: { paddingVertical: 12, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },

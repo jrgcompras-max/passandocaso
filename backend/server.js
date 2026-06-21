@@ -10,6 +10,7 @@ const redeRouter = require("./rede");
 const farmacoRouter = require("./farmaco");
 const escores = require("./escores");
 const interacoesFda = require("./interacoesFda");
+const chipsRouter = require("./chips");
 const { analisarTendencias } = require("./alertasTendencia");
 const ontologia = require("./ontologia");
 const icd11 = require("./icd11");
@@ -1117,6 +1118,9 @@ app.use("/api", farmacoRouter);
 
 // Fase 3 — escores clínicos automáticos (cálculo + persistência + histórico).
 app.use("/api", escores.router);
+
+// Feature 2 — aprendizado de chips do exame físico (pessoal + global).
+app.use("/api", chipsRouter);
 
 // Tratador de erros final: corpo acima do limite (express.json) vira 413 claro
 // em vez de erro genérico.

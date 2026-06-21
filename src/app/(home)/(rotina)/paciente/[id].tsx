@@ -60,6 +60,7 @@ import {
   textoPosologia,
   type TFG,
 } from "@/lib/farmaco";
+import { listarPessoais, logTermos as logChipTermos } from "@/lib/chips";
 import {
   buscarReferencia,
   type ReferenciaLab,
@@ -2039,23 +2040,37 @@ const CHIPS_EXAME: { secao: string; campo: CampoExame; label: string; chips: str
  */
 function ExameComChips({
   label,
+  secao,
   valor,
   chips,
+  pessoais,
   onChange,
   onBlur,
-  onLivre,
+  onLog,
 }: {
   label: string;
+  secao: string;
   valor: string;
   chips: string[];
+  /** Chips pessoais aprendidos (sempre visíveis, junto aos padrões). */
+  pessoais: string[];
   onChange: (t: string) => void;
   onBlur: () => void;
-  onLivre?: (texto: string) => void;
+  onLog: (secao: string, termos: string[]) => void;
 }) {
   const [verMais, setVerMais] = useState(false);
+  const jaLogados = useRef<Set<string>>(new Set());
   const tokens = valor.split(/\s*[,;]\s*/).map((t) => t.trim()).filter(Boolean);
   const selecionados = new Set(tokens.map(normMerge));
-  const visiveis = verMais ? chips : chips.slice(0, 4);
+  // Padrões (top 4 ou todos) + pessoais (deduplicados contra os padrões).
+  const normPadroes = new Set(chips.map(normMerge));
+  const padroesVisiveis = verMais ? chips : chips.slice(0, 4);
+  const visiveis = [
+    ...padroesVisiveis,
+    ...pessoais.filter((p) => !normPadroes.has(normMerge(p))),
+  ];
+  const todosChipsNorm = new Set([...normPadroes, ...pessoais.map(normMerge)]);
+
   const toggle = (chip: string) => {
     if (selecionados.has(normMerge(chip))) {
       onChange(tokens.filter((t) => normMerge(t) !== normMerge(chip)).join(", "));
@@ -2063,17 +2078,37 @@ function ExameComChips({
       onChange(valor.trim() ? `${valor.trim()}, ${chip}` : chip);
     }
   };
+
+  // Ao sair do campo: termos que não são chips conhecidos = achados livres →
+  // registra (aprendizado). Evita re-logar o mesmo termo nesta sessão.
+  const aoSair = () => {
+    onBlur();
+    const livres = tokens.filter((t) => {
+      const n = normMerge(t);
+      return n.length >= 3 && !todosChipsNorm.has(n) && !jaLogados.current.has(n);
+    });
+    if (livres.length) {
+      livres.forEach((t) => jaLogados.current.add(normMerge(t)));
+      onLog(secao, livres);
+    }
+  };
+
   return (
     <View style={styles.exameBox}>
       <Text style={styles.evoLabel}>{label}</Text>
       <View style={styles.chipsWrap}>
         {visiveis.map((chip) => {
           const ativo = selecionados.has(normMerge(chip));
+          const pessoal = !normPadroes.has(normMerge(chip));
           return (
             <TouchableOpacity
               key={chip}
               onPress={() => toggle(chip)}
-              style={[styles.exameChip, ativo && styles.exameChipAtivo]}
+              style={[
+                styles.exameChip,
+                pessoal && styles.exameChipPessoal,
+                ativo && styles.exameChipAtivo,
+              ]}
             >
               <Text style={[styles.exameChipTxt, ativo && styles.exameChipTxtAtivo]}>{chip}</Text>
             </TouchableOpacity>
@@ -2089,10 +2124,7 @@ function ExameComChips({
         style={[styles.campoInput, styles.exameLivre]}
         value={valor}
         onChangeText={onChange}
-        onBlur={() => {
-          onBlur();
-          if (onLivre) onLivre(valor);
-        }}
+        onBlur={aoSair}
         placeholder="Achados adicionais…"
         placeholderTextColor={ClinicalColors.textMuted}
         multiline
@@ -2114,9 +2146,30 @@ function EvolucaoBeiraLeitoSecao({
 }) {
   const [aberto, setAberto] = useState(false);
   const [evo, setEvo] = useState(evolucao);
+  // Chips pessoais aprendidos (Feature 2), por seção.
+  const [chipsPessoais, setChipsPessoais] = useState<Record<string, string[]>>({});
 
   // Resync se a evolução do dia mudar (ex.: virada de data).
   useEffect(() => setEvo(evolucao), [evolucao]);
+
+  // Carrega os chips pessoais ao abrir a seção pela primeira vez.
+  useEffect(() => {
+    if (!aberto) return;
+    let vivo = true;
+    listarPessoais().then((m) => {
+      if (!vivo) return;
+      const so: Record<string, string[]> = {};
+      for (const [secao, lista] of Object.entries(m)) so[secao] = lista.map((c) => c.texto);
+      setChipsPessoais(so);
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [aberto]);
+
+  const registrarTermos = (secao: string, termos: string[]) => {
+    logChipTermos(secao, termos);
+  };
 
   const aplicar = (patch: Partial<EvolucaoBeiraLeito>, persistir = true) => {
     const novo = { ...evo, ...patch };
@@ -2236,10 +2289,13 @@ function EvolucaoBeiraLeitoSecao({
             <ExameComChips
               key={cfg.campo}
               label={cfg.label}
+              secao={cfg.secao}
               chips={cfg.chips}
+              pessoais={chipsPessoais[cfg.secao] ?? []}
               valor={(evo[cfg.campo] as string) ?? ""}
               onChange={(t) => aplicar({ [cfg.campo]: t } as Partial<EvolucaoBeiraLeito>, false)}
               onBlur={() => onSalvar(evo)}
+              onLog={registrarTermos}
             />
           ))}
         </View>
@@ -4321,6 +4377,7 @@ const styles = StyleSheet.create({
     borderColor: ClinicalColors.border,
   },
   exameChipAtivo: { backgroundColor: ClinicalColors.primary, borderColor: ClinicalColors.primary },
+  exameChipPessoal: { borderColor: ClinicalColors.accent, borderStyle: "dashed" },
   exameChipTxt: { color: ClinicalColors.text, fontSize: 13 },
   exameChipTxtAtivo: { color: "#FFFFFF", fontWeight: "600" },
   verMaisChip: { paddingVertical: 7, paddingHorizontal: 10 },

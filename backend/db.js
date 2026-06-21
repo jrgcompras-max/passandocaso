@@ -290,6 +290,45 @@ async function initDB() {
     "CREATE INDEX IF NOT EXISTS idx_escores_paciente ON escores_clinicos(paciente_id, tipo, calculado_em DESC);",
   );
 
+  // === Feature 2 — Aprendizado de chips do exame físico ===
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS chips_evolucao_pessoal (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      usuario_id TEXT NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+      secao TEXT NOT NULL,
+      texto TEXT NOT NULL,
+      texto_norm TEXT NOT NULL,
+      uso_count INTEGER NOT NULL DEFAULT 1,
+      fixado BOOLEAN NOT NULL DEFAULT FALSE,
+      removido BOOLEAN NOT NULL DEFAULT FALSE,
+      criado_em TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(usuario_id, secao, texto_norm)
+    );
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS chips_evolucao_global (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      secao TEXT NOT NULL,
+      texto TEXT NOT NULL,
+      texto_norm TEXT NOT NULL,
+      ativo BOOLEAN DEFAULT FALSE,
+      uso_total INTEGER DEFAULT 0,
+      medicos_distintos INTEGER DEFAULT 0,
+      criado_em TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(secao, texto_norm)
+    );
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS texto_livre_log (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      usuario_id TEXT REFERENCES usuarios(id) ON DELETE CASCADE,
+      secao TEXT NOT NULL,
+      texto_digitado TEXT NOT NULL,
+      termos_extraidos JSONB,
+      criado_em TIMESTAMPTZ DEFAULT NOW()
+    );
+  `);
+
   console.log("PostgreSQL — tabelas verificadas/criadas.");
 }
 
