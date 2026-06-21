@@ -13,6 +13,7 @@ const interacoesFda = require("./interacoesFda");
 const { analisarTendencias } = require("./alertasTendencia");
 const ontologia = require("./ontologia");
 const icd11 = require("./icd11");
+const { parseJsonIA } = require("./iaJson");
 const { PROMPTS: PROMPTS_SECAO, deriveBlocos } = require("./promptsSecao");
 
 const app = express();
@@ -47,18 +48,7 @@ function getAnthropic() {
   return _anthropic;
 }
 
-/**
- * Isola o objeto JSON dentro da resposta do modelo, que às vezes vem embrulhado
- * em cercas de código markdown (```json ... ```) ou com texto ao redor.
- */
-function extrairBlocoJson(texto) {
-  const inicio = texto.indexOf("{");
-  const fim = texto.lastIndexOf("}");
-  if (inicio === -1 || fim === -1 || fim < inicio) {
-    throw new Error(`Resposta da IA não contém JSON:\n${texto}`);
-  }
-  return texto.slice(inicio, fim + 1);
-}
+// O parsing robusto de JSON da IA vive em ./iaJson (parseJsonIA).
 
 // --- Health ---
 app.get("/health", (_req, res) => {
@@ -114,7 +104,9 @@ app.post("/api/extract", auth.autenticar, async (req, res) => {
 
     const bloco = msg.content.find((c) => c.type === "text");
     const texto = bloco ? bloco.text : "";
-    const dados = JSON.parse(extrairBlocoJson(texto));
+    // Parsing robusto: tolera cercas ```json e texto ao redor; loga o bruto se
+    // falhar (em vez de derrubar com 502 genérico).
+    const dados = parseJsonIA(texto, `extract:${secao || "?"}`);
     // Anti-misrouting: remove dados que pertencem a OUTRA seção (ex.: comorbidade
     // extraída para a Prescrição). Limpa os campos estruturados ANTES de derivar
     // os blocos; depois limpa os blocos (se a IA tiver devolvido blocos direto).
@@ -155,6 +147,13 @@ app.post("/api/extract", auth.autenticar, async (req, res) => {
     console.error("Erro em /api/extract:", e);
     const status = e?.status || e?.statusCode;
     const msg = String(e?.message || "");
+    // Resposta da IA ilegível (JSON malformado): o bruto já foi logado em
+    // parseJsonIA. Devolve mensagem amigável (422) em vez de 502 genérico.
+    if (e?.ehParseIA) {
+      return res.status(422).json({
+        erro: "Não foi possível ler os dados desta foto. Tente novamente com uma imagem mais nítida ou reenquadrada.",
+      });
+    }
     // Imagem grande demais (limite do servidor ou da Anthropic).
     if (status === 413 || /too large|maximum|payload|image.*size|tamanho/i.test(msg)) {
       return res.status(413).json({

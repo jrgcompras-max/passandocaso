@@ -17,6 +17,7 @@
 const Anthropic = require("@anthropic-ai/sdk");
 const db = require("./db");
 const ontologia = require("./ontologia");
+const { parseJsonIASeguro } = require("./iaJson");
 
 const OPENFDA_URL = "https://api.fda.gov/drug/label.json";
 
@@ -96,17 +97,6 @@ async function consultarOpenFDA(innEn) {
   }
 }
 
-function extrairJson(texto) {
-  const i = texto.indexOf("{");
-  const f = texto.lastIndexOf("}");
-  if (i === -1 || f === -1 || f < i) return null;
-  try {
-    return JSON.parse(texto.slice(i, f + 1));
-  } catch {
-    return null;
-  }
-}
-
 /** Extrai a interação A×B do texto bruto da FDA via Anthropic (JSON em PT). */
 async function parsearComIA(a, b, textoFda) {
   if (!process.env.ANTHROPIC_API_KEY) return null;
@@ -130,7 +120,7 @@ async function parsearComIA(a, b, textoFda) {
     ],
   });
   const bloco = msg.content.find((c) => c.type === "text");
-  const parsed = bloco ? extrairJson(bloco.text) : null;
+  const parsed = bloco ? parseJsonIASeguro(bloco.text, "interacoesFda") : null;
   return parsed && parsed.encontrada ? parsed : null;
 }
 
