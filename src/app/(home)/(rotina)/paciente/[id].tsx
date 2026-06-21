@@ -60,7 +60,7 @@ import {
   textoPosologia,
   type TFG,
 } from "@/lib/farmaco";
-import { listarPessoais, logTermos as logChipTermos } from "@/lib/chips";
+import { listarGlobais, listarPessoais, logTermos as logChipTermos } from "@/lib/chips";
 import {
   buscarReferencia,
   type ReferenciaLab,
@@ -2038,12 +2038,17 @@ const CHIPS_EXAME: { secao: string; campo: CampoExame; label: string; chips: str
  * para achados não listados. Os chips inserem/removem seu texto no conteúdo do
  * campo; o resultado já é o texto clínico usado no Passar o Caso. (Feature 1)
  */
+/** Junta termos em texto (trim, sem vazios, separados por vírgula). */
+const juntarTermos = (arr: string[]) =>
+  arr.map((t) => t.trim()).filter(Boolean).join(", ");
+
 function ExameComChips({
   label,
   secao,
   valor,
   chips,
   pessoais,
+  globais,
   onChange,
   onBlur,
   onLog,
@@ -2052,54 +2057,67 @@ function ExameComChips({
   secao: string;
   valor: string;
   chips: string[];
-  /** Chips pessoais aprendidos (sempre visíveis, junto aos padrões). */
+  /** Chips pessoais aprendidos (borda tracejada). */
   pessoais: string[];
+  /** Chips globais aprovados (sempre visíveis). */
+  globais: string[];
   onChange: (t: string) => void;
   onBlur: () => void;
   onLog: (secao: string, termos: string[]) => void;
 }) {
   const [verMais, setVerMais] = useState(false);
   const jaLogados = useRef<Set<string>>(new Set());
-  const tokens = valor.split(/\s*[,;]\s*/).map((t) => t.trim()).filter(Boolean);
-  const selecionados = new Set(tokens.map(normMerge));
-  // Padrões (top 4 ou todos) + pessoais (deduplicados contra os padrões).
+
+  // Conjunto de TODOS os chips conhecidos (padrões + globais + pessoais).
   const normPadroes = new Set(chips.map(normMerge));
-  const padroesVisiveis = verMais ? chips : chips.slice(0, 4);
-  const visiveis = [
-    ...padroesVisiveis,
-    ...pessoais.filter((p) => !normPadroes.has(normMerge(p))),
-  ];
-  const todosChipsNorm = new Set([...normPadroes, ...pessoais.map(normMerge)]);
+  const globaisExtra = globais.filter((g) => !normPadroes.has(normMerge(g)));
+  const pessoaisExtra = pessoais.filter(
+    (p) => !normPadroes.has(normMerge(p)) && !globaisExtra.some((g) => normMerge(g) === normMerge(p)),
+  );
+  const conhecidos = [...chips, ...globaisExtra, ...pessoaisExtra];
+  const normConhecidos = new Set(conhecidos.map(normMerge));
+
+  // Separa o conteúdo do campo em: chips selecionados × texto livre (achados
+  // não listados). A caixa de texto mostra SÓ o texto livre (Feature 1).
+  const tokens = valor.split(/\s*[,;]\s*/).map((t) => t.trim()).filter(Boolean);
+  const chipsSelecionados = tokens.filter((t) => normConhecidos.has(normMerge(t)));
+  const selecionadoNorm = new Set(chipsSelecionados.map(normMerge));
+  const livre = juntarTermos(tokens.filter((t) => !normConhecidos.has(normMerge(t))));
+
+  const recompor = (novosChips: string[], novoLivre: string) =>
+    onChange(juntarTermos([...novosChips, novoLivre]));
 
   const toggle = (chip: string) => {
-    if (selecionados.has(normMerge(chip))) {
-      onChange(tokens.filter((t) => normMerge(t) !== normMerge(chip)).join(", "));
+    if (selecionadoNorm.has(normMerge(chip))) {
+      recompor(chipsSelecionados.filter((t) => normMerge(t) !== normMerge(chip)), livre);
     } else {
-      onChange(valor.trim() ? `${valor.trim()}, ${chip}` : chip);
+      recompor([...chipsSelecionados, chip], livre);
     }
   };
 
-  // Ao sair do campo: termos que não são chips conhecidos = achados livres →
-  // registra (aprendizado). Evita re-logar o mesmo termo nesta sessão.
+  // Termos do texto livre alimentam o aprendizado (Feature 2). Evita re-logar.
   const aoSair = () => {
     onBlur();
-    const livres = tokens.filter((t) => {
-      const n = normMerge(t);
-      return n.length >= 3 && !todosChipsNorm.has(n) && !jaLogados.current.has(n);
-    });
-    if (livres.length) {
-      livres.forEach((t) => jaLogados.current.add(normMerge(t)));
-      onLog(secao, livres);
+    const termos = livre
+      .split(/\s*[,;]\s*/)
+      .map((t) => t.trim())
+      .filter((t) => normMerge(t).length >= 3 && !jaLogados.current.has(normMerge(t)));
+    if (termos.length) {
+      termos.forEach((t) => jaLogados.current.add(normMerge(t)));
+      onLog(secao, termos);
     }
   };
+
+  const padroesVisiveis = verMais ? chips : chips.slice(0, 4);
+  const visiveis = [...padroesVisiveis, ...globaisExtra, ...pessoaisExtra];
 
   return (
     <View style={styles.exameBox}>
       <Text style={styles.evoLabel}>{label}</Text>
       <View style={styles.chipsWrap}>
         {visiveis.map((chip) => {
-          const ativo = selecionados.has(normMerge(chip));
-          const pessoal = !normPadroes.has(normMerge(chip));
+          const ativo = selecionadoNorm.has(normMerge(chip));
+          const pessoal = pessoaisExtra.some((p) => normMerge(p) === normMerge(chip));
           return (
             <TouchableOpacity
               key={chip}
@@ -2122,10 +2140,10 @@ function ExameComChips({
       </View>
       <TextInput
         style={[styles.campoInput, styles.exameLivre]}
-        value={valor}
-        onChangeText={onChange}
+        value={livre}
+        onChangeText={(t) => recompor(chipsSelecionados, t)}
         onBlur={aoSair}
-        placeholder="Achados adicionais…"
+        placeholder="Achados adicionais (texto livre)…"
         placeholderTextColor={ClinicalColors.textMuted}
         multiline
       />
@@ -2146,13 +2164,14 @@ function EvolucaoBeiraLeitoSecao({
 }) {
   const [aberto, setAberto] = useState(false);
   const [evo, setEvo] = useState(evolucao);
-  // Chips pessoais aprendidos (Feature 2), por seção.
+  // Chips aprendidos (Feature 2): pessoais (do médico) e globais (aprovados).
   const [chipsPessoais, setChipsPessoais] = useState<Record<string, string[]>>({});
+  const [chipsGlobais, setChipsGlobais] = useState<Record<string, string[]>>({});
 
   // Resync se a evolução do dia mudar (ex.: virada de data).
   useEffect(() => setEvo(evolucao), [evolucao]);
 
-  // Carrega os chips pessoais ao abrir a seção pela primeira vez.
+  // Carrega os chips pessoais/globais ao abrir a seção pela primeira vez.
   useEffect(() => {
     if (!aberto) return;
     let vivo = true;
@@ -2161,6 +2180,9 @@ function EvolucaoBeiraLeitoSecao({
       const so: Record<string, string[]> = {};
       for (const [secao, lista] of Object.entries(m)) so[secao] = lista.map((c) => c.texto);
       setChipsPessoais(so);
+    });
+    listarGlobais().then((m) => {
+      if (vivo) setChipsGlobais(m);
     });
     return () => {
       vivo = false;
@@ -2292,6 +2314,7 @@ function EvolucaoBeiraLeitoSecao({
               secao={cfg.secao}
               chips={cfg.chips}
               pessoais={chipsPessoais[cfg.secao] ?? []}
+              globais={chipsGlobais[cfg.secao] ?? []}
               valor={(evo[cfg.campo] as string) ?? ""}
               onChange={(t) => aplicar({ [cfg.campo]: t } as Partial<EvolucaoBeiraLeito>, false)}
               onBlur={() => onSalvar(evo)}

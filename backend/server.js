@@ -582,6 +582,50 @@ app.delete("/api/admin/usuarios/:id", auth.autenticar, auth.exigirAdmin, async (
   }
 });
 
+// --- Admin: fila de chips globais (Feature 2 — candidatos para revisão) ---
+
+/** Lista os chips globais (candidatos primeiro), com uso e nº de médicos. */
+app.get("/api/admin/chips-candidatos", auth.autenticar, auth.exigirAdmin, async (_req, res) => {
+  try {
+    const r = await db.query(
+      `SELECT id, secao, texto, ativo, uso_total, medicos_distintos, criado_em
+         FROM chips_evolucao_global
+        ORDER BY ativo ASC, medicos_distintos DESC, uso_total DESC`,
+    );
+    res.json({ chips: r.rows });
+  } catch (e) {
+    console.error("Erro GET /api/admin/chips-candidatos:", e);
+    res.status(500).json({ erro: e.message || "Falha ao listar candidatos." });
+  }
+});
+
+/** Aprova/desativa um chip global. Body: { ativo: boolean }. */
+app.put("/api/admin/chips-candidatos/:id", auth.autenticar, auth.exigirAdmin, async (req, res) => {
+  const ativo = !!(req.body || {}).ativo;
+  try {
+    const r = await db.query(
+      "UPDATE chips_evolucao_global SET ativo = $1 WHERE id = $2 RETURNING id",
+      [ativo, req.params.id],
+    );
+    if (!r.rows.length) return res.status(404).json({ erro: "Candidato não encontrado." });
+    res.json({ ok: true });
+  } catch (e) {
+    console.error("Erro PUT /api/admin/chips-candidatos/:id:", e);
+    res.status(500).json({ erro: e.message || "Falha ao atualizar candidato." });
+  }
+});
+
+/** Rejeita (remove) um chip global candidato. */
+app.delete("/api/admin/chips-candidatos/:id", auth.autenticar, auth.exigirAdmin, async (req, res) => {
+  try {
+    await db.query("DELETE FROM chips_evolucao_global WHERE id = $1", [req.params.id]);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error("Erro DELETE /api/admin/chips-candidatos/:id:", e);
+    res.status(500).json({ erro: e.message || "Falha ao remover candidato." });
+  }
+});
+
 // --- Pacientes (sincronização app ⇄ banco) — escopo: usuário autenticado ---
 
 /** Lista todos os pacientes do usuário (mais recentes primeiro). */

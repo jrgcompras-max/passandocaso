@@ -118,6 +118,23 @@ router.get("/chips/pessoais", async (req, res) => {
   }
 });
 
+/** GET /api/chips/globais — chips globais ATIVOS (aprovados no admin), por seção. */
+router.get("/chips/globais", async (_req, res) => {
+  try {
+    const r = await db.query(
+      "SELECT secao, texto FROM chips_evolucao_global WHERE ativo ORDER BY uso_total DESC",
+    );
+    const porSecao = {};
+    for (const row of r.rows) {
+      (porSecao[row.secao] = porSecao[row.secao] || []).push(row.texto);
+    }
+    res.json({ chips: porSecao });
+  } catch (e) {
+    console.error("Erro GET /chips/globais:", e);
+    res.status(500).json({ erro: e.message || "Falha ao listar chips globais." });
+  }
+});
+
 /** PUT /api/chips/pessoal — fixar/desafixar um chip pessoal. Body: { secao, texto, fixado }. */
 router.put("/chips/pessoal", async (req, res) => {
   const b = req.body || {};

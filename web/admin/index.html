@@ -171,6 +171,25 @@
             <tbody id="tbody"><tr><td colspan="6" class="vazio">Carregando…</td></tr></tbody>
           </table>
         </div>
+
+        <div class="barra-acoes" style="margin-top:28px">
+          <div class="secao-titulo" style="margin:0">Chips do exame físico — fila global</div>
+        </div>
+        <div class="tabela-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Seção</th>
+                <th>Texto</th>
+                <th>Médicos</th>
+                <th class="col-mobile-hide">Usos</th>
+                <th>Status</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-chips"><tr><td colspan="6" class="vazio">Carregando…</td></tr></tbody>
+          </table>
+        </div>
       </main>
     </div>
 
@@ -230,7 +249,52 @@
         recarregar();
       }
       async function recarregar() {
-        await Promise.all([carregarDashboard(), carregarUsuarios()]);
+        await Promise.all([carregarDashboard(), carregarUsuarios(), carregarChips()]);
+      }
+
+      // ======== CHIPS DO EXAME FÍSICO (fila global) ========
+      const SECAO_CHIP_LABEL = {
+        estado_geral: "Estado geral", neurologico: "Neurológico",
+        cardiovascular: "Cardiovascular", respiratorio: "Respiratório",
+        abdominal: "Abdominal", membros: "Membros e extremidades", pele: "Pele e mucosas",
+      };
+      async function carregarChips() {
+        const tb = document.getElementById("tbody-chips");
+        try {
+          const { chips } = await apiGet("/api/admin/chips-candidatos");
+          if (!chips || !chips.length) {
+            tb.innerHTML = '<tr><td colspan="6" class="vazio">Nenhum chip na fila.</td></tr>';
+            return;
+          }
+          tb.innerHTML = chips.map(linhaChip).join("");
+        } catch (e) {
+          tb.innerHTML = '<tr><td colspan="6" class="vazio">Erro: ' + esc(e.message) + "</td></tr>";
+        }
+      }
+      function linhaChip(c) {
+        const status = c.ativo
+          ? '<span class="badge b-ativo">Ativo</span>'
+          : '<span class="badge b-trial">Candidato</span>';
+        const aprovar = c.ativo
+          ? `<button class="btn-mini" onclick="chipAtivo('${c.id}',false)">Desativar</button>`
+          : `<button class="btn-mini" onclick="chipAtivo('${c.id}',true)">Aprovar</button>`;
+        return `<tr>
+          <td>${esc(SECAO_CHIP_LABEL[c.secao] || c.secao)}</td>
+          <td>${esc(c.texto)}</td>
+          <td>${c.medicos_distintos}</td>
+          <td class="col-mobile-hide">${c.uso_total}</td>
+          <td>${status}</td>
+          <td>${aprovar} <button class="btn-mini danger" onclick="chipRejeitar('${c.id}')">Excluir</button></td>
+        </tr>`;
+      }
+      async function chipAtivo(id, ativo) {
+        try { await apiPut("/api/admin/chips-candidatos/" + encodeURIComponent(id), { ativo }); await carregarChips(); }
+        catch (e) { alert(e.message); }
+      }
+      async function chipRejeitar(id) {
+        if (!confirm("Excluir este chip da fila?")) return;
+        try { await apiDelete("/api/admin/chips-candidatos/" + encodeURIComponent(id)); await carregarChips(); }
+        catch (e) { alert(e.message); }
       }
 
       // ======== DASHBOARD ========

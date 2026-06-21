@@ -34,6 +34,18 @@ export async function listarPessoais(): Promise<Record<string, ChipPessoal[]>> {
   }
 }
 
+/** Chips globais ATIVOS (aprovados no admin), por seção. */
+export async function listarGlobais(): Promise<Record<string, string[]>> {
+  try {
+    const r = await apiFetch("/api/chips/globais");
+    if (!r.ok) return {};
+    const j = (await r.json()) as { chips?: Record<string, string[]> };
+    return j.chips || {};
+  } catch {
+    return {};
+  }
+}
+
 export async function fixarChip(secao: string, texto: string, fixado: boolean): Promise<void> {
   try {
     await apiFetch("/api/chips/pessoal", {
