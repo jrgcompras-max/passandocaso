@@ -209,6 +209,43 @@ function blocosBrutos(texto: string | undefined): Bloco[] {
   }
 }
 
+const normMerge = (s: string) =>
+  String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+
+/**
+ * Mescla os blocos de uma nova foto com os já existentes (merge não destrutivo):
+ * mantém os itens atuais e ACRESCENTA apenas os novos não duplicados (agrupados
+ * por título de bloco). Nunca descarta o que já foi escaneado. (BUG 3)
+ */
+function mergeBlocos(extraidoAtual: string, novos: Bloco[]): Bloco[] {
+  const porTitulo = new Map<string, Bloco>();
+  const ordem: string[] = [];
+  const obter = (titulo?: string) => {
+    const k = normMerge(titulo || "");
+    if (!porTitulo.has(k)) {
+      porTitulo.set(k, { titulo: titulo || "", itens: [] });
+      ordem.push(k);
+    }
+    return porTitulo.get(k) as Bloco;
+  };
+  const adicionar = (blocos: Bloco[]) => {
+    for (const b of blocos) {
+      const alvo = obter(b.titulo);
+      const vistos = new Set(alvo.itens.map(normMerge));
+      for (const it of b.itens || []) {
+        const n = normMerge(it);
+        if (n && !vistos.has(n)) {
+          alvo.itens.push(it);
+          vistos.add(n);
+        }
+      }
+    }
+  };
+  adicionar(blocosBrutos(extraidoAtual));
+  adicionar(novos);
+  return ordem.map((k) => porTitulo.get(k) as Bloco).filter((b) => b.itens.length);
+}
+
 /**
  * Compatibilidade: deriva o conteúdo das seções separadas (comorbidades /
  * medicacoesUsoContinuo) a partir da seção combinada antiga (comorbidadesMedicacoes),
@@ -729,6 +766,8 @@ export default function Paciente() {
                   : [];
                 if (!meds.length) return false;
                 const base = paciente?.medicamentos ?? [];
+                // BUG 3: não duplica medicamentos já presentes na lista.
+                const jaExiste = new Set(base.map((m) => normMerge(m.texto)));
                 const novos = meds
                   .map((m, i) => ({
                     id: `${novoId()}-${i}`,
@@ -738,7 +777,7 @@ export default function Paciente() {
                       .trim(),
                     classe: "",
                   }))
-                  .filter((m) => m.texto);
+                  .filter((m) => m.texto && !jaExiste.has(normMerge(m.texto)));
                 if (!novos.length) return false;
                 const lista = [...base, ...novos];
                 atualizarPaciente(id, { medicamentos: lista });
@@ -759,23 +798,53 @@ export default function Paciente() {
                 });
                 return true;
               }
-              // Sinais vitais: preenche o formulário do dia.
+              // Sinais vitais (BUG 3): preenche só os campos VAZIOS; mantém os já
+              // preenchidos; em conflito (valor diferente), pergunta ao usuário.
               if (item.id === "sinaisVitaisIntercorrencias") {
-                const campos = ["paSist", "paDiast", "fc", "fr", "sato2", "temp", "glasgow", "glicemia", "diurese"];
-                const tem = campos.some(
-                  (k) => dados[k] != null && String(dados[k]).trim() !== "",
-                );
-                if (!tem) return false;
+                const rotuloSV: Record<string, string> = {
+                  paSist: "PA sist", paDiast: "PA diast", fc: "FC", fr: "FR",
+                  sato2: "SatO₂", temp: "Tax", glasgow: "Glasgow",
+                  glicemia: "Glicemia", diurese: "Diurese",
+                };
+                const campos = Object.keys(rotuloSV);
+                const valorNovo = (k: string) =>
+                  dados[k] != null && String(dados[k]).trim() !== "" ? String(dados[k]).trim() : "";
+                if (!campos.some((k) => valorNovo(k))) return false;
                 const atual = paciente?.sinaisVitais?.[hoje] ?? SV_VAZIO;
-                const novo = { ...atual };
+                const novo = { ...atual } as Record<string, string>;
+                const conflitos: { k: string; cur: string; nv: string }[] = [];
                 for (const k of campos) {
-                  if (dados[k] != null && String(dados[k]).trim() !== "") {
-                    (novo as Record<string, string>)[k] = String(dados[k]);
-                  }
+                  const nv = valorNovo(k);
+                  if (!nv) continue;
+                  const cur = String((atual as Record<string, string>)[k] || "").trim();
+                  if (!cur) novo[k] = nv; // vazio → preenche
+                  else if (cur !== nv) conflitos.push({ k, cur, nv }); // conflito
+                  // igual → mantém
                 }
                 atualizarPaciente(id, {
-                  sinaisVitais: { ...paciente?.sinaisVitais, [hoje]: novo },
+                  sinaisVitais: { ...paciente?.sinaisVitais, [hoje]: novo as SinaisVitaisDia },
                 });
+                if (conflitos.length) {
+                  Alert.alert(
+                    "Valores diferentes na foto",
+                    conflitos
+                      .map((c) => `${rotuloSV[c.k]}: atual ${c.cur} → foto ${c.nv}`)
+                      .join("\n"),
+                    [
+                      { text: "Manter atuais", style: "cancel" },
+                      {
+                        text: "Usar os da foto",
+                        onPress: () => {
+                          const novo2 = { ...novo };
+                          for (const c of conflitos) novo2[c.k] = c.nv;
+                          atualizarPaciente(id, {
+                            sinaisVitais: { ...paciente?.sinaisVitais, [hoje]: novo2 as SinaisVitaisDia },
+                          });
+                        },
+                      },
+                    ],
+                  );
+                }
                 return true;
               }
               return false;
@@ -1497,9 +1566,10 @@ function SecaoExpansivel({
         );
       }
       // Mapeamento direto (prescrição/sinais vitais) consome o estruturado; as
-      // demais seções gravam os blocos derivados para exibição.
+      // demais seções MESCLAM os blocos novos com os já existentes (não
+      // sobrescreve — múltiplas fotos acumulam). (BUG 3)
       if (!(aoExtrair && aoExtrair(json))) {
-        onExtraido(JSON.stringify(json.blocos ?? []));
+        onExtraido(JSON.stringify(mergeBlocos(extraido, (json.blocos ?? []) as Bloco[])));
       }
     } catch (e) {
       const mensagem = e instanceof Error ? e.message : String(e);
