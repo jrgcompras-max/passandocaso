@@ -295,6 +295,8 @@ export default function Paciente() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [medsTexto]);
   const irParaPrescricao = () => scrollRef.current?.scrollToPosition(0, Math.max(0, prescY - 8), true);
+  // "Adicionar medicamento" acionado pelo cabeçalho da seção Prescrição.
+  const [addPrescricao, setAddPrescricao] = useState(false);
   useEffect(() => {
     const sub = AppState.addEventListener("change", (estado) => {
       if ((estado === "inactive" || estado === "background") && paciente) {
@@ -685,6 +687,12 @@ export default function Paciente() {
             instrucao={item.instrucao}
             secaoId={item.id}
             medicacao={item.medicacao}
+            onAdicionar={
+              item.id === "prescricaoHospitalar"
+                ? () => setAddPrescricao(true)
+                : undefined
+            }
+            rotuloAdicionar="Medicamento"
             anotacoes={normalizarAnotacoes(
               paciente?.secoes?.[item.id]?.anotacoes,
             )}
@@ -776,6 +784,8 @@ export default function Paciente() {
                   medicamentos={paciente?.medicamentos ?? []}
                   paciente={paciente}
                   editando={editando}
+                  mostrarAdd={addPrescricao}
+                  onFecharAdd={() => setAddPrescricao(false)}
                   onChange={(l) => atualizarPaciente(id, { medicamentos: l })}
                 />
               ) : item.id === "sinaisVitaisIntercorrencias" ? (
@@ -1336,6 +1346,8 @@ function SecaoExpansivel({
   onSalvarAnotacoes,
   onExtraido,
   aoExtrair,
+  onAdicionar,
+  rotuloAdicionar,
 }: {
   titulo: string;
   instrucao: string;
@@ -1344,6 +1356,9 @@ function SecaoExpansivel({
   extraido: string;
   medicacao?: boolean;
   prosa?: boolean;
+  /** Ação opcional exibida à esquerda da linha de botões (ex.: "+ Medicamento"). */
+  onAdicionar?: () => void;
+  rotuloAdicionar?: string;
   /**
    * Conteúdo estruturado extra no fim do corpo da seção. Pode ser um render-prop
    * que recebe o estado de edição (para gating de ações de editar/remover).
@@ -1489,6 +1504,17 @@ function SecaoExpansivel({
       {aberto && (
         <View style={styles.secaoBody}>
           <View style={styles.escanearRow}>
+            {onAdicionar && (
+              <TouchableOpacity
+                style={[styles.botaoEscanear, styles.botaoAdicionarSecao]}
+                onPress={onAdicionar}
+              >
+                <Ionicons name="add" size={18} color="#fff" />
+                <Text style={[styles.botaoEscanearTexto, styles.botaoEscanearTextoAtivo]}>
+                  {rotuloAdicionar || "Adicionar"}
+                </Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
               style={[styles.botaoEscanear, editando && styles.botaoEscanearAtivo]}
               onPress={() => setEditando((v) => !v)}
@@ -1523,6 +1549,10 @@ function SecaoExpansivel({
               <Text style={styles.erroTexto}>{erro}</Text>
             </View>
           )}
+
+          {/* Prescrição: medicamentos (extra) no topo; anotações vão ao fim. */}
+          {secaoId === "prescricaoHospitalar" &&
+            (typeof extra === "function" ? extra(editando) : extra)}
 
           <Text style={styles.campoLabel}>Anotações</Text>
           <TextInput
@@ -1651,7 +1681,9 @@ function SecaoExpansivel({
             </>
           )}
 
-          {typeof extra === "function" ? extra(editando) : extra}
+          {/* Na Prescrição o extra já foi renderizado no topo (medicamentos). */}
+          {secaoId !== "prescricaoHospitalar" &&
+            (typeof extra === "function" ? extra(editando) : extra)}
         </View>
       )}
     </View>
@@ -3360,16 +3392,29 @@ function PrescricaoSecao({
   medicamentos,
   paciente,
   editando,
+  mostrarAdd,
+  onFecharAdd,
   onChange,
 }: {
   medicamentos: Medicamento[];
   paciente?: PacienteModel | null;
   editando?: boolean;
+  /** Abre o campo de adicionar medicamento no topo (acionado pelo cabeçalho). */
+  mostrarAdd?: boolean;
+  onFecharAdd?: () => void;
   onChange: (l: Medicamento[]) => void;
 }) {
   const [texto, setTexto] = useState("");
   const [editClasseId, setEditClasseId] = useState<string | null>(null);
   const [classeDraft, setClasseDraft] = useState("");
+  const inputAddRef = useRef<TextInput>(null);
+
+  // Foca o campo ao abrir "Adicionar" pelo cabeçalho da seção.
+  useEffect(() => {
+    if (!mostrarAdd) return;
+    const t = setTimeout(() => inputAddRef.current?.focus(), 120);
+    return () => clearTimeout(t);
+  }, [mostrarAdd]);
 
   // Segurança farmacológica (informativa). Falhas degradam em silêncio.
   const [interacoes, setInteracoes] = useState<Interacao[]>([]);
@@ -3450,6 +3495,32 @@ function PrescricaoSecao({
           TFG estimada: {tfg.tfg} mL/min/1,73m² · {tfg.estadio} ({tfg.descricao}) · {tfg.fonte}
         </Text>
       )}
+
+      {(mostrarAdd || editando) && (
+        <View style={styles.medAddBox}>
+          <TextInput
+            ref={inputAddRef}
+            style={[styles.campoInput, styles.medAddInput]}
+            value={texto}
+            onChangeText={setTexto}
+            placeholder="Ex.: Ceftriaxona 1g EV 1x/dia D5/7"
+            placeholderTextColor={ClinicalColors.textMuted}
+            onSubmitEditing={adicionar}
+            returnKeyType="done"
+          />
+          <View style={styles.medAddAcoes}>
+            <TouchableOpacity style={styles.medAddBtn} onPress={adicionar}>
+              <Text style={styles.medAddBtnTexto}>+ Adicionar</Text>
+            </TouchableOpacity>
+            {mostrarAdd && onFecharAdd && (
+              <TouchableOpacity onPress={onFecharAdd} hitSlop={8}>
+                <Text style={styles.medAddFechar}>Concluir</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      )}
+
       {medicamentos.map((m) => {
         const sev = severidadeDoMed(m.texto, interacoes);
         const pos = posologias[m.id];
@@ -3554,20 +3625,6 @@ function PrescricaoSecao({
         </View>
       )}
 
-      {editando && (
-        <>
-          <TextInput
-            style={[styles.campoInput, styles.medAddInput]}
-            value={texto}
-            onChangeText={setTexto}
-            placeholder="Ex.: Ceftriaxona 1g EV 1x/dia D5/7"
-            placeholderTextColor={ClinicalColors.textMuted}
-          />
-          <TouchableOpacity style={styles.medAddBtn} onPress={adicionar}>
-            <Text style={styles.medAddBtnTexto}>+ Adicionar medicamento</Text>
-          </TouchableOpacity>
-        </>
-      )}
     </View>
   );
 }
@@ -3853,6 +3910,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   botaoEscanearAtivo: { backgroundColor: ClinicalColors.primary },
+  botaoAdicionarSecao: { backgroundColor: ClinicalColors.accent, paddingHorizontal: 14 },
   botaoEscanearTexto: { color: ClinicalColors.primary, fontSize: 14, fontWeight: "600" },
   botaoEscanearTextoAtivo: { color: "#fff" },
   botaoCaptura: { flex: 1, marginBottom: 0 },
@@ -4576,14 +4634,28 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   medAddInput: { marginTop: 8 },
-  medAddBtn: {
+  medAddBox: {
     backgroundColor: ClinicalColors.background,
+    borderRadius: Radius.card,
+    padding: 10,
+    marginBottom: 12,
+  },
+  medAddAcoes: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    marginTop: 8,
+  },
+  medAddFechar: { color: ClinicalColors.textMuted, fontSize: 14, fontWeight: "600", paddingHorizontal: 8 },
+  medAddBtn: {
+    flex: 1,
+    backgroundColor: ClinicalColors.surface,
     borderColor: ClinicalColors.primary,
     borderWidth: BorderWidth.hairline,
     borderRadius: Radius.badge,
     paddingVertical: 10,
     alignItems: "center",
-    marginTop: 8,
   },
   medAddBtnTexto: {
     color: ClinicalColors.primary,
