@@ -32,27 +32,38 @@ const PROMPTS = {
     REGRA,
   historia:
     "Extraia APENAS a história da doença atual (HDA/HMA), como TEXTO DISSERTATIVO. " +
-    "Ignore: comorbidades, medicações, exames, dados de identificação. " +
+    "NÃO inclua: listas de comorbidades, medicações, resultados de exames (labs/imagem), " +
+    "condutas/prescrição, sinais vitais nem dados de identificação. " +
     "O campo 'hda' deve ser UM PARÁGRAFO CORRIDO (texto dissertado), NUNCA uma lista " +
     "de tópicos. Aplique apenas correção de gramática, concordância e pontuação, " +
     "preservando o conteúdo. " +
     'Formato: {"hda":"texto corrido em parágrafo único","motivoInternacao":"diagnóstico de entrada ou null","sintomaPrincipal":"sintoma principal ou null"}. ' +
     REGRA,
   examesLaboratoriais:
-    "Extraia APENAS os valores de exames laboratoriais. Use null quando ausente. " +
+    "Extraia APENAS os valores de exames laboratoriais (sangue/urina/líquor). Use null quando ausente. " +
+    "NÃO inclua: sinais vitais (PA, FC, FR, SatO2, Tax), laudos de exames de imagem, " +
+    "medicamentos, comorbidades nem história. " +
     'Formato: {"hb":num,"ht":num,"lt":num,"plaq":num,"pcr":num,"na":num,"k":num,"cr":num,"ureia":num,"glicemia":num,"tgo":num,"tgp":num,"bt":num,"inr":num,"hba1c":num,"albumina":num,"data":"DD/MM ou null","outros":[{"nome":"Lactato","valor":"2,1 mmol/L"}]}. ' +
     REGRA,
   imagem:
-    "Extraia APENAS laudos de exames de imagem. Ignore: laboratório, texto clínico, identificação. " +
+    "Extraia APENAS laudos de exames de IMAGEM (RX, TC, RM, USG, ECO, Doppler, etc.). " +
+    "NÃO inclua: valores de exames laboratoriais, sinais vitais, medicamentos, " +
+    "comorbidades, texto clínico nem identificação. " +
     'Formato: {"exames":[{"nome":"TC de Crânio","data":"DD/MM/AAAA ou null","laudo":"texto resumido do laudo"}]}. ' +
     REGRA,
   prescricaoHospitalar:
-    "Extraia APENAS medicamentos da prescrição hospitalar atual. " +
-    "Ignore: medicações de uso contínuo de casa, história, exames. " +
+    "Extraia APENAS medicamentos da prescrição hospitalar ATUAL (em uso nesta internação). " +
+    "NÃO inclua, de forma alguma: comorbidades, diagnósticos ou hipóteses diagnósticas " +
+    "(ex.: 'DRC dialítico', 'HAS', 'DM'), medicações de uso contínuo de casa, história, " +
+    "exames laboratoriais/imagem nem sinais vitais. " +
+    "Se a imagem só tiver diagnósticos/comorbidades e NENHUM medicamento prescrito, " +
+    'retorne {"medicamentos":[]}. ' +
     'Formato: {"medicamentos":[{"nome":"Ceftriaxona","dose":"1g","via":"EV","frequencia":"1x/dia","diaUso":"D5 ou null"}]}. ' +
     REGRA,
   sinaisVitaisIntercorrencias:
     "Extraia APENAS os sinais vitais mais recentes. Use null quando ausente. " +
+    "NÃO inclua: exames laboratoriais, laudos de imagem, exame físico por aparelhos, " +
+    "medicamentos nem comorbidades. " +
     'Formato: {"data":"DD/MM ou null","hora":"HH:MM ou null","paSist":num,"paDiast":num,"fc":num,"fr":num,"sato2":num,"temp":num,"glasgow":num,"glicemia":num,"peso":num,"diurese":num}. ' +
     REGRA,
 };

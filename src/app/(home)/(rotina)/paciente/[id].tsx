@@ -1382,6 +1382,8 @@ function SecaoExpansivel({
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [extraindo, setExtraindo] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  // Aviso de itens removidos por não pertencerem a esta seção (anti-misrouting).
+  const [aviso, setAviso] = useState<string | null>(null);
   // Modo de revisão/correção: fora dele, a exibição é limpa (sem lixeiras nem
   // campos). Ligado pelo botão "Editar" — o médico revisa o que a IA escaneou.
   const [editando, setEditando] = useState(false);
@@ -1464,11 +1466,22 @@ function SecaoExpansivel({
   const processarUri = async (uri: string) => {
     setExtraindo(true);
     setErro(null);
+    setAviso(null);
     try {
       const base64 = await converterParaJpegBase64(uri);
       const json = await extrairDadosImagem<
-        { blocos?: Bloco[] } & Record<string, unknown>
+        { blocos?: Bloco[]; anomalias?: { item: string }[] } & Record<string, unknown>
       >(base64, `${instrucao} ${SUFIXO_JSON}`, secaoId);
+      // Anti-misrouting: o backend remove itens que não pertencem a esta seção
+      // e os reporta em `anomalias` — avisa o usuário (não foram salvos aqui).
+      if (Array.isArray(json.anomalias) && json.anomalias.length) {
+        const itens = json.anomalias.map((a) => a.item).filter(Boolean).join(", ");
+        setAviso(
+          `${json.anomalias.length} item(ns) não pertencem a esta seção e foram ignorados${
+            itens ? `: ${itens}` : ""
+          }.`,
+        );
+      }
       // Mapeamento direto (prescrição/sinais vitais) consome o estruturado; as
       // demais seções gravam os blocos derivados para exibição.
       if (!(aoExtrair && aoExtrair(json))) {
@@ -1551,6 +1564,13 @@ function SecaoExpansivel({
             <View style={styles.erroBox}>
               <Text style={styles.erroTitulo}>Erro ao extrair dados</Text>
               <Text style={styles.erroTexto}>{erro}</Text>
+            </View>
+          )}
+
+          {aviso && (
+            <View style={styles.avisoBox}>
+              <Ionicons name="information-circle-outline" size={16} color="#9A6700" />
+              <Text style={styles.avisoTexto}>{aviso}</Text>
             </View>
           )}
 
@@ -3947,6 +3967,18 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 16,
   },
+  avisoBox: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    backgroundColor: "#FFF8E7",
+    borderLeftWidth: 3,
+    borderLeftColor: "#FF9500",
+    borderRadius: Radius.badge,
+    padding: 12,
+    marginBottom: 14,
+  },
+  avisoTexto: { flex: 1, fontSize: 13, color: "#7A5B00", lineHeight: 18 },
   erroTitulo: {
     color: StatusColors.pendente.text,
     fontSize: 14,

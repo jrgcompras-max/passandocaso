@@ -115,11 +115,32 @@ app.post("/api/extract", auth.autenticar, async (req, res) => {
     const bloco = msg.content.find((c) => c.type === "text");
     const texto = bloco ? bloco.text : "";
     const dados = JSON.parse(extrairBlocoJson(texto));
+    // Anti-misrouting: remove dados que pertencem a OUTRA seção (ex.: comorbidade
+    // extraída para a Prescrição). Limpa os campos estruturados ANTES de derivar
+    // os blocos; depois limpa os blocos (se a IA tiver devolvido blocos direto).
+    let anomalias = [];
+    if (dados && secao) {
+      try {
+        anomalias = await ontologia.sanitizarEstruturado(dados, secao);
+      } catch (e) {
+        console.error("Sanitização (estruturado) falhou:", e.message);
+      }
+    }
     // Deriva `blocos` do estruturado para a UI atual continuar funcionando
     // (mantém também os campos estruturados para mapeamento direto no app).
     if (dados && !Array.isArray(dados.blocos) && secao && PROMPTS_SECAO[secao]) {
       dados.blocos = deriveBlocos(secao, dados);
     }
+    if (dados && Array.isArray(dados.blocos) && secao) {
+      try {
+        const r = await ontologia.sanitizarSecao(dados.blocos, secao);
+        dados.blocos = r.blocos;
+        anomalias = anomalias.concat(r.anomalias);
+      } catch (e) {
+        console.error("Sanitização (blocos) falhou:", e.message);
+      }
+    }
+    if (anomalias.length) dados.anomalias = anomalias;
     // Camada de ontologia: valida/enriquece (não-destrutivo) e alimenta o
     // feedback loop com termos não reconhecidos. Best-effort: nunca quebra.
     if (dados && Array.isArray(dados.blocos) && secao) {

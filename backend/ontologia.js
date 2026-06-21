@@ -182,10 +182,127 @@ async function salvarDiagnosticoCid11(termoBusca, resultado) {
   }
 }
 
+// Categoria-alvo de cada seção (o que PODE permanecer). Itens reconhecidos numa
+// categoria CONFLITANTE são removidos como anomalia (misrouting do scan).
+const CATEGORIA_ESPERADA = {
+  prescricaoHospitalar: "medicacao",
+  medicacoesUsoContinuo: "medicacao",
+  comorbidades: "comorbidade",
+  examesLaboratoriais: "exame_lab",
+  imagem: "exame_imagem",
+};
+const CATEGORIAS_FORTES = ["comorbidade", "medicacao", "exame_lab", "exame_imagem"];
+
+// Palavras-chave de diagnóstico/comorbidade (abreviações e termos que a ontologia
+// pode não casar exatamente, ex.: "DRC dialítico", "DM"). Complementa a ontologia.
+const KW_COMORBIDADE =
+  /\b(drc|irc|dm1|dm2|dm|has|hass|icc|ic|dpoc|avc|ave|ait|tep|tvp|hiv|les|iam|dac|dap|hpb|drge|nash|dhgna)\b|diabet|hipertens|cirrose|hepatopat|nefropat|cardiopat|neoplasi|c[âa]ncer|carcinom|insufici[êe]ncia (cardiac|renal|hepat|coronar)|demenci|alzheimer|parkinson|epileps|dialit|dialis|tabagism|etilism|obesidad|dislipidemi|hipotireoid|hipertireoid/i;
+
+async function buscarTermoSeguro(texto) {
+  try {
+    return await buscarTermo(texto);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Categoria conflitante detectada para um item numa seção (ou null se OK).
+ * Usa a ontologia e, para diagnósticos na Prescrição/MUC, também palavras-chave.
+ */
+function categoriaConflitante(texto, termo, esperada) {
+  if (esperada === "medicacao") {
+    // Medicação reconhecida nunca é anomalia (precede a heurística de keyword).
+    if (termo && termo.categoria === "medicacao") return null;
+    if ((termo && termo.categoria === "comorbidade") || KW_COMORBIDADE.test(texto)) {
+      return "comorbidade";
+    }
+    if (termo && termo.categoria !== "medicacao" && CATEGORIAS_FORTES.includes(termo.categoria)) {
+      return termo.categoria;
+    }
+    return null;
+  }
+  if (esperada === "comorbidade") {
+    if (termo && termo.categoria === "comorbidade") return null;
+    if (termo && termo.categoria === "medicacao") return "medicacao";
+    return null;
+  }
+  // labs/imagem: conflito por categoria forte reconhecida.
+  if (termo && termo.categoria && termo.categoria !== esperada && CATEGORIAS_FORTES.includes(termo.categoria)) {
+    return termo.categoria;
+  }
+  return null;
+}
+
+/**
+ * Remove dos `blocos` os itens cuja categoria (na ontologia) CONFLITA com a
+ * seção — ex.: comorbidade ("DRC", "HAS") extraída para a Prescrição. Itens não
+ * reconhecidos permanecem. Devolve { blocos, anomalias }. Best-effort.
+ */
+async function sanitizarSecao(blocos, secao) {
+  const esperada = CATEGORIA_ESPERADA[secao];
+  if (!esperada || !Array.isArray(blocos)) return { blocos, anomalias: [] };
+  const anomalias = [];
+  const limpos = [];
+  for (const b of blocos) {
+    const itens = [];
+    for (const item of b?.itens || []) {
+      const texto = String(item || "").trim();
+      if (!texto) continue;
+      const termo = await buscarTermoSeguro(texto);
+      const conflito = categoriaConflitante(texto, termo, esperada);
+      if (conflito) {
+        anomalias.push({ item: texto, categoriaDetectada: conflito, esperada, secao });
+      } else {
+        itens.push(item);
+      }
+    }
+    if (itens.length) limpos.push({ ...b, itens });
+  }
+  return { blocos: limpos, anomalias };
+}
+
+/**
+ * Sanitiza os CAMPOS ESTRUTURADOS da extração (consumidos por mapeamento direto
+ * no app), removendo itens misroteados antes de derivar os blocos. Devolve a
+ * lista de anomalias. Best-effort.
+ */
+async function sanitizarEstruturado(dados, secao) {
+  const anomalias = [];
+  if (!dados || typeof dados !== "object") return anomalias;
+  const nomeDe = (m) => (typeof m === "string" ? m : m && m.nome) || "";
+
+  const filtrar = async (lista, esperada, campoNome) => {
+    const limpos = [];
+    for (const it of lista) {
+      const texto = campoNome ? nomeDe(it) : String(it || "");
+      const termo = await buscarTermoSeguro(texto);
+      const conflito = categoriaConflitante(texto, termo, esperada);
+      if (conflito) anomalias.push({ item: texto, categoriaDetectada: conflito, esperada, secao });
+      else limpos.push(it);
+    }
+    return limpos;
+  };
+
+  if (secao === "prescricaoHospitalar" && Array.isArray(dados.medicamentos)) {
+    dados.medicamentos = await filtrar(dados.medicamentos, "medicacao", true);
+  }
+  if (secao === "medicacoesUsoContinuo" && Array.isArray(dados.medicacoesUsoContinuo)) {
+    dados.medicacoesUsoContinuo = await filtrar(dados.medicacoesUsoContinuo, "medicacao", true);
+  }
+  if (secao === "comorbidades" && Array.isArray(dados.comorbidades)) {
+    dados.comorbidades = await filtrar(dados.comorbidades, "comorbidade", false);
+  }
+
+  return anomalias;
+}
+
 module.exports = {
   normalizar,
   buscarTermo,
   referenciaLab,
   validarComOntologia,
   salvarDiagnosticoCid11,
+  sanitizarSecao,
+  sanitizarEstruturado,
 };
