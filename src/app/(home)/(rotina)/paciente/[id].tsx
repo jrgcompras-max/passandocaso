@@ -823,11 +823,15 @@ export default function Paciente() {
           )}
           <TouchableOpacity
             style={styles.botaoPassarCaso}
+            activeOpacity={0.85}
             onPress={() => {
               if (paciente) salvarSnapshotDiario(paciente);
               router.push({ pathname: "/evolucao/[id]", params: { id } });
             }}
           >
+            <View style={styles.passarCasoIcone}>
+              <Ionicons name="arrow-redo" size={15} color="#0E7A5A" />
+            </View>
             <Text style={styles.botaoPassarCasoTexto}>Passar o Caso</Text>
           </TouchableOpacity>
         </>
@@ -3886,17 +3890,31 @@ const styles = StyleSheet.create({
   verEvolucaoTxt: { color: ClinicalColors.primary, fontSize: 15, fontWeight: "600" },
   verEvolucaoBadge: { flex: 1, textAlign: "right", color: ClinicalColors.textMuted, fontSize: 13 },
   botaoPassarCaso: {
-    backgroundColor: ClinicalColors.accent,
-    borderRadius: Radius.card,
-    paddingVertical: 18,
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    backgroundColor: "#ECFAF1",
+    borderWidth: 1,
+    borderColor: "#B6E8C9",
+    borderRadius: Radius.pill,
+    paddingVertical: 15,
     marginTop: 4,
     marginBottom: 24,
   },
+  passarCasoIcone: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "#D2F2DF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   botaoPassarCasoTexto: {
-    color: ClinicalColors.textOnPrimary,
+    color: "#0E7A5A",
     fontSize: 17,
     fontWeight: "700",
+    letterSpacing: 0.2,
   },
   capturaRow: { flexDirection: "row", gap: 12, marginBottom: 16 },
   escanearRow: { flexDirection: "row", justifyContent: "flex-end", gap: 8, marginBottom: 12 },
