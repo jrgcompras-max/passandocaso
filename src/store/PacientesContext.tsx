@@ -237,7 +237,11 @@ export function PacientesProvider({ children }: { children: ReactNode }) {
             ? {
                 ...p,
                 nomeCompleto: cab.nomeCompleto || p.nomeCompleto,
-                idade: cab.idade ?? p.idade,
+                // Idade: a PRIMEIRA leitura conhecida vence. Re-escanear o cabeçalho
+                // não sobrescreve uma idade já registrada (a IA pode ler valores
+                // diferentes em fotos distintas — ex.: 60 vs 69). Correção fica a
+                // cargo da edição manual da ficha (atualizarPaciente).
+                idade: p.idade ?? cab.idade,
                 sexo: cab.sexo ?? p.sexo,
                 // Setor vem da IA; leito é manual, então preservamos o existente.
                 setor: cab.setor || p.setor,

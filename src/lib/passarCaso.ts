@@ -43,19 +43,35 @@ const num = (v: string): number | null => {
   return m ? parseFloat(m[0]) : null;
 };
 
+/**
+ * Quebra um trecho em itens atômicos: separa por quebra de linha, ponto-e-vírgula
+ * e vírgula — exceto vírgula seguida de dígito, para preservar decimais/doses
+ * (ex.: "Losartana 2,5 mg" continua um item). Garante comorbidades/MUC em chips
+ * individuais mesmo quando vêm num único item (scan ou anotação manual).
+ */
+function dividir(texto: string): string[] {
+  return String(texto || "")
+    .split(/[\n;]+|,(?!\d)/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 /** Comorbidades e MUC (seções separadas + fallback combinado). */
 function comorbidadesMUC(p: Paciente): { comorb: string[]; muc: string[] } {
   const comorb: string[] = [];
   const muc: string[] = [];
   const secC = p.secoes?.comorbidades;
-  for (const b of parseBlocos(secC?.extraido)) comorb.push(...b.itens);
-  for (const a of (secC?.anotacoes as Anotacao[]) || []) if (a.texto?.trim()) comorb.push(a.texto.trim());
+  for (const b of parseBlocos(secC?.extraido)) for (const it of b.itens) comorb.push(...dividir(it));
+  for (const a of (secC?.anotacoes as Anotacao[]) || []) comorb.push(...dividir(a.texto));
   const secM = p.secoes?.medicacoesUsoContinuo;
-  for (const b of parseBlocos(secM?.extraido)) if (!/alergia/i.test(b.titulo || "")) muc.push(...b.itens);
-  for (const a of (secM?.anotacoes as Anotacao[]) || []) if (a.texto?.trim()) muc.push(a.texto.trim());
+  for (const b of parseBlocos(secM?.extraido)) if (!/alergia/i.test(b.titulo || "")) for (const it of b.itens) muc.push(...dividir(it));
+  for (const a of (secM?.anotacoes as Anotacao[]) || []) muc.push(...dividir(a.texto));
   const sec = p.secoes?.comorbidadesMedicacoes;
   if (sec && !comorb.length && !muc.length) {
-    for (const b of parseBlocos(sec.extraido)) (/medica|muc/i.test(b.titulo || "") ? muc : comorb).push(...b.itens);
+    for (const b of parseBlocos(sec.extraido)) {
+      const alvo = /medica|muc/i.test(b.titulo || "") ? muc : comorb;
+      for (const it of b.itens) alvo.push(...dividir(it));
+    }
   }
   return { comorb, muc };
 }

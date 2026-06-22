@@ -390,18 +390,35 @@ export default function Paciente() {
   const salvarEdicao = () => {
     const idadeTexto = idadeForm.trim();
     const idadeNum = idadeTexto === "" ? null : Number(idadeTexto);
-    atualizarPaciente(id, {
-      nomeCompleto: nomeForm.trim(),
-      idade: idadeNum != null && Number.isNaN(idadeNum) ? null : idadeNum,
-      leito: leitoForm.trim(),
-      setor: setorForm.trim(),
-      dataEntrada: entradaForm.trim(),
-      numeroProntuario: prontuarioForm.trim(),
-      status: statusForm,
-      diagnosticoPrincipal: diagnosticoForm.trim(),
-      motivoInternacao: motivoForm.trim(),
-    });
-    setEditando(false);
+    const idadeFinal =
+      idadeNum != null && Number.isNaN(idadeNum) ? null : idadeNum;
+    const aplicar = () => {
+      atualizarPaciente(id, {
+        nomeCompleto: nomeForm.trim(),
+        idade: idadeFinal,
+        leito: leitoForm.trim(),
+        setor: setorForm.trim(),
+        dataEntrada: entradaForm.trim(),
+        numeroProntuario: prontuarioForm.trim(),
+        status: statusForm,
+        diagnosticoPrincipal: diagnosticoForm.trim(),
+        motivoInternacao: motivoForm.trim(),
+      });
+      setEditando(false);
+    };
+    // Idade improvável (erro de digitação ou de leitura do scan): confirma antes.
+    if (idadeFinal != null && (idadeFinal < 0 || idadeFinal > 120)) {
+      Alert.alert(
+        "Idade improvável",
+        `${idadeFinal} anos parece fora do esperado. Deseja salvar mesmo assim?`,
+        [
+          { text: "Revisar", style: "cancel" },
+          { text: "Salvar assim", style: "destructive", onPress: aplicar },
+        ],
+      );
+      return;
+    }
+    aplicar();
   };
 
   const definirStatusClinico = (sc: StatusClinico) => {
@@ -1226,9 +1243,13 @@ function ComorbidadesUnificado({
   onExcluir: (a: Anotacao) => void;
   onExtraido: (texto: string) => void;
 }) {
-  const blocos =
+  // Normaliza: cada item vira um átomo (split por vírgula/;/quebra). Garante que
+  // "Cirrose, HIV, insônia" (vindo de scan ou legado num item só) apareça como
+  // chips/itens individuais — e o split é persistido no próximo salvar.
+  const blocos = (
     parseBlocos(extraido) ??
-    (extraido.trim() ? [{ titulo: "", itens: dividirItens(extraido) }] : []);
+    (extraido.trim() ? [{ titulo: "", itens: dividirItens(extraido) }] : [])
+  ).map((b) => ({ ...b, itens: b.itens.flatMap((it) => dividirItens(it)) }));
   // Cada extra guarda a origem (bloco/índice) para permitir remover no modo edição.
   type Extra = { texto: string; bi: number; ii: number };
   const comorbExtra: Extra[] = [];
@@ -1280,17 +1301,19 @@ function ComorbidadesUnificado({
             )}
           </View>
         ))}
-        {anots.map((a) => (
-          <View key={a.id} style={styles.itemRow}>
-            <Text style={styles.itemBullet}>•</Text>
-            <Text style={styles.itemTexto}>{a.texto}</Text>
-            {editando && (
-              <TouchableOpacity onPress={() => onExcluir(a)} hitSlop={8}>
-                <Ionicons name="trash-outline" size={16} color={ClinicalColors.danger} />
-              </TouchableOpacity>
-            )}
-          </View>
-        ))}
+        {anots.flatMap((a) =>
+          dividirItens(a.texto).map((atomo, k) => (
+            <View key={`${a.id}-${k}`} style={styles.itemRow}>
+              <Text style={styles.itemBullet}>•</Text>
+              <Text style={styles.itemTexto}>{atomo}</Text>
+              {editando && (
+                <TouchableOpacity onPress={() => onExcluir(a)} hitSlop={8}>
+                  <Ionicons name="trash-outline" size={16} color={ClinicalColors.danger} />
+                </TouchableOpacity>
+              )}
+            </View>
+          )),
+        )}
       </View>
     );
   };
