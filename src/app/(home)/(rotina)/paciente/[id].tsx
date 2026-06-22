@@ -43,6 +43,7 @@ import { CHECKLIST_ALTA } from "@/constants/checklistAlta";
 import { SECOES } from "@/constants/secoes";
 import { categorizarAnotacao } from "@/lib/categorizarAnotacao";
 import { classificarMedicamento } from "@/lib/classificarMedicamento";
+import { ehAntibiotico } from "@/lib/passarCaso";
 import { diaDeInternacao, formatarDataBR, hojeISO, limparDataEmTexto } from "@/lib/datas";
 import { extrairDadosImagem } from "@/lib/extrairDadosImagem";
 import { formatarNome } from "@/lib/formatarNome";
@@ -2861,7 +2862,11 @@ const LAB_CAMPOS: { key: string; label: string; unidade: string; alias: RegExp }
   { key: "Glicemia", label: "Glicemia", unidade: "mg/dL", alias: /^(glic)/i },
   { key: "TGO", label: "TGO", unidade: "U/L", alias: /^(tgo|ast)/i },
   { key: "TGP", label: "TGP", unidade: "U/L", alias: /^(tgp|alt)/i },
-  { key: "BT", label: "BT", unidade: "mg/dL", alias: /^(bt|bilirr)/i },
+  { key: "FA", label: "FA", unidade: "U/L", alias: /^(fa|fosfatase)/i },
+  { key: "GGT", label: "GGT", unidade: "U/L", alias: /^(ggt|gama)/i },
+  { key: "BT", label: "BT", unidade: "mg/dL", alias: /^bt\b|bilirrubina t/i },
+  { key: "BD", label: "BD", unidade: "mg/dL", alias: /^bd\b|bilirrubina d/i },
+  { key: "Alb", label: "Alb", unidade: "g/dL", alias: /^(alb|albumin)/i },
   { key: "INR", label: "INR", unidade: "", alias: /^(inr|rni)/i },
 ];
 // Labs onde a queda é o "ruim" (para a cor da seta de tendência).
@@ -3770,6 +3775,11 @@ function PrescricaoSecao({
             <View style={styles.medInfo}>
               <View style={styles.medTituloLinha}>
                 <Text style={styles.medTexto}>{m.texto}</Text>
+                {ehAntibiotico(m.texto, m.classe) && (
+                  <View style={styles.badgeAtb}>
+                    <Text style={styles.badgeAtbTexto}>ATB</Text>
+                  </View>
+                )}
                 {sev && (sev === "moderada" || sev === "grave") && (
                   <View style={[styles.badgeInteracao, { backgroundColor: COR_SEVERIDADE[sev] }]}>
                     <Ionicons name="warning" size={11} color="#FFFFFF" />
@@ -4857,6 +4867,14 @@ const styles = StyleSheet.create({
     paddingVertical: 1,
   },
   badgeInteracaoTexto: { color: "#FFFFFF", fontSize: 10, fontWeight: "700" },
+  // Badge ATB — mesma identidade do Passar o Caso (#FFEDE6 / #C2410C).
+  badgeAtb: {
+    backgroundColor: "#FFEDE6",
+    borderRadius: Radius.badge,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+  },
+  badgeAtbTexto: { color: "#C2410C", fontSize: 10, fontWeight: "800" },
   badgeAjuste: {
     color: "#FF9500",
     fontSize: 11,

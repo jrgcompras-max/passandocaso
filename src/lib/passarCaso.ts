@@ -64,11 +64,21 @@ const RE_ATB = /antibi|antimicro|\batb\b/i;
 const KW_ATB =
   /ceftriaxona|cefepime|cefalexina|cefazolina|ceftazidima|amoxicilina|ampicilina|azitromicina|claritromicina|ciprofloxac|levofloxac|piperacilina|tazobactam|imipenem|meropen|ertapen|vancomicina|teicoplanina|oxacilina|metronidazol|clindamicina|gentamicina|amicacina|sulfametoxazol|bactrim|polimixina|penicilina|clavulanato|sulbactam|linezolida|daptomicina/i;
 
+/**
+ * Heurística única para "este medicamento é antibiótico?": pela classe
+ * farmacológica (classificada pela IA) OU pelo nome do princípio ativo.
+ * Usada tanto aqui (antibioticoterapia do Passar o Caso) quanto na badge ATB
+ * da Prescrição Hospitalar — uma só fonte de verdade.
+ */
+export function ehAntibiotico(texto?: string, classe?: string): boolean {
+  return RE_ATB.test(classe || "") || KW_ATB.test(texto || "");
+}
+
 /** Antibióticos da prescrição (medicamentos + anotações com badge ATB). */
 function antibioticos(p: Paciente): string[] {
   const out: string[] = [];
   for (const m of p.medicamentos || []) {
-    if (RE_ATB.test(m.classe || "") || KW_ATB.test(m.texto || "")) out.push(m.texto.trim());
+    if (ehAntibiotico(m.texto, m.classe)) out.push(m.texto.trim());
   }
   const sec = p.secoes?.prescricaoHospitalar;
   for (const a of (sec?.anotacoes as Anotacao[]) || []) {
@@ -116,8 +126,14 @@ const REF_LAB: { re: RegExp; min: number; max: number }[] = [
   { re: /^k\b|pot[áa]ssio/i, min: 3.5, max: 5.0 },
   { re: /^cr\b|creatin/i, min: 0.6, max: 1.3 },
   { re: /ureia|ur[ée]ia/i, min: 10, max: 50 },
+  // Bilirrubinas: direta/indireta ANTES da total para não cair na regra genérica.
+  { re: /^bd\b|bilirrubina dir/i, min: 0, max: 0.3 },
+  { re: /^bi\b|bilirrubina ind/i, min: 0.1, max: 0.8 },
   { re: /^bt\b|bilirrubina/i, min: 0, max: 1.2 },
   { re: /albumina/i, min: 3.5, max: 5.0 },
+  // Função hepática: FA = Fosfatase Alcalina (NÃO fibrilação atrial); GGT = Gama-GT.
+  { re: /^fa\b|fosfatase alcalina/i, min: 40, max: 130 },
+  { re: /^ggt\b|gama|gama-?gt/i, min: 10, max: 60 },
   { re: /lactato/i, min: 0.5, max: 2.2 },
   { re: /^inr\b|rni/i, min: 0.8, max: 1.2 },
   { re: /^na\b/i, min: 135, max: 145 },

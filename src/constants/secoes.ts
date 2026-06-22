@@ -65,7 +65,10 @@ const DEFS: SecaoDef[] = [
     escopo: "os resultados de exames laboratoriais (sangue, urina, líquor, etc.)",
     especifico:
       "Agrupe por painel/sistema (ex.: 'Hemograma', 'Função renal', 'Eletrólitos', 'Função hepática', 'Coagulação', 'Gasometria', 'Marcadores'), " +
-      "cada exame com valor e unidade como um item. NÃO inclua laudos de exames de imagem.",
+      "cada exame com valor e unidade como um item. NÃO inclua laudos de exames de imagem. " +
+      "Reconheça abreviações laboratoriais, inclusive as de função hepática: " +
+      "FA = Fosfatase Alcalina, GGT = Gama-GT, BD/BI = bilirrubina direta/indireta, BT = bilirrubina total, ALB = albumina, TGO/TGP = transaminases. " +
+      "ATENÇÃO: 'FA' seguido de um valor é Fosfatase Alcalina (um EXAME laboratorial) — NÃO é fibrilação atrial nem sinal vital; inclua-o normalmente.",
   },
   {
     id: "imagem",
@@ -89,7 +92,8 @@ const DEFS: SecaoDef[] = [
     titulo: "Sinais Vitais e Intercorrências",
     escopo: "os sinais vitais e as intercorrências do dia",
     especifico:
-      "Use dois blocos: 'Sinais vitais' (PA, FC, FR, Tax, SatO2, etc., um por item) e 'Intercorrências' (uma por item).",
+      "Use dois blocos: 'Sinais vitais' (PA, FC, FR, Tax, SatO2, etc., um por item) e 'Intercorrências' (uma por item). " +
+      "NÃO inclua exames laboratoriais: em especial, 'FA' (Fosfatase Alcalina) é um exame de função hepática e pertence aos Exames Laboratoriais, não aos sinais vitais.",
   },
 ];
 
