@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -9,6 +9,7 @@ import { diaDeInternacao, hojeISO } from "@/lib/datas";
 import { calcularEscores } from "@/lib/escoresClinicos";
 import { formatarNome } from "@/lib/formatarNome";
 import { type CasoData, montarCaso } from "@/lib/passarCaso";
+import { resumirHdaUmaLinha } from "@/lib/resumirHda";
 import { useAuth } from "@/store/AuthContext";
 import { usePacientes } from "@/store/PacientesContext";
 import { type Paciente } from "@/types/paciente";
@@ -80,6 +81,22 @@ export default function PassarCaso() {
     [paciente, hoje, escoresAtivado],
   );
 
+  // HDA: resumo via API (uma linha clínica). Mostra o resumo local até chegar.
+  const [hdaResumo, setHdaResumo] = useState<string | null>(null);
+  const hdaCompleta = caso?.hdaCompleta || "";
+  useEffect(() => {
+    let vivo = true;
+    setHdaResumo(null);
+    if (hdaCompleta.length > 120) {
+      resumirHdaUmaLinha(hdaCompleta).then((r) => {
+        if (vivo && r) setHdaResumo(r);
+      });
+    }
+    return () => {
+      vivo = false;
+    };
+  }, [hdaCompleta]);
+
   return (
     <View style={s.container}>
       <View style={[s.topo, { paddingTop: insets.top + 6 }]}>
@@ -96,7 +113,7 @@ export default function PassarCaso() {
           <>
             {!!caso.hda && (
               <Card label="HDA">
-                <Text style={s.hdaTexto}>{caso.hda}</Text>
+                <Text style={s.hdaTexto}>{hdaResumo || caso.hda}</Text>
               </Card>
             )}
 

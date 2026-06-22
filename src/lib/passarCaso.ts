@@ -14,6 +14,8 @@ export type ExameSecaoCaso = { label: string; itens: string[] };
 
 export type CasoData = {
   hda: string;
+  /** HDA completa (para resumir via API no Passar o Caso). */
+  hdaCompleta: string;
   atual: string[];
   comorbidades: string[];
   muc: string[];
@@ -199,7 +201,9 @@ export function montarCaso(paciente: Paciente, hoje: string): CasoData {
   const { comorb, muc } = comorbidadesMUC(paciente);
 
   const hdaBlocos = parseBlocos(paciente.secoes?.historia?.extraido);
-  const hda = resumirUmaLinha(hdaBlocos.flatMap((b) => b.itens).join(" ").trim());
+  const hdaCompleta = hdaBlocos.flatMap((b) => b.itens).join(" ").trim();
+  // Resumo local (fallback imediato); a tela troca pelo resumo via API quando pronto.
+  const hda = resumirUmaLinha(hdaCompleta);
 
   const atual = (paciente.problemas || [])
     .filter((x) => x.status === "ativo" || x.status === "resolvendo")
@@ -227,6 +231,7 @@ export function montarCaso(paciente: Paciente, hoje: string): CasoData {
 
   return {
     hda,
+    hdaCompleta,
     atual,
     comorbidades: comorb,
     muc,
