@@ -249,7 +249,6 @@ export function montarTextoEvolucao(paciente: Paciente, hoje: string): string {
     sv?.fr ? `FR ${sv.fr}` : null,
     sv?.sato2 ? `SatO2 ${sv.sato2}` : null,
     sv?.temp ? `Tax ${sv.temp}` : null,
-    sv?.glasgow ? `Glasgow ${sv.glasgow}` : null,
   ].filter(Boolean);
   const ssvv = ssvvPartes.length ? `SSVV: ${ssvvPartes.join(" | ")}` : null;
 

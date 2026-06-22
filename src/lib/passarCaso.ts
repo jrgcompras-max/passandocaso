@@ -142,8 +142,6 @@ function ssvvAlterados(p: Paciente, hoje: string): SsvvAlterado[] {
   checa("sato2", "SatO₂", "%");
   checa("temp", "Tax", "°C");
   checa("glicemia", "Glicemia", " mg/dL");
-  const g = num(sv.glasgow || "");
-  if (g != null && g < 15) out.push({ label: "Glasgow", valor: String(sv.glasgow) });
   return out;
 }
 

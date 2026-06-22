@@ -198,12 +198,22 @@ const CATEGORIAS_FORTES = ["comorbidade", "medicacao", "exame_lab", "exame_image
 const KW_COMORBIDADE =
   /\b(drc|irc|dm1|dm2|dm|has|hass|icc|ic|dpoc|avc|ave|ait|tep|tvp|hiv|les|iam|dac|dap|hpb|drge|nash|dhgna)\b|diabet|hipertens|cirrose|hepatopat|nefropat|cardiopat|neoplasi|c[âa]ncer|carcinom|insufici[êe]ncia (cardiac|renal|hepat|coronar)|demenci|alzheimer|parkinson|epileps|dialit|dialis|tabagism|etilism|obesidad|dislipidemi|hipotireoid|hipertireoid/i;
 
-async function buscarTermoSeguro(texto) {
+async function buscarTermoSeguro(texto, categoria) {
   try {
-    return await buscarTermo(texto);
+    return await buscarTermo(texto, categoria);
   } catch {
     return null;
   }
+}
+
+/**
+ * O item PERTENCE à categoria esperada da seção? Resolve abreviações ambíguas:
+ * "FA 140" nos labs casa Fosfatase Alcalina (exame_lab) — não deve ser tratado
+ * como Fibrilação Atrial (comorbidade). Se pertence à esperada, nunca é anomalia.
+ */
+async function pertenceEsperada(texto, esperada) {
+  if (!esperada) return false;
+  return !!(await buscarTermoSeguro(texto, esperada));
 }
 
 /**
@@ -249,8 +259,11 @@ async function sanitizarSecao(blocos, secao) {
     for (const item of b?.itens || []) {
       const texto = String(item || "").trim();
       if (!texto) continue;
+      // Se o item pertence à categoria esperada, nunca é anomalia (ex.: "FA" lab).
       const termo = await buscarTermoSeguro(texto);
-      const conflito = categoriaConflitante(texto, termo, esperada);
+      const conflito = (await pertenceEsperada(texto, esperada))
+        ? null
+        : categoriaConflitante(texto, termo, esperada);
       if (conflito) {
         anomalias.push({ item: texto, categoriaDetectada: conflito, esperada, secao });
       } else {
@@ -277,7 +290,9 @@ async function sanitizarEstruturado(dados, secao) {
     for (const it of lista) {
       const texto = campoNome ? nomeDe(it) : String(it || "");
       const termo = await buscarTermoSeguro(texto);
-      const conflito = categoriaConflitante(texto, termo, esperada);
+      const conflito = (await pertenceEsperada(texto, esperada))
+        ? null
+        : categoriaConflitante(texto, termo, esperada);
       if (conflito) anomalias.push({ item: texto, categoriaDetectada: conflito, esperada, secao });
       else limpos.push(it);
     }

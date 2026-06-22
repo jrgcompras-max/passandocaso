@@ -50,6 +50,7 @@ import { type CabecalhoProntuario } from "@/types/paciente";
 const ORDEM_STATUS: StatusType[] = [
   "naoVisitado",
   "visitado",
+  "evoluido",
   "revisar",
   "pendente",
   "altaProvavel",
@@ -60,6 +61,7 @@ const ORDEM_STATUS: StatusType[] = [
 const ROTULO_GRUPO: Record<StatusType, string> = {
   naoVisitado: "Não visitados",
   visitado: "Visitados",
+  evoluido: "Evoluídos",
   revisar: "Revisar",
   pendente: "Pendentes",
   altaProvavel: "Alta provável",

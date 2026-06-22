@@ -84,7 +84,6 @@ function ssvvRows(sv: RegistroDiario["sinais_vitais"]): { label: string; valor: 
     linhas.push({ label: "O₂", valor: O2_ROTULO[String(sv.o2)] });
   }
   if (v(sv.temp)) linhas.push({ label: "Tax", valor: `${v(sv.temp)}°C` });
-  if (v(sv.glasgow)) linhas.push({ label: "Glasgow", valor: v(sv.glasgow) });
   if (v(sv.glicemia)) linhas.push({ label: "Glicemia", valor: `${v(sv.glicemia)} mg/dL` });
   if (v(sv.diurese)) linhas.push({ label: "Diurese", valor: `${v(sv.diurese)} mL/24h` });
   return linhas;

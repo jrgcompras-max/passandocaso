@@ -826,7 +826,7 @@ export default function Paciente() {
               if (item.id === "sinaisVitaisIntercorrencias") {
                 const rotuloSV: Record<string, string> = {
                   paSist: "PA sist", paDiast: "PA diast", fc: "FC", fr: "FR",
-                  sato2: "SatO₂", temp: "Tax", glasgow: "Glasgow",
+                  sato2: "SatO₂", temp: "Tax",
                   glicemia: "Glicemia", diurese: "Diurese",
                 };
                 const campos = Object.keys(rotuloSV);
@@ -2114,7 +2114,7 @@ const CHIPS_EXAME: { secao: string; campo: CampoExame; label: string; chips: str
   },
   {
     secao: "respiratorio", campo: "respiratorio", label: "Respiratório",
-    chips: ["AP MV+ bilat simétrico sem RA", "eupneico", "sem ruídos adventícios", "taquipneico", "dispneico", "estertores crepitantes", "sibilos difusos", "roncos", "MV reduzido em base", "uso de musculatura acessória"],
+    chips: ["AP MV+ bilat simétrico sem RA", "eupneico", "sem ruídos adventícios", "taquipneico", "dispneico", "estertores crepitantes", "sibilos difusos", "roncos", "MV reduzido globalmente", "MV reduzido em base", "uso de musculatura acessória"],
   },
   {
     secao: "abdominal", campo: "abdominal", label: "Abdominal",
@@ -2896,7 +2896,6 @@ type CampoNum =
   | "fc"
   | "fr"
   | "sato2"
-  | "glasgow"
   | "glicemia"
   | "diurese";
 
@@ -3546,7 +3545,6 @@ function SinaisVitaisSecao({
     { k: "fc", label: "FC (bpm)", ph: "78" },
     { k: "fr", label: "FR (irpm)", ph: "16" },
     { k: "sato2", label: "SatO2 (%)", ph: "96" },
-    { k: "glasgow", label: "Glasgow", ph: "15" },
     { k: "glicemia", label: "Glicemia (mg/dL)", ph: "—" },
     { k: "diurese", label: "Diurese (mL/24h)", ph: "—" },
   ];

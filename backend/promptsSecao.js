@@ -100,8 +100,8 @@ const PROMPTS = {
   sinaisVitaisIntercorrencias:
     "Extraia APENAS os sinais vitais mais recentes. Use null quando ausente. " +
     "NÃO inclua: exames laboratoriais, laudos de imagem, exame físico por aparelhos, " +
-    "medicamentos nem comorbidades. " +
-    'Formato: {"data":"DD/MM ou null","hora":"HH:MM ou null","paSist":num,"paDiast":num,"fc":num,"fr":num,"sato2":num,"temp":num,"glasgow":num,"glicemia":num,"peso":num,"diurese":num}. ' +
+    "Glasgow/orientação (ficam no exame neurológico), medicamentos nem comorbidades. " +
+    'Formato: {"data":"DD/MM ou null","hora":"HH:MM ou null","paSist":num,"paDiast":num,"fc":num,"fr":num,"sato2":num,"temp":num,"glicemia":num,"peso":num,"diurese":num}. ' +
     REGRA,
 };
 

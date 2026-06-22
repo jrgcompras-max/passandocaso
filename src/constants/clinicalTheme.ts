@@ -24,6 +24,7 @@ export const ClinicalColors = {
 export type StatusType =
   | "naoVisitado"
   | "visitado"
+  | "evoluido"
   | "revisar"
   | "pendente"
   | "altaProvavel"
@@ -35,6 +36,7 @@ export const StatusColors: Record<
 > = {
   naoVisitado: { label: "Não visitado", bg: "#FFE5E5", text: "#FF3B30" },
   visitado: { label: "Visitado", bg: "#FFF3E0", text: "#FF9500" },
+  evoluido: { label: "Evoluído", bg: "#E0F2FE", text: "#0369A1" },
   revisar: { label: "Revisar", bg: "#F3E5FF", text: "#AF52DE" },
   pendente: { label: "Pendente", bg: "#F3E5FF", text: "#AF52DE" },
   altaProvavel: { label: "Alta provável", bg: "#E5F7EE", text: "#34C759" },
