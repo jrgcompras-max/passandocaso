@@ -910,12 +910,18 @@ export default function Paciente() {
           <EvolucaoBeiraLeitoSecao
             key={hoje}
             evolucao={paciente?.evolucoes?.[hoje] ?? EVOLUCAO_VAZIA}
-            onSalvar={(evo) => atualizarEvolucao(id, hoje, evo)}
+            // Salva tudo MENOS a conduta — a Conduta do Dia é dona desse campo
+            // e o grava por conta própria; assim uma seção não apaga a outra.
+            onSalvar={({ condutaDoDia: _conduta, ...resto }) =>
+              atualizarEvolucao(id, hoje, resto)
+            }
           />
           <CondutaSecao
             key={`conduta-${hoje}`}
             evolucao={paciente?.evolucoes?.[hoje] ?? EVOLUCAO_VAZIA}
-            onSalvar={(evo) => atualizarEvolucao(id, hoje, evo)}
+            onSalvar={(evo) =>
+              atualizarEvolucao(id, hoje, { condutaDoDia: evo.condutaDoDia })
+            }
           />
           {mostrarChecklistAlta && (
             <ChecklistAltaSecao

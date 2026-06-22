@@ -8,6 +8,7 @@ import {
 } from "react";
 
 import { type StatusType } from "@/constants/clinicalTheme";
+import { EVOLUCAO_VAZIA } from "@/constants/evolucao";
 import { gerarPacientesExemplo } from "@/constants/pacientesExemplo";
 import {
   buscarPacientes,
@@ -64,11 +65,16 @@ type PacientesContextValue = {
   atualizarProblemas: (id: string, problemas: Problema[]) => void;
   /** Substitui a lista de pendências do paciente. */
   atualizarPendencias: (id: string, pendencias: Pendencia[]) => void;
-  /** Salva (substitui) a evolução beira-leito de uma data específica. */
+  /**
+   * Mescla campos da evolução beira-leito de uma data. Recebe um PATCH parcial
+   * e o funde no objeto do dia já armazenado — assim seções independentes
+   * (ex.: Conduta do Dia vs. Exame Físico) não sobrescrevem os campos umas das
+   * outras ao salvar (cada uma envia só o que possui).
+   */
   atualizarEvolucao: (
     id: string,
     data: string,
-    evolucao: EvolucaoBeiraLeito,
+    patch: Partial<EvolucaoBeiraLeito>,
   ) => void;
   removerPaciente: (id: string) => void;
   /** Move todos os pacientes de um hospital para outro. Retorna quantos moveu. */
@@ -319,12 +325,21 @@ export function PacientesProvider({ children }: { children: ReactNode }) {
   const atualizarEvolucao = (
     id: string,
     data: string,
-    evolucao: EvolucaoBeiraLeito,
+    patch: Partial<EvolucaoBeiraLeito>,
   ) => {
     setPacientes((prev) =>
       prev.map((p) =>
         p.id === id
-          ? { ...p, evolucoes: { ...p.evolucoes, [data]: evolucao } }
+          ? {
+              ...p,
+              evolucoes: {
+                ...p.evolucoes,
+                [data]: {
+                  ...(p.evolucoes?.[data] ?? EVOLUCAO_VAZIA),
+                  ...patch,
+                },
+              },
+            }
           : p,
       ),
     );
