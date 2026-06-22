@@ -3171,6 +3171,20 @@ function LabsPorData({
   const [freeValor, setFreeValor] = useState("");
   const [escaneando, setEscaneando] = useState(false);
   const [verTodos, setVerTodos] = useState(false);
+  // FEATURE 1: seleção múltipla das entradas de hoje (excluir em massa).
+  const [selecionando, setSelecionando] = useState(false);
+  const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
+  const toggleSel = (k: string) =>
+    setSelecionados((p) => {
+      const n = new Set(p);
+      if (n.has(k)) n.delete(k);
+      else n.add(k);
+      return n;
+    });
+  const sairSelecao = () => {
+    setSelecionando(false);
+    setSelecionados(new Set());
+  };
 
   // Agrupa por data → mapa exame→valor (último valor do dia vence).
   const porData = new Map<string, { exame: string; valor: string }[]>();
@@ -3302,6 +3316,36 @@ function LabsPorData({
     return a > p ? "↑" : "↓";
   };
 
+  const keysHoje = entradasHoje.map((e) => e.key.toLowerCase());
+  const todosSelecionados =
+    keysHoje.length > 0 && keysHoje.every((k) => selecionados.has(k));
+  const excluirSelecionados = () => {
+    if (!selecionados.size) return;
+    Alert.alert(
+      "Excluir exames de hoje",
+      `Remover ${selecionados.size} exame${selecionados.size > 1 ? "s" : ""} de hoje? Esta ação não pode ser desfeita.`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: `Excluir (${selecionados.size})`,
+          style: "destructive",
+          onPress: () => {
+            const novos = resultados.filter(
+              (r) =>
+                !(
+                  r.data.slice(0, 10) === hoje &&
+                  selecionados.has(r.exame.toLowerCase())
+                ),
+            );
+            onChange(novos);
+            onAposSalvar?.(novos);
+            sairSelecao();
+          },
+        },
+      ],
+    );
+  };
+
   return (
     <View style={styles.labBox}>
       <View style={styles.labHistHeader}>
@@ -3321,19 +3365,77 @@ function LabsPorData({
       {/* Painel de hoje */}
       {temHoje && (
         <View style={styles.labHojeBox}>
-          <Text style={styles.labHojeData}>Hoje · {rotuloDiaMes(hoje)}</Text>
-          <View style={styles.labHojeWrap}>
-            {entradasHoje.map((e) => (
-              <LabHojeChip
-                key={e.key}
-                label={e.label}
-                exameKey={e.key}
-                valor={e.valor}
-                setaStr={seta(e.key, e.valor)}
-                sexo={sexo}
-              />
-            ))}
+          <View style={styles.labHojeTopo}>
+            <Text style={styles.labHojeData}>Hoje · {rotuloDiaMes(hoje)}</Text>
+            {entradasHoje.length > 0 && (
+              <TouchableOpacity
+                onPress={() => (selecionando ? sairSelecao() : setSelecionando(true))}
+                hitSlop={8}
+              >
+                <Text style={styles.labSelToggle}>
+                  {selecionando ? "Cancelar" : "Selecionar"}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
+          <View style={styles.labHojeWrap}>
+            {entradasHoje.map((e) => {
+              const k = e.key.toLowerCase();
+              const sel = selecionados.has(k);
+              const chip = (
+                <LabHojeChip
+                  label={e.label}
+                  exameKey={e.key}
+                  valor={e.valor}
+                  setaStr={seta(e.key, e.valor)}
+                  sexo={sexo}
+                />
+              );
+              if (!selecionando) return <View key={e.key}>{chip}</View>;
+              return (
+                <TouchableOpacity
+                  key={e.key}
+                  style={[styles.labChipSel, sel && styles.labChipSelOn]}
+                  onPress={() => toggleSel(k)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons
+                    name={sel ? "checkmark-circle" : "ellipse-outline"}
+                    size={16}
+                    color={sel ? ClinicalColors.primary : ClinicalColors.textMuted}
+                  />
+                  {chip}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          {selecionando && (
+            <View style={styles.labSelBar}>
+              <TouchableOpacity
+                onPress={() =>
+                  setSelecionados(todosSelecionados ? new Set() : new Set(keysHoje))
+                }
+                hitSlop={8}
+              >
+                <Text style={styles.labSelTodos}>
+                  {todosSelecionados ? "Limpar seleção" : "Selecionar todos"}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.labSelExcluir,
+                  !selecionados.size && styles.labSelExcluirOff,
+                ]}
+                onPress={excluirSelecionados}
+                disabled={!selecionados.size}
+              >
+                <Ionicons name="trash-outline" size={14} color="#FFFFFF" />
+                <Text style={styles.labSelExcluirTxt}>
+                  Excluir ({selecionados.size})
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
           <Text style={styles.labRefFonte}>
             Referências: LOINC{sexo ? " · ajustadas por sexo" : ""} · avalie clinicamente
           </Text>
@@ -4926,12 +5028,53 @@ const styles = StyleSheet.create({
     borderRadius: Radius.card,
     padding: 12,
   },
+  labHojeTopo: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
   labHojeData: {
     fontSize: 12,
     fontWeight: "600",
     color: ClinicalColors.textMuted,
-    marginBottom: 8,
   },
+  labSelToggle: { fontSize: 13, fontWeight: "600", color: ClinicalColors.primary },
+  labChipSel: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    borderWidth: 1,
+    borderColor: ClinicalColors.border,
+    borderRadius: Radius.badge,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+  },
+  labChipSelOn: {
+    borderColor: ClinicalColors.primary,
+    backgroundColor: "#FFFFFF",
+  },
+  labSelBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: 0.5,
+    borderTopColor: ClinicalColors.border,
+  },
+  labSelTodos: { fontSize: 13, fontWeight: "600", color: ClinicalColors.primary },
+  labSelExcluir: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: ClinicalColors.warning,
+    borderRadius: Radius.badge,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  labSelExcluirOff: { opacity: 0.4 },
+  labSelExcluirTxt: { color: "#FFFFFF", fontSize: 13, fontWeight: "700" },
   labHojeWrap: { flexDirection: "row", flexWrap: "wrap", rowGap: 8, columnGap: 14 },
   labHojeChip: { flexDirection: "row", alignItems: "baseline" },
   labHojeLabel: { fontSize: 13, color: ClinicalColors.textMuted },
