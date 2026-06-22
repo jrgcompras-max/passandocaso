@@ -179,6 +179,21 @@ export default function Index() {
     selecionar,
   } = useHospitais();
 
+  // Seleção múltipla para exclusão em massa (BUG 8).
+  const [selecionando, setSelecionando] = useState(false);
+  const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
+  const alternarSelecionado = (id: string) =>
+    setSelecionados((prev) => {
+      const novo = new Set(prev);
+      if (novo.has(id)) novo.delete(id);
+      else novo.add(id);
+      return novo;
+    });
+  const sairSelecao = () => {
+    setSelecionando(false);
+    setSelecionados(new Set());
+  };
+
   // Sem hospital ativo, seleciona "Geral" por padrão (a troca é feita na aba Hospitais).
   useEffect(() => {
     if (hospCarregado && !hospitalAtivo) selecionar("geral");
@@ -360,6 +375,27 @@ export default function Index() {
     );
   };
 
+  // Exclusão em massa dos pacientes selecionados (BUG 8), com confirmação.
+  const excluirSelecionados = () => {
+    const ids = [...selecionados];
+    if (!ids.length) return;
+    Alert.alert(
+      "Excluir selecionados",
+      `Remover ${ids.length} paciente${ids.length > 1 ? "s" : ""} da rotina? Esta ação não pode ser desfeita.`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: `Excluir (${ids.length})`,
+          style: "destructive",
+          onPress: () => {
+            ids.forEach((pid) => removerPaciente(pid));
+            sairSelecao();
+          },
+        },
+      ],
+    );
+  };
+
   const processarImagem = async (uri: string) => {
     setProcessando(true);
     setErro(null);
@@ -472,6 +508,17 @@ export default function Index() {
           )}
         </View>
         {processando && <ActivityIndicator color={ClinicalColors.primary} />}
+        {pacientesHosp.length > 0 && (
+          <TouchableOpacity
+            style={styles.selecionarBtn}
+            onPress={() => (selecionando ? sairSelecao() : setSelecionando(true))}
+            hitSlop={8}
+          >
+            <Text style={styles.selecionarBtnTexto}>
+              {selecionando ? "Cancelar" : "Selecionar"}
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {processando && (
@@ -540,6 +587,7 @@ export default function Index() {
                       friction={2}
                       rightThreshold={40}
                       overshootRight={false}
+                      enabled={!selecionando}
                       renderRightActions={() => (
                         <TouchableOpacity
                           style={styles.swipeExcluir}
@@ -554,12 +602,27 @@ export default function Index() {
                       <TouchableOpacity
                         style={styles.card}
                         onPress={() =>
-                          router.push({
-                            pathname: "/paciente/[id]",
-                            params: { id: item.id },
-                          })
+                          selecionando
+                            ? alternarSelecionado(item.id)
+                            : router.push({
+                                pathname: "/paciente/[id]",
+                                params: { id: item.id },
+                              })
                         }
                       >
+                        {selecionando && (
+                          <View
+                            style={[
+                              styles.checkCircle,
+                              selecionados.has(item.id) &&
+                                styles.checkCircleAtivo,
+                            ]}
+                          >
+                            {selecionados.has(item.id) && (
+                              <Ionicons name="checkmark" size={15} color="#FFFFFF" />
+                            )}
+                          </View>
+                        )}
                         <View style={styles.cardLeft}>
                           {(!!item.leito || !!item.setor) && (
                             <Text style={styles.leito}>
@@ -658,6 +721,40 @@ export default function Index() {
                 : []),
             ])}
       </ScrollView>
+
+      {selecionando && (
+        <View style={styles.selBar}>
+          <TouchableOpacity
+            onPress={() =>
+              setSelecionados((prev) =>
+                prev.size === pacientesHosp.length
+                  ? new Set()
+                  : new Set(pacientesHosp.map((p) => p.id)),
+              )
+            }
+            hitSlop={8}
+          >
+            <Text style={styles.selBarTodos}>
+              {selecionados.size === pacientesHosp.length
+                ? "Limpar seleção"
+                : "Selecionar todos"}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.selBarExcluir,
+              !selecionados.size && styles.selBarExcluirInativo,
+            ]}
+            onPress={excluirSelecionados}
+            disabled={!selecionados.size}
+          >
+            <Ionicons name="trash-outline" size={16} color="#FFFFFF" />
+            <Text style={styles.selBarExcluirTexto}>
+              Excluir ({selecionados.size})
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       <Modal
         visible={modalVisivel}
@@ -1053,6 +1150,55 @@ const styles = StyleSheet.create({
     borderRadius: Radius.card,
   },
   swipeExcluirTexto: { color: "#FFFFFF", fontSize: 15, fontWeight: "700" },
+
+  // Seleção múltipla (BUG 8)
+  selecionarBtn: { paddingHorizontal: 6, paddingVertical: 4 },
+  selecionarBtnTexto: {
+    color: ClinicalColors.primary,
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  checkCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: ClinicalColors.border,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  checkCircleAtivo: {
+    backgroundColor: ClinicalColors.primary,
+    borderColor: ClinicalColors.primary,
+  },
+  selBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 28,
+    borderTopWidth: BorderWidth.hairline,
+    borderTopColor: ClinicalColors.border,
+    backgroundColor: ClinicalColors.surface,
+  },
+  selBarTodos: {
+    color: ClinicalColors.primary,
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  selBarExcluir: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#991B1B",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: Radius.card,
+  },
+  selBarExcluirInativo: { opacity: 0.4 },
+  selBarExcluirTexto: { color: "#FFFFFF", fontSize: 15, fontWeight: "700" },
 
   // Multi-hospital
   topoLinha: {
