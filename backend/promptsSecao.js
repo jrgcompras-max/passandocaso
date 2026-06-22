@@ -10,6 +10,39 @@
 
 const REGRA = "Responda SOMENTE com JSON válido (aspas duplas), sem nenhum texto fora do JSON.";
 
+/**
+ * Pipeline de labs multi-data (BUGS 10+11). A extração única perdia datas quando
+ * a tabela de laboratório tinha várias colunas/datas (importava só a mais
+ * recente). Estes dois prompts dividem o trabalho:
+ *  - INVENTÁRIO: só lista as datas presentes na tabela de labs.
+ *  - POR DATA: extrai os exames de UMA data específica (uma chamada por data).
+ */
+const PROMPT_INVENTARIO_LABS =
+  "Esta é a foto de um prontuário. Olhe APENAS a TABELA de exames laboratoriais " +
+  "(sangue/urina/líquor). Liste TODAS as datas de coleta presentes (cabeçalhos de " +
+  "coluna ou seções de laboratório), na ordem em que aparecem. Ignore sinais vitais, " +
+  "imagem, medicamentos e história. " +
+  'Formato: {"tem_labs":true/false,"datas":["DD/MM",...]}. ' +
+  "Se a tabela não tiver datas explícitas mas houver labs, retorne " +
+  '{"tem_labs":true,"datas":[]}. ' +
+  REGRA;
+
+function promptLabsPorData(data) {
+  const alvo = data ? `da data ${data}` : "presentes (sem data explícita)";
+  return (
+    `Extraia APENAS os exames laboratoriais ${alvo} desta imagem. ` +
+    "Ignore TODAS as outras datas/colunas e todas as outras seções (sinais vitais, " +
+    "imagem, medicamentos, comorbidades, história). " +
+    "Reconheça abreviações, inclusive de função hepática: FA = Fosfatase Alcalina " +
+    "(NÃO fibrilação atrial), GGT = Gama-GT, BD/BI = bilirrubina direta/indireta, " +
+    "BT = bilirrubina total, ALB = albumina, TGO/TGP = transaminases. " +
+    `Formato: {"data":"${data || "null"}","exames":[{"nome":"Hb","valor":"13","unidade":"g/dL"}]}. ` +
+    "Use unidade null quando não houver. Se não houver exames desta data, retorne " +
+    `{"data":"${data || "null"}","exames":[]}. ` +
+    REGRA
+  );
+}
+
 const PROMPTS = {
   // Combinada (legado): mantida para compatibilidade. As novas extrações usam
   // as seções separadas `comorbidades` e `medicacoesUsoContinuo`.
@@ -179,4 +212,9 @@ function deriveBlocos(secao, d) {
   return [];
 }
 
-module.exports = { PROMPTS, deriveBlocos };
+module.exports = {
+  PROMPTS,
+  deriveBlocos,
+  PROMPT_INVENTARIO_LABS,
+  promptLabsPorData,
+};

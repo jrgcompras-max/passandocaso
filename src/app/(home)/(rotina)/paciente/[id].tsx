@@ -44,6 +44,10 @@ import { SECOES } from "@/constants/secoes";
 import { categorizarAnotacao } from "@/lib/categorizarAnotacao";
 import { classificarMedicamento } from "@/lib/classificarMedicamento";
 import { ehAntibiotico } from "@/lib/passarCaso";
+import {
+  extrairLabsMultiData,
+  mesclarResultadosLab,
+} from "@/lib/extrairLabsMultiData";
 import { diaDeInternacao, formatarDataBR, hojeISO, limparDataEmTexto } from "@/lib/datas";
 import { extrairDadosImagem } from "@/lib/extrairDadosImagem";
 import { formatarNome } from "@/lib/formatarNome";
@@ -868,6 +872,33 @@ export default function Paciente() {
               }
               return false;
             }}
+            scanCustom={
+              item.id === "examesLaboratoriais"
+                ? async (base64, onProgresso) => {
+                    // BUGS 10+11 + 4/9: pipeline multi-data → popula resultadosLab
+                    // (estrutura única dos labs). Não perde datas e alimenta o
+                    // "Resultados por data", a timeline e o Passar o Caso.
+                    onProgresso("Identificando datas dos labs...");
+                    const r = await extrairLabsMultiData(base64);
+                    if (r.porData.length && paciente) {
+                      const total = r.porData.reduce(
+                        (n, p) => n + p.exames.length,
+                        0,
+                      );
+                      onProgresso(`Importando ${total} resultado(s)...`);
+                      const novos = mesclarResultadosLab(
+                        r.porData,
+                        paciente.resultadosLab ?? [],
+                      );
+                      atualizarPaciente(id, { resultadosLab: novos });
+                      salvarSnapshotDiario({ ...paciente, resultadosLab: novos });
+                    }
+                    return r.gaps.length
+                      ? { aviso: r.gaps.map((g) => g.detalhe).join(" ") }
+                      : undefined;
+                  }
+                : undefined
+            }
             extra={(editando) =>
               item.id === "examesLaboratoriais" ? (
                 <LabsPorData
@@ -1479,6 +1510,7 @@ function SecaoExpansivel({
   onSalvarAnotacoes,
   onExtraido,
   aoExtrair,
+  scanCustom,
   onAdicionar,
   rotuloAdicionar,
 }: {
@@ -1505,11 +1537,22 @@ function SecaoExpansivel({
    * Retorna true se consumiu (aí não grava em `extraido`).
    */
   aoExtrair?: (dados: Record<string, unknown>) => boolean;
+  /**
+   * Fluxo de scan próprio da seção (ex.: labs multi-data via /api/extract-labs).
+   * Quando presente, SUBSTITUI a extração genérica: recebe a imagem em base64,
+   * faz a sua própria extração/persistência e devolve um aviso opcional (gaps)
+   * para o banner amarelo. Mensagens de progresso vêm por `onProgresso`.
+   */
+  scanCustom?: (
+    base64: string,
+    onProgresso: (msg: string) => void,
+  ) => Promise<{ aviso?: string } | void>;
 }) {
   const [aberto, setAberto] = useState(false);
   const [rascunho, setRascunho] = useState("");
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [extraindo, setExtraindo] = useState(false);
+  const [progresso, setProgresso] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   // Aviso de itens removidos por não pertencerem a esta seção (anti-misrouting).
   const [aviso, setAviso] = useState<string | null>(null);
@@ -1596,8 +1639,17 @@ function SecaoExpansivel({
     setExtraindo(true);
     setErro(null);
     setAviso(null);
+    setProgresso(null);
     try {
       const base64 = await converterParaJpegBase64(uri);
+      // Seção com scan próprio (ex.: labs multi-data): delega tudo e sai.
+      if (scanCustom) {
+        const r = await scanCustom(base64, setProgresso);
+        if (r?.aviso) setAviso(r.aviso);
+        setProgresso(null);
+        setExtraindo(false);
+        return;
+      }
       const json = await extrairDadosImagem<
         { blocos?: Bloco[]; anomalias?: { item: string }[] } & Record<string, unknown>
       >(base64, `${instrucao} ${SUFIXO_JSON}`, secaoId);
@@ -1687,7 +1739,7 @@ function SecaoExpansivel({
           </View>
 
           {extraindo && (
-            <Text style={styles.extraindo}>Lendo prontuário...</Text>
+            <Text style={styles.extraindo}>{progresso || "Lendo prontuário..."}</Text>
           )}
 
           {erro && (

@@ -15,7 +15,12 @@ const { analisarTendencias } = require("./alertasTendencia");
 const ontologia = require("./ontologia");
 const icd11 = require("./icd11");
 const { parseJsonIA } = require("./iaJson");
-const { PROMPTS: PROMPTS_SECAO, deriveBlocos } = require("./promptsSecao");
+const {
+  PROMPTS: PROMPTS_SECAO,
+  deriveBlocos,
+  PROMPT_INVENTARIO_LABS,
+  promptLabsPorData,
+} = require("./promptsSecao");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -167,6 +172,114 @@ app.post("/api/extract", auth.autenticar, async (req, res) => {
         .json({ erro: "Muitas solicitações no momento. Tente novamente em instantes." });
     }
     res.status(502).json({ erro: msg || "Falha ao ler o prontuário." });
+  }
+});
+
+/** Uma chamada de visão (imagem + prompt) que devolve o JSON já parseado. */
+async function chamarVisao(imagemBase64, prompt, contexto, maxTokens = 1200) {
+  const msg = await getAnthropic().messages.create({
+    model: "claude-sonnet-4-6",
+    max_tokens: maxTokens,
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "image",
+            source: { type: "base64", media_type: "image/jpeg", data: imagemBase64 },
+          },
+          { type: "text", text: prompt },
+        ],
+      },
+    ],
+  });
+  const bloco = msg.content.find((c) => c.type === "text");
+  return parseJsonIA(bloco ? bloco.text : "", contexto);
+}
+
+/**
+ * Extração de LABS em múltiplos passos (BUGS 10+11). A extração única perdia
+ * datas em tabelas densas (importava só a mais recente). Aqui:
+ *   PASSO 1 — inventário: lista as datas presentes na tabela de labs.
+ *   PASSO 2 — uma extração FOCADA por data (cada chamada ignora as demais).
+ *   PASSO 3 — validação: datas do inventário sem exames extraídos viram "gaps".
+ *
+ * Custo: N+1 chamadas por scan — justificado para dados clínicos (perda de
+ * informação tem impacto). Não armazena a imagem (LGPD); só o resultado.
+ *
+ * Body: { imagemBase64 }
+ * Resposta: { porData: [{data, exames:[{nome,valor,unidade}]}], datas, gaps:[...] }
+ */
+app.post("/api/extract-labs", auth.autenticar, async (req, res) => {
+  const { imagemBase64 } = req.body || {};
+  if (!imagemBase64) {
+    return res.status(400).json({ erro: "Campo obrigatório: imagemBase64." });
+  }
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return res
+      .status(500)
+      .json({ erro: "ANTHROPIC_API_KEY não configurada no servidor." });
+  }
+
+  try {
+    // PASSO 1 — inventário das datas.
+    const inv = await chamarVisao(imagemBase64, PROMPT_INVENTARIO_LABS, "labs:inventario", 400);
+    const temLabs = inv && inv.tem_labs;
+    const datasInv = Array.isArray(inv?.datas)
+      ? inv.datas.map((d) => String(d).trim()).filter(Boolean)
+      : [];
+
+    if (!temLabs && !datasInv.length) {
+      return res.json({ porData: [], datas: [], gaps: [] });
+    }
+
+    // PASSO 2 — uma extração por data (ou uma só, quando não há datas explícitas).
+    // Sem data explícita: usa null (o app atribui a data de hoje).
+    const alvos = datasInv.length ? datasInv : [null];
+    const porData = await Promise.all(
+      alvos.map((data) =>
+        chamarVisao(imagemBase64, promptLabsPorData(data), `labs:data:${data || "?"}`, 1000)
+          .then((r) => ({
+            data: data || (r && r.data) || null,
+            exames: Array.isArray(r?.exames)
+              ? r.exames.filter((e) => e && e.nome && e.valor != null && String(e.valor).trim() !== "")
+              : [],
+          }))
+          .catch((e) => {
+            console.error(`extract-labs data ${data}:`, e.message);
+            return { data: data || null, exames: [], erro: true };
+          }),
+      ),
+    );
+
+    // PASSO 3 — validação: datas do inventário que não renderam exames.
+    const gaps = porData
+      .filter((p) => !p.exames.length)
+      .map((p) => ({
+        tipo: "labs",
+        data: p.data,
+        detalhe: p.data
+          ? `Identificamos a data ${p.data} na tabela de labs, mas não conseguimos extrair os valores.`
+          : "Identificamos exames laboratoriais na foto, mas não conseguimos extrair os valores.",
+      }));
+
+    res.json({ porData: porData.filter((p) => p.exames.length), datas: datasInv, gaps });
+  } catch (e) {
+    console.error("Erro em /api/extract-labs:", e);
+    const status = e?.status || e?.statusCode;
+    const msg = String(e?.message || "");
+    if (e?.ehParseIA) {
+      return res.status(422).json({
+        erro: "Não foi possível ler os labs desta foto. Tente novamente com uma imagem mais nítida.",
+      });
+    }
+    if (status === 413 || /too large|maximum|payload|image.*size|tamanho/i.test(msg)) {
+      return res.status(413).json({ erro: "A imagem é muito grande. Tente uma foto menor." });
+    }
+    if (status === 429) {
+      return res.status(429).json({ erro: "Muitas solicitações. Tente novamente em instantes." });
+    }
+    res.status(502).json({ erro: msg || "Falha ao extrair os labs." });
   }
 });
 
