@@ -173,6 +173,19 @@ export default function PassarCaso() {
               </Card>
             )}
 
+            {caso.imagem.length > 0 && (
+              <Card label="Imagem">
+                {caso.imagem.map((ex, i) => (
+                  <View key={i} style={s.imgExame}>
+                    <Text style={s.imgExameNome}>{ex.titulo}</Text>
+                    <Text style={[s.imgExameTexto, ex.destacado && s.imgExameMarcado]}>
+                      {ex.texto}
+                    </Text>
+                  </View>
+                ))}
+              </Card>
+            )}
+
             {caso.antibioticos.length > 0 && (
               <Card label="Antibióticos">
                 {caso.antibioticos.map((a, i) => (
@@ -269,5 +282,9 @@ const s = StyleSheet.create({
   atbBadge: { backgroundColor: "#FFEDE6", borderRadius: Radius.badge, paddingHorizontal: 7, paddingVertical: 2 },
   atbBadgeTxt: { color: "#C2410C", fontSize: 11, fontWeight: "800" },
   atbNome: { flex: 1, fontSize: 14, color: C.text },
+  imgExame: { paddingVertical: 4 },
+  imgExameNome: { fontSize: 13.5, fontWeight: "700", color: C.text, marginBottom: 2 },
+  imgExameTexto: { fontSize: 14, color: C.textSecondary, lineHeight: 20 },
+  imgExameMarcado: { color: C.text },
   disclaimer: { fontSize: 11, color: C.textMuted, fontStyle: "italic", marginTop: 8 },
 });

@@ -153,8 +153,16 @@ const SUFIXO_JSON =
   '{"blocos":[{"titulo":"Comorbidades","itens":["HAS","DM2","DPOC","AVC isquêmico prévio"]},' +
   '{"titulo":"Medicações de uso contínuo","itens":["AAS 100 mg/dia","Losartana 50 mg/dia","Metformina 500 mg 2-0-2"]}]}';
 
-/** Um agrupamento clínico do conteúdo extraído: rótulo opcional + itens. */
-type Bloco = { titulo?: string; itens: string[] };
+/** Um agrupamento clínico do conteúdo extraído: rótulo opcional + itens.
+ * `destacados` (FEATURE 3): trechos do laudo marca-texto (imagem). */
+type Bloco = { titulo?: string; itens: string[]; destacados?: string[] };
+
+/** Quebra um laudo em frases tocáveis (sem lookbehind, p/ Hermes). */
+function fragmentarLaudo(texto: string): string[] {
+  return (String(texto || "").match(/[^.;]+[.;]?/g) || [])
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
 
 /** Horário atual no formato HH:MM (local). */
 function horaAgora(): string {
@@ -1496,8 +1504,19 @@ function ImagemSecao({
   const [adicionando, setAdicionando] = useState(false);
   const [nome, setNome] = useState("");
   const [laudo, setLaudo] = useState("");
+  // FEATURE 3: marca-texto. Card em modo "marcar" (índice) destaca trechos.
+  const [marcandoIdx, setMarcandoIdx] = useState<number | null>(null);
 
   const salvar = (lista: Bloco[]) => onChange(JSON.stringify(lista));
+
+  // Liga/desliga um trecho do laudo no destaque (marca-texto) do exame `i`.
+  const alternarDestaque = (i: number, frase: string) => {
+    const atual = blocos[i]?.destacados ?? [];
+    const destacados = atual.includes(frase)
+      ? atual.filter((f) => f !== frase)
+      : [...atual, frase];
+    salvar(blocos.map((b, j) => (j === i ? { ...b, destacados } : b)));
+  };
 
   const remover = (i: number) => {
     Alert.alert("Remover este exame?", blocos[i]?.titulo || "Exame de imagem", [
@@ -1531,21 +1550,71 @@ function ImagemSecao({
         <Text style={styles.secaoConteudo}>—</Text>
       )}
 
-      {blocos.map((b, i) => (
-        <View key={i} style={styles.imgCard}>
-          <View style={styles.imgCardTopo}>
-            <Text style={styles.imgNome}>{limparDataEmTexto(b.titulo || "") || "Exame"}</Text>
-            {editando && (
-              <TouchableOpacity onPress={() => remover(i)} hitSlop={8}>
-                <Ionicons name="trash-outline" size={16} color={ClinicalColors.danger} />
-              </TouchableOpacity>
+      {blocos.map((b, i) => {
+        const laudoTxt = b.itens.join(". ");
+        const destacados = b.destacados ?? [];
+        const frases = fragmentarLaudo(laudoTxt);
+        const marcando = marcandoIdx === i;
+        return (
+          <View key={i} style={styles.imgCard}>
+            <View style={styles.imgCardTopo}>
+              <Text style={styles.imgNome}>{limparDataEmTexto(b.titulo || "") || "Exame"}</Text>
+              <View style={styles.imgCardAcoes}>
+                {!!laudoTxt && (
+                  <TouchableOpacity
+                    onPress={() => setMarcandoIdx(marcando ? null : i)}
+                    hitSlop={8}
+                  >
+                    <Text style={styles.imgMarcarTxt}>
+                      {marcando ? "Concluir" : "Marcar"}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                {editando && (
+                  <TouchableOpacity onPress={() => remover(i)} hitSlop={8}>
+                    <Ionicons name="trash-outline" size={16} color={ClinicalColors.danger} />
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+            {!!laudoTxt &&
+              (marcando ? (
+                <View style={styles.imgFrasesWrap}>
+                  {frases.map((f, j) => {
+                    const on = destacados.includes(f);
+                    return (
+                      <TouchableOpacity
+                        key={j}
+                        style={[styles.imgFrase, on && styles.imgFraseOn]}
+                        onPress={() => alternarDestaque(i, f)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={styles.imgFraseTxt}>{f}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              ) : (
+                <Text style={styles.imgLaudo}>
+                  {frases.map((f, j) =>
+                    destacados.includes(f) ? (
+                      <Text key={j} style={styles.imgLaudoMarcado}>
+                        {f}{" "}
+                      </Text>
+                    ) : (
+                      <Text key={j}>{f} </Text>
+                    ),
+                  )}
+                </Text>
+              ))}
+            {marcando && (
+              <Text style={styles.imgMarcarDica}>
+                Toque nos trechos relevantes. No Passar o Caso aparece só o que estiver marcado.
+              </Text>
             )}
           </View>
-          {!!b.itens.length && (
-            <Text style={styles.imgLaudo}>{b.itens.join(". ")}</Text>
-          )}
-        </View>
-      ))}
+        );
+      })}
 
       {!editando ? null : adicionando ? (
         <View style={styles.formInline}>
@@ -4706,11 +4775,31 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   imgNome: { flex: 1, fontSize: 14, fontWeight: "700", color: "#000" },
+  imgCardAcoes: { flexDirection: "row", alignItems: "center", gap: 14 },
+  imgMarcarTxt: { fontSize: 13, fontWeight: "600", color: ClinicalColors.primary },
   imgLaudo: {
     fontSize: 13,
     color: ClinicalColors.textSecondary,
     lineHeight: 19,
     marginTop: 4,
+  },
+  imgLaudoMarcado: { backgroundColor: "#FFF3B0", color: ClinicalColors.text },
+  imgFrasesWrap: { marginTop: 6, gap: 6 },
+  imgFrase: {
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: ClinicalColors.border,
+    borderRadius: Radius.badge,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  imgFraseOn: { backgroundColor: "#FFF3B0", borderColor: "#E6C200" },
+  imgFraseTxt: { fontSize: 13, color: ClinicalColors.text, lineHeight: 18 },
+  imgMarcarDica: {
+    fontSize: 11,
+    color: ClinicalColors.textMuted,
+    fontStyle: "italic",
+    marginTop: 8,
   },
   imgLaudoInput: { minHeight: 64, textAlignVertical: "top" },
   imgAddBtn: {

@@ -11,6 +11,7 @@ import { agruparPorExame } from "./lab";
 export type LabAlterado = { exame: string; valor: string; seta: "alta" | "baixa" };
 export type SsvvAlterado = { label: string; valor: string };
 export type ExameSecaoCaso = { label: string; itens: string[] };
+export type ImagemCaso = { titulo: string; texto: string; destacado: boolean };
 
 export type CasoData = {
   hda: string;
@@ -22,6 +23,7 @@ export type CasoData = {
   ssvvAlterados: SsvvAlterado[];
   exameFisico: ExameSecaoCaso[];
   labsAlterados: LabAlterado[];
+  imagem: ImagemCaso[];
   antibioticos: string[];
   avaliacao: string[];
   conduta: string[];
@@ -184,6 +186,44 @@ function labsAlterados(p: Paciente): LabAlterado[] {
   return out;
 }
 
+/** Quebra um laudo em frases (igual à tela; sem lookbehind p/ Hermes). */
+function fragmentarLaudo(texto: string): string[] {
+  return (String(texto || "").match(/[^.;]+[.;]?/g) || [])
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+/**
+ * Exames de imagem para o Passar o Caso (FEATURE 3). Se o médico marcou trechos
+ * (marca-texto), mostra SÓ os trechos destacados; sem marcação, o laudo inteiro.
+ */
+function imagemCaso(p: Paciente): ImagemCaso[] {
+  const t = (p.secoes?.imagem?.extraido || "").trim();
+  if (!t.startsWith("[")) return [];
+  let blocos: { titulo?: string; itens?: string[]; destacados?: string[] }[];
+  try {
+    blocos = JSON.parse(t);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(blocos)) return [];
+  const out: ImagemCaso[] = [];
+  for (const b of blocos) {
+    const laudo = (b.itens || []).join(". ").trim();
+    if (!laudo) continue;
+    const destacados = b.destacados || [];
+    const frases = fragmentarLaudo(laudo);
+    const marcadas = frases.filter((f) => destacados.includes(f));
+    const texto = marcadas.length ? marcadas.join(" ") : laudo;
+    out.push({
+      titulo: (b.titulo || "Exame").trim(),
+      texto,
+      destacado: marcadas.length > 0,
+    });
+  }
+  return out;
+}
+
 // Seções do exame físico (mesma ordem dos chips).
 const EXAME_SECOES: { campo: string; label: string }[] = [
   { campo: "estadoGeralExame", label: "Estado geral" },
@@ -238,6 +278,7 @@ export function montarCaso(paciente: Paciente, hoje: string): CasoData {
     ssvvAlterados: ssvvAlterados(paciente, hoje),
     exameFisico,
     labsAlterados: labsAlterados(paciente),
+    imagem: imagemCaso(paciente),
     antibioticos: antibioticos(paciente),
     avaliacao: avaliacao.length ? avaliacao : fallback ? [fallback] : [],
     conduta,
