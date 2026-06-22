@@ -56,6 +56,22 @@ function dividir(texto: string): string[] {
     .filter(Boolean);
 }
 
+/**
+ * Resume a HDA para UMA LINHA de contexto no Passar o Caso (a HDA completa
+ * continua na ficha). Mantém o texto inteiro quando já é curto; senão corta de
+ * forma inteligente — preferindo o fim de uma frase e, na falta, a última
+ * palavra inteira — para não exibir o parágrafo longo na passagem de plantão.
+ */
+function resumirUmaLinha(texto: string, max = 180): string {
+  const t = texto.replace(/\s+/g, " ").trim();
+  if (t.length <= max) return t;
+  const corte = t.slice(0, max);
+  const fimFrase = Math.max(corte.lastIndexOf(". "), corte.lastIndexOf("; "));
+  if (fimFrase > max * 0.5) return corte.slice(0, fimFrase + 1).trim();
+  const esp = corte.lastIndexOf(" ");
+  return (esp > 0 ? corte.slice(0, esp) : corte).trim() + "…";
+}
+
 /** Comorbidades e MUC (seções separadas + fallback combinado). */
 function comorbidadesMUC(p: Paciente): { comorb: string[]; muc: string[] } {
   const comorb: string[] = [];
@@ -185,7 +201,7 @@ export function montarCaso(paciente: Paciente, hoje: string): CasoData {
   const { comorb, muc } = comorbidadesMUC(paciente);
 
   const hdaBlocos = parseBlocos(paciente.secoes?.historia?.extraido);
-  const hda = hdaBlocos.flatMap((b) => b.itens).join(" ").trim();
+  const hda = resumirUmaLinha(hdaBlocos.flatMap((b) => b.itens).join(" ").trim());
 
   const atual = (paciente.problemas || [])
     .filter((x) => x.status === "ativo" || x.status === "resolvendo")
