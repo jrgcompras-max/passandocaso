@@ -7,6 +7,26 @@ export function hojeISO(): string {
   return `${ano}-${mes}-${dia}`;
 }
 
+/** Data de ontem em formato YYYY-MM-DD (local). */
+export function ontemISO(): string {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  const ano = d.getFullYear();
+  const mes = String(d.getMonth() + 1).padStart(2, "0");
+  const dia = String(d.getDate()).padStart(2, "0");
+  return `${ano}-${mes}-${dia}`;
+}
+
+/** Converte "DD/MM" ou "DD/MM/AAAA" para ISO YYYY-MM-DD; null se inválido. */
+export function brParaISO(texto: string): string | null {
+  const m = (texto || "").trim().match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?$/);
+  if (!m) return null;
+  const dia = m[1].padStart(2, "0");
+  const mes = m[2].padStart(2, "0");
+  const ano = m[3] ? (m[3].length === 2 ? `20${m[3]}` : m[3]) : String(new Date().getFullYear());
+  return `${ano}-${mes}-${dia}`;
+}
+
 /**
  * Formata uma data para o padrão brasileiro DD/MM/YYYY. Aceita ISO
  * (YYYY-MM-DD) e devolve no formato BR; qualquer outro texto é repassado

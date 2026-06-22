@@ -48,7 +48,7 @@ import {
   extrairLabsMultiData,
   mesclarResultadosLab,
 } from "@/lib/extrairLabsMultiData";
-import { diaDeInternacao, formatarDataBR, hojeISO, limparDataEmTexto } from "@/lib/datas";
+import { brParaISO, diaDeInternacao, formatarDataBR, hojeISO, limparDataEmTexto, ontemISO } from "@/lib/datas";
 import { extrairDadosImagem } from "@/lib/extrairDadosImagem";
 import { formatarNome } from "@/lib/formatarNome";
 import { gerarResumoIA } from "@/lib/gerarResumoIA";
@@ -376,6 +376,21 @@ export default function Paciente() {
 
   // Modo Round (apresentação) e geração de resumo por IA.
   const [gerandoResumo, setGerandoResumo] = useState(false);
+
+  // BUG 3: modal "Data da coleta?" para labs escaneados sem data identificada.
+  const [modalDataLabs, setModalDataLabs] = useState<{
+    qtd: number;
+    resolver: (iso: string | null) => void;
+  } | null>(null);
+  const [outraDataLabs, setOutraDataLabs] = useState("");
+  const pedirDataLabs = (qtd: number): Promise<string | null> => {
+    setOutraDataLabs("");
+    return new Promise((resolver) => setModalDataLabs({ qtd, resolver }));
+  };
+  const responderDataLabs = (iso: string | null) => {
+    modalDataLabs?.resolver(iso);
+    setModalDataLabs(null);
+  };
 
   const iniciarEdicao = () => {
     if (!paciente) return;
@@ -747,6 +762,70 @@ export default function Paciente() {
       extraScrollHeight={20}
     >
       {cabecalho}
+
+      <Modal
+        visible={!!modalDataLabs}
+        transparent
+        animationType="fade"
+        onRequestClose={() => responderDataLabs(null)}
+      >
+        <View style={styles.modalDataFundo}>
+          <View style={styles.modalDataCaixa}>
+            <Text style={styles.modalDataTitulo}>Data da coleta</Text>
+            <Text style={styles.modalDataSub}>
+              {modalDataLabs?.qtd
+                ? `${modalDataLabs.qtd} resultado(s) sem data identificada. Quando foram coletados?`
+                : "Quando esses exames foram coletados?"}
+            </Text>
+            <TouchableOpacity
+              style={styles.modalDataOpcao}
+              onPress={() => responderDataLabs(hojeISO())}
+            >
+              <Text style={styles.modalDataOpcaoTxt}>
+                Hoje · {formatarDataBR(hojeISO()).slice(0, 5)}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.modalDataOpcao}
+              onPress={() => responderDataLabs(ontemISO())}
+            >
+              <Text style={styles.modalDataOpcaoTxt}>
+                Ontem · {formatarDataBR(ontemISO()).slice(0, 5)}
+              </Text>
+            </TouchableOpacity>
+            <View style={styles.modalDataOutra}>
+              <TextInput
+                style={styles.modalDataInput}
+                placeholder="Outra data (DD/MM)"
+                placeholderTextColor={ClinicalColors.textMuted}
+                keyboardType="numbers-and-punctuation"
+                value={outraDataLabs}
+                onChangeText={setOutraDataLabs}
+              />
+              <TouchableOpacity
+                style={[
+                  styles.modalDataOk,
+                  !brParaISO(outraDataLabs) && styles.modalDataOkOff,
+                ]}
+                disabled={!brParaISO(outraDataLabs)}
+                onPress={() => {
+                  const iso = brParaISO(outraDataLabs);
+                  if (iso) responderDataLabs(iso);
+                }}
+              >
+                <Text style={styles.modalDataOkTxt}>OK</Text>
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity
+              style={styles.modalDataCancelar}
+              onPress={() => responderDataLabs(null)}
+            >
+              <Text style={styles.modalDataCancelarTxt}>Cancelar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {mostrarSecoes &&
         SECOES.map((item) => (
           <View
@@ -881,17 +960,41 @@ export default function Paciente() {
                     onProgresso("Identificando datas dos labs...");
                     const r = await extrairLabsMultiData(base64);
                     if (r.porData.length && paciente) {
-                      const total = r.porData.reduce(
-                        (n, p) => n + p.exames.length,
-                        0,
-                      );
-                      onProgresso(`Importando ${total} resultado(s)...`);
-                      const novos = mesclarResultadosLab(
-                        r.porData,
-                        paciente.resultadosLab ?? [],
-                      );
-                      atualizarPaciente(id, { resultadosLab: novos });
-                      salvarSnapshotDiario({ ...paciente, resultadosLab: novos });
+                      // BUG 3: se algum grupo veio SEM data, pergunta antes de
+                      // salvar (não assume "hoje" silenciosamente).
+                      let porData = r.porData;
+                      let dataPadrao: string | undefined;
+                      const semData = r.porData.filter((p) => !p.data);
+                      if (semData.length) {
+                        const qtd = semData.reduce(
+                          (n, p) => n + p.exames.length,
+                          0,
+                        );
+                        const escolhida = await pedirDataLabs(qtd);
+                        if (escolhida) {
+                          dataPadrao = escolhida;
+                        } else {
+                          // Cancelou: salva só os grupos COM data identificada.
+                          porData = r.porData.filter((p) => p.data);
+                        }
+                      }
+                      if (porData.length) {
+                        const total = porData.reduce(
+                          (n, p) => n + p.exames.length,
+                          0,
+                        );
+                        onProgresso(`Importando ${total} resultado(s)...`);
+                        const novos = mesclarResultadosLab(
+                          porData,
+                          paciente.resultadosLab ?? [],
+                          dataPadrao,
+                        );
+                        atualizarPaciente(id, { resultadosLab: novos });
+                        salvarSnapshotDiario({
+                          ...paciente,
+                          resultadosLab: novos,
+                        });
+                      }
                     }
                     return r.gaps.length
                       ? { aviso: r.gaps.map((g) => g.detalhe).join(" ") }
@@ -3986,6 +4089,68 @@ function PrescricaoSecao({
 }
 
 const styles = StyleSheet.create({
+  // BUG 3: modal "Data da coleta?" dos labs sem data.
+  modalDataFundo: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    paddingHorizontal: 28,
+  },
+  modalDataCaixa: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: Radius.card,
+    padding: 20,
+  },
+  modalDataTitulo: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: ClinicalColors.text,
+  },
+  modalDataSub: {
+    fontSize: 14,
+    color: ClinicalColors.textSecondary,
+    marginTop: 6,
+    marginBottom: 14,
+    lineHeight: 19,
+  },
+  modalDataOpcao: {
+    backgroundColor: ClinicalColors.background,
+    borderRadius: Radius.badge,
+    paddingVertical: 13,
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  modalDataOpcaoTxt: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: ClinicalColors.primary,
+  },
+  modalDataOutra: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 2,
+  },
+  modalDataInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: ClinicalColors.border,
+    borderRadius: Radius.badge,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    fontSize: 15,
+    color: ClinicalColors.text,
+  },
+  modalDataOk: {
+    backgroundColor: ClinicalColors.primary,
+    borderRadius: Radius.badge,
+    paddingHorizontal: 18,
+    justifyContent: "center",
+  },
+  modalDataOkOff: { opacity: 0.4 },
+  modalDataOkTxt: { color: "#FFFFFF", fontSize: 15, fontWeight: "700" },
+  modalDataCancelar: { alignItems: "center", paddingVertical: 12, marginTop: 4 },
+  modalDataCancelarTxt: { fontSize: 14, color: ClinicalColors.textMuted },
+
   container: {
     flex: 1,
     backgroundColor: ClinicalColors.background,

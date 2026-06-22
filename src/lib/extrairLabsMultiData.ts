@@ -43,9 +43,9 @@ export async function extrairLabsMultiData(
   }
 }
 
-/** Converte "DD/MM" (ou "DD/MM/AAAA") para ISO YYYY-MM-DD; null → hoje. */
-function ddmmParaISO(data: string | null): string {
-  if (!data) return hojeISO();
+/** Converte "DD/MM" (ou "DD/MM/AAAA") para ISO YYYY-MM-DD; null → padrão/hoje. */
+function ddmmParaISO(data: string | null, padraoISO?: string): string {
+  if (!data) return padraoISO || hojeISO();
   const m = data.match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/);
   if (!m) return hojeISO();
   const dia = m[1].padStart(2, "0");
@@ -70,13 +70,14 @@ function gerarId(): string {
 export function mesclarResultadosLab(
   porData: LabPorData[],
   existentes: ResultadoLab[],
+  dataPadraoISO?: string,
 ): ResultadoLab[] {
   const out = [...existentes];
   const chave = (exame: string, data: string) =>
     `${exame.trim().toLowerCase()}|${data.slice(0, 10)}`;
   const vistos = new Set(existentes.map((r) => chave(r.exame, r.data)));
   for (const { data, exames } of porData) {
-    const iso = ddmmParaISO(data);
+    const iso = ddmmParaISO(data, dataPadraoISO);
     for (const e of exames) {
       if (!e?.nome || e.valor == null || String(e.valor).trim() === "") continue;
       const k = chave(e.nome, iso);
