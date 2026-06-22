@@ -2439,6 +2439,27 @@ function CondutaSecao({
   const [evo, setEvo] = useState(evolucao);
   useEffect(() => setEvo(evolucao), [evolucao]);
 
+  // Auto-save com debounce: a conduta é gravada ENQUANTO digita, não só quando o
+  // campo perde o foco. Dado clínico não pode depender do onBlur — se a médica
+  // fechar o app ou trocar de tela sem desfocar, o texto se perderia.
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelarTimer = () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = null;
+  };
+  useEffect(() => cancelarTimer, []);
+
+  const aoDigitar = (t: string) => {
+    const proximo = { ...evo, condutaDoDia: t };
+    setEvo(proximo);
+    cancelarTimer();
+    timerRef.current = setTimeout(() => onSalvar(proximo), 800);
+  };
+  const salvarAgora = () => {
+    cancelarTimer();
+    onSalvar(evo);
+  };
+
   return (
     <View style={styles.secao}>
       <TouchableOpacity
@@ -2454,8 +2475,8 @@ function CondutaSecao({
           <CampoTexto
             value={evo.condutaDoDia}
             placeholder="Condutas definidas na discussão com o preceptor..."
-            onChangeText={(t) => setEvo((e) => ({ ...e, condutaDoDia: t }))}
-            onBlur={() => onSalvar(evo)}
+            onChangeText={aoDigitar}
+            onBlur={salvarAgora}
           />
         </View>
       )}
