@@ -1181,6 +1181,8 @@ function parseBlocos(texto: string): Bloco[] | null {
       return (v as Bloco[]).map((b) => ({
         titulo: b.titulo,
         itens: b.itens.flatMap((it) => dividirItens(String(it))),
+        // FEATURE 3: preserva o marca-texto dos laudos (não descartar no parse).
+        ...(b.destacados ? { destacados: b.destacados } : {}),
       }));
     }
   } catch {
@@ -4784,17 +4786,14 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   imgLaudoMarcado: { backgroundColor: "#FFF3B0", color: ClinicalColors.text },
-  imgFrasesWrap: { marginTop: 6, gap: 6 },
+  imgFrasesWrap: { marginTop: 6, gap: 4 },
   imgFrase: {
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: ClinicalColors.border,
-    borderRadius: Radius.badge,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
+    borderRadius: 5,
+    paddingHorizontal: 6,
+    paddingVertical: 5,
   },
-  imgFraseOn: { backgroundColor: "#FFF3B0", borderColor: "#E6C200" },
-  imgFraseTxt: { fontSize: 13, color: ClinicalColors.text, lineHeight: 18 },
+  imgFraseOn: { backgroundColor: "#FFF3B0" },
+  imgFraseTxt: { fontSize: 13, color: ClinicalColors.text, lineHeight: 19 },
   imgMarcarDica: {
     fontSize: 11,
     color: ClinicalColors.textMuted,
