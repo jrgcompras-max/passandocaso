@@ -520,7 +520,7 @@ export default function Index() {
             </Text>
             <Ionicons name="chevron-forward" size={14} color={ClinicalColors.primary} />
           </TouchableOpacity>
-          <Text style={styles.subtitulo}>{dataPorExtenso()} · build B23</Text>
+          <Text style={styles.subtitulo}>{dataPorExtenso()}</Text>
           {temRede && (
             <TouchableOpacity
               style={styles.passarBtn}
