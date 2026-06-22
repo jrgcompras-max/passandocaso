@@ -46,10 +46,11 @@ function hojeISO() {
  * Reset diário de status: todo paciente volta a "naoVisitado" na virada do dia.
  * O status do dia que terminou é preservado em `historicoStatus[diaEncerrado]`
  * (registro/evolução). Idempotente: quem já está "naoVisitado" não muda.
+ * "altaRealizada" é PRESERVADO (não reaparece como não visitado na rotina).
  */
 function resetarStatusDoDia(lista: Paciente[], diaEncerrado: string): Paciente[] {
   return lista.map((p) =>
-    p.status === "naoVisitado"
+    p.status === "naoVisitado" || p.status === "altaRealizada"
       ? p
       : {
           ...p,
