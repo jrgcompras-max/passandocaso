@@ -2290,10 +2290,22 @@ function EvolucaoBeiraLeitoSecao({
     logChipTermos(secao, termos);
   };
 
+  // Auto-save com debounce para os campos de TEXTO (persistir=false): grava
+  // enquanto digita, sem depender do onBlur. Toggles/seleções (persistir=true)
+  // continuam salvando na hora. Evita perder texto ao fechar o app sem desfocar.
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelarTimer = () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = null;
+  };
+  useEffect(() => cancelarTimer, []);
+
   const aplicar = (patch: Partial<EvolucaoBeiraLeito>, persistir = true) => {
     const novo = { ...evo, ...patch };
     setEvo(novo);
+    cancelarTimer();
     if (persistir) onSalvar(novo);
+    else timerRef.current = setTimeout(() => onSalvar(novo), 800);
   };
 
   const selecionarUnico = (
