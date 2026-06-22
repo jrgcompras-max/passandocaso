@@ -1,11 +1,13 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useState,
   type ReactNode,
 } from "react";
+import { AppState } from "react-native";
 
 import { type StatusType } from "@/constants/clinicalTheme";
 import { EVOLUCAO_VAZIA } from "@/constants/evolucao";
@@ -28,6 +30,8 @@ import {
 } from "@/types/paciente";
 
 const STORAGE_KEY = "@passandocaso/pacientes";
+/** Última data (YYYY-MM-DD) em que o reset diário de status foi aplicado. */
+const RESET_STATUS_KEY = "@passandocaso/ultimoResetStatus";
 
 /** Data de hoje em formato YYYY-MM-DD (local). */
 function hojeISO() {
@@ -36,6 +40,26 @@ function hojeISO() {
   const mes = String(d.getMonth() + 1).padStart(2, "0");
   const dia = String(d.getDate()).padStart(2, "0");
   return `${ano}-${mes}-${dia}`;
+}
+
+/**
+ * Reset diário de status: todo paciente volta a "naoVisitado" na virada do dia.
+ * O status do dia que terminou é preservado em `historicoStatus[diaEncerrado]`
+ * (registro/evolução). Idempotente: quem já está "naoVisitado" não muda.
+ */
+function resetarStatusDoDia(lista: Paciente[], diaEncerrado: string): Paciente[] {
+  return lista.map((p) =>
+    p.status === "naoVisitado"
+      ? p
+      : {
+          ...p,
+          status: "naoVisitado" as StatusType,
+          historicoStatus: {
+            ...(p.historicoStatus ?? {}),
+            [diaEncerrado]: p.status,
+          },
+        },
+  );
 }
 
 type AdicionarResultado = { id: string; vinculado: boolean };
@@ -212,6 +236,56 @@ export function PacientesProvider({ children }: { children: ReactNode }) {
     }, 1500);
     return () => clearTimeout(t);
   }, [pacientes, carregado]);
+
+  // Reset diário de status (virada do dia). Backend não guarda paciente/status
+  // (são local-first), então o reset acontece aqui: ao abrir o app, ao voltar do
+  // background e à meia-noite com o app aberto.
+  const verificarResetDiario = useCallback(async () => {
+    const hoje = hojeISO();
+    let ultimoReset: string | null = null;
+    try {
+      ultimoReset = await AsyncStorage.getItem(RESET_STATUS_KEY);
+    } catch {
+      // sem storage: tenta resetar mesmo assim (best-effort)
+    }
+    if (ultimoReset === hoje) return;
+    try {
+      await AsyncStorage.setItem(RESET_STATUS_KEY, hoje);
+    } catch {
+      // best-effort
+    }
+    // Primeira execução (sem registro prévio): apenas ancora hoje, sem resetar —
+    // evita zerar status legítimos do dia logo após o update.
+    if (!ultimoReset) return;
+    setPacientes((prev) => resetarStatusDoDia(prev, ultimoReset));
+  }, []);
+
+  useEffect(() => {
+    if (!carregado) return;
+    verificarResetDiario();
+
+    const sub = AppState.addEventListener("change", (estado) => {
+      if (estado === "active") verificarResetDiario();
+    });
+
+    // Agenda a próxima meia-noite (00:00:05) e reagenda a cada dia.
+    let timer: ReturnType<typeof setTimeout>;
+    const agendarMeiaNoite = () => {
+      const agora = new Date();
+      const proxima = new Date(agora);
+      proxima.setHours(24, 0, 5, 0);
+      timer = setTimeout(() => {
+        verificarResetDiario();
+        agendarMeiaNoite();
+      }, proxima.getTime() - agora.getTime());
+    };
+    agendarMeiaNoite();
+
+    return () => {
+      sub.remove();
+      clearTimeout(timer);
+    };
+  }, [carregado, verificarResetDiario]);
 
   const getPaciente = (id: string) => pacientes.find((p) => p.id === id);
 

@@ -44,7 +44,16 @@ import * as rede from "@/lib/rede";
 import { useAcoes } from "@/store/AcoesContext";
 import { KEY_MIGRACAO_GERAL, useHospitais } from "@/store/HospitaisContext";
 import { usePacientes } from "@/store/PacientesContext";
-import { type CabecalhoProntuario } from "@/types/paciente";
+import { type CabecalhoProntuario, type Paciente } from "@/types/paciente";
+
+/** Normaliza texto para busca: minúsculas e sem acentos. */
+function normalizar(t: string): string {
+  return (t || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+}
 
 /** Ordem de prioridade (topo → fim) usada tanto para avançar quanto para ordenar. */
 const ORDEM_STATUS: StatusType[] = [
@@ -196,6 +205,9 @@ export default function Index() {
     setSelecionados(new Set());
   };
 
+  // Busca de paciente por nome (filtro em tempo real na lista).
+  const [busca, setBusca] = useState("");
+
   // Sem hospital ativo, seleciona "Geral" por padrão (a troca é feita na aba Hospitais).
   useEffect(() => {
     if (hospCarregado && !hospitalAtivo) selecionar("geral");
@@ -252,6 +264,12 @@ export default function Index() {
     (p) => (p.hospitalId ?? "geral") === hospitalAtivo,
   );
 
+  // Resultado da busca por nome (null = sem busca → mostra a lista agrupada).
+  const buscaNorm = normalizar(busca);
+  const filtrados = buscaNorm
+    ? pacientesHosp.filter((p) => normalizar(p.nomeCompleto).includes(buscaNorm))
+    : null;
+
   // Alertas de tendência laboratorial por paciente. Busca em paralelo (não
   // bloqueia a lista); falha silenciosa quando o backend está indisponível.
   const [alertas, setAlertas] = useState<Record<string, AlertaTendencia[]>>({});
@@ -298,10 +316,12 @@ export default function Index() {
   };
 
   // Agrupa por status na ordem de prioridade; só inclui grupos não-vazios.
+  // Durante a busca, a fonte é a lista filtrada (grupos vazios somem).
+  const fonteLista = filtrados ?? pacientesHosp;
   const secoes = ORDEM_STATUS.map((status) => ({
     status,
     titulo: ROTULO_GRUPO[status],
-    data: pacientesHosp.filter((p) => grupoDe(p) === status),
+    data: fonteLista.filter((p) => grupoDe(p) === status),
   })).filter((s) => s.data.length > 0);
 
   // Grupos expansíveis. Estado salvo no AsyncStorage; "Não visitados" (ou o
@@ -310,7 +330,8 @@ export default function Index() {
   const initGrupos = useRef(false);
   const temPac = (st: StatusType) => pacientesHosp.some((p) => grupoDe(p) === st);
   const primeiroComPac = ORDEM_AUTO.find((st) => temPac(st));
-  const estaAberto = (st: StatusType) => grupoAberto[st] ?? st === primeiroComPac;
+  const estaAberto = (st: StatusType) =>
+    buscaNorm ? true : (grupoAberto[st] ?? st === primeiroComPac);
 
   useEffect(() => {
     if (initGrupos.current || pacientes.length === 0) return;
@@ -535,6 +556,26 @@ export default function Index() {
         </View>
       )}
 
+      {pacientesHosp.length > 0 && (
+        <View style={styles.buscaBox}>
+          <Ionicons name="search" size={16} color={ClinicalColors.textMuted} />
+          <TextInput
+            style={styles.buscaInput}
+            value={busca}
+            onChangeText={setBusca}
+            placeholder="Buscar paciente"
+            placeholderTextColor={ClinicalColors.textMuted}
+            autoCorrect={false}
+            returnKeyType="search"
+          />
+          {!!busca && (
+            <TouchableOpacity onPress={() => setBusca("")} hitSlop={8}>
+              <Ionicons name="close-circle" size={17} color={ClinicalColors.textMuted} />
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={
@@ -552,6 +593,13 @@ export default function Index() {
                 <Text style={styles.vazioTexto}>
                   Toque em + para fotografar o cabeçalho do primeiro prontuário.
                 </Text>
+              </View>
+            )
+          : filtrados && filtrados.length === 0
+          ? (
+              <View style={styles.vazio}>
+                <Text style={styles.vazioTitulo}>Nenhum paciente encontrado</Text>
+                <Text style={styles.vazioTexto}>Para “{busca.trim()}”.</Text>
               </View>
             )
           : secoes.flatMap((s) => [
@@ -1025,6 +1073,20 @@ const styles = StyleSheet.create({
   erroTexto: { color: StatusColors.pendente.text, fontSize: 13, lineHeight: 18 },
   vazioContainer: { flexGrow: 1, justifyContent: "center" },
   listaConteudo: { paddingBottom: 110 },
+  buscaBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: ClinicalColors.surface ?? "#FFFFFF",
+    borderWidth: BorderWidth.hairline,
+    borderColor: ClinicalColors.border,
+    borderRadius: Radius.badge,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    marginHorizontal: 16,
+    marginBottom: 8,
+  },
+  buscaInput: { flex: 1, fontSize: 15, color: ClinicalColors.text, padding: 0 },
   grupoHeader: {
     flexDirection: "row",
     alignItems: "center",
