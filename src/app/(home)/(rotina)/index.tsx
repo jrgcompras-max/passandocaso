@@ -20,6 +20,7 @@ import {
   View,
 } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
   BorderWidth,
@@ -157,6 +158,7 @@ const INSTRUCAO_CABECALHO =
 
 export default function Index() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { pedidoAdicionar, recebidos, limparRecebidos } = useAcoes();
 
   // Destaque transitório dos pacientes recém-recebidos por passagem de plantão:
@@ -773,7 +775,7 @@ export default function Index() {
       </ScrollView>
 
       {selecionando && (
-        <View style={styles.selBar}>
+        <View style={[styles.selBar, { bottom: 64 + insets.bottom }]}>
           <TouchableOpacity
             onPress={() =>
               setSelecionados((prev) =>
@@ -1237,15 +1239,22 @@ const styles = StyleSheet.create({
     borderColor: ClinicalColors.primary,
   },
   selBar: {
+    position: "absolute",
+    left: 0,
+    right: 0,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 28,
+    paddingVertical: 12,
     borderTopWidth: BorderWidth.hairline,
     borderTopColor: ClinicalColors.border,
     backgroundColor: ClinicalColors.surface,
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: -2 },
+    elevation: 8,
   },
   selBarTodos: {
     color: ClinicalColors.primary,
