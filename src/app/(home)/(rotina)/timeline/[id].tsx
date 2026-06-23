@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ClinicalColors as C, Radius } from "@/constants/clinicalTheme";
 import { formatarNome } from "@/lib/formatarNome";
+import { abreviarLab } from "@/lib/lab";
 import {
   listarEvolucaoDiaria,
   type RegistroDiario,
@@ -311,7 +312,7 @@ function CardDia({
                 const s = seta(k, v, labsAnt[k]);
                 return (
                   <Text key={k} style={styles.labItem}>
-                    {k} {v}
+                    {abreviarLab(k)} {v}
                     {s ? <Text style={{ color: s.cor }}> {s.icone}</Text> : null}
                   </Text>
                 );

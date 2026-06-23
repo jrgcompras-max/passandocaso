@@ -1,6 +1,6 @@
 import { type Anotacao, type Paciente } from "@/types/paciente";
 
-import { agruparPorExame } from "./lab";
+import { abreviarLab, agruparPorExame } from "./lab";
 
 /**
  * Construtor de dados do "Passar o Caso" (visual rico, fica no app). Estrutura e
@@ -180,8 +180,8 @@ function labsAlterados(p: Paciente): LabAlterado[] {
     const ultimo = s.pontos[s.pontos.length - 1];
     const v = num(ultimo.valor);
     if (v == null) continue;
-    if (v > ref.max) out.push({ exame: s.exame, valor: ultimo.valor, seta: "alta" });
-    else if (v < ref.min) out.push({ exame: s.exame, valor: ultimo.valor, seta: "baixa" });
+    if (v > ref.max) out.push({ exame: abreviarLab(s.exame), valor: ultimo.valor, seta: "alta" });
+    else if (v < ref.min) out.push({ exame: abreviarLab(s.exame), valor: ultimo.valor, seta: "baixa" });
   }
   return out;
 }

@@ -53,7 +53,7 @@ import { extrairDadosImagem } from "@/lib/extrairDadosImagem";
 import { formatarNome } from "@/lib/formatarNome";
 import { gerarResumoIA } from "@/lib/gerarResumoIA";
 import { converterParaJpegBase64 } from "@/lib/imagem";
-import { agruparPorExame, type ExameSerie, TENDENCIA_INFO } from "@/lib/lab";
+import { abreviarLab, agruparPorExame, type ExameSerie, GRUPOS_LAB, grupoLab, TENDENCIA_INFO } from "@/lib/lab";
 import { EscoresClinicosSecao } from "@/components/EscoresClinicosSecao";
 import {
   buscarInteracoes,
@@ -3437,40 +3437,7 @@ const LAB_CAMPOS: { key: string; label: string; unidade: string; alias: RegExp }
 // Labs onde a queda é o "ruim" (para a cor da seta de tendência).
 const LAB_INVERTIDOS = /^(hb|ht|plaq)$/i;
 
-// Abreviações clínicas (nome completo OU sigla → sigla) para exibição compacta
-// em "Resultados por data" (BUG 13.1). Ordem importa (BD/BI antes de BT).
-const LAB_ABREV: { re: RegExp; abbr: string }[] = [
-  { re: /hemoglob|^hb$/i, abbr: "Hb" },
-  { re: /hemat[oó]cr|^ht$/i, abbr: "Ht" },
-  { re: /leuc[oó]|^lt$/i, abbr: "LT" },
-  { re: /bast[õo]|^bast/i, abbr: "Bast" },
-  { re: /plaquet|^plaq$|^plt$/i, abbr: "Plaq" },
-  { re: /prote[ií]na c|^pcr$/i, abbr: "PCR" },
-  { re: /creatin|^cr$/i, abbr: "Cr" },
-  { re: /ur[eé]ia|^u$/i, abbr: "U" },
-  { re: /pot[aá]ssio|^k$/i, abbr: "K" },
-  { re: /s[oó]dio|^na$/i, abbr: "Na" },
-  { re: /magn[eé]sio|^mg$/i, abbr: "Mg" },
-  { re: /bilirrubina\s*d|^bd$/i, abbr: "BD" },
-  { re: /bilirrubina\s*i|^bi$/i, abbr: "BI" },
-  { re: /bilirrubina|^bt$/i, abbr: "BT" },
-  { re: /aspartato|^tgo$|^ast$/i, abbr: "TGO" },
-  { re: /alanina|^tgp$|^alt$/i, abbr: "TGP" },
-  { re: /fosfatase|^fa$/i, abbr: "FA" },
-  { re: /gama|^ggt$/i, abbr: "GGT" },
-  { re: /albumin|^alb$/i, abbr: "Alb" },
-  { re: /^inr$|rni/i, abbr: "INR" },
-  { re: /atividade de protromb|^tap$/i, abbr: "TAP" },
-  { re: /^ttpa$|tromboplastina/i, abbr: "TTPA" },
-  { re: /filtra[çc]|^tfg$/i, abbr: "TFG" },
-  { re: /hemossedimenta|^vhs$/i, abbr: "VHS" },
-  { re: /desidrogenase l|^ldh$/i, abbr: "LDH" },
-  { re: /glic/i, abbr: "Glic" },
-];
-function abreviarLab(nome: string): string {
-  const n = nome.trim();
-  return LAB_ABREV.find((a) => a.re.test(n))?.abbr ?? n;
-}
+// Abreviação dos labs: fonte única em @/lib/lab (abreviarLab), incluindo LÍQUOR.
 
 // Faixas de referência p/ seta colorida (BUG 13.2): ↑ alto (vermelho),
 // ↓ baixo (azul), → normal (cinza). Determinístico (sem chamada de rede).
@@ -3585,6 +3552,8 @@ function LabsPorData({
   const [freeValor, setFreeValor] = useState("");
   const [escaneando, setEscaneando] = useState(false);
   const [verTodos, setVerTodos] = useState(false);
+  // BUG 3: data cujo detalhe (todos os exames, agrupados) está aberto no modal.
+  const [dataDetalhe, setDataDetalhe] = useState<string | null>(null);
   // FEATURE 1: seleção múltipla das entradas de hoje (excluir em massa).
   const [selecionando, setSelecionando] = useState(false);
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
@@ -3719,6 +3688,12 @@ function LabsPorData({
       ]
     : [];
 
+  // BUG 1: agrupa as entradas de hoje por tipo (HEMOGRAMA / BIOQUÍMICA / ...).
+  const gruposHoje = GRUPOS_LAB.map((g) => ({
+    grupo: g,
+    itens: entradasHoje.filter((e) => grupoLab(e.key) === g),
+  })).filter((x) => x.itens.length > 0);
+
   const dataAnteriorMaisRecente = datasAnteriores[0];
 
   const seta = (key: string, valorHoje: string) => {
@@ -3792,37 +3767,42 @@ function LabsPorData({
               </TouchableOpacity>
             )}
           </View>
-          <View style={styles.labHojeWrap}>
-            {entradasHoje.map((e) => {
-              const k = e.key.toLowerCase();
-              const sel = selecionados.has(k);
-              const chip = (
-                <LabHojeChip
-                  label={e.label}
-                  exameKey={e.key}
-                  valor={e.valor}
-                  setaStr={seta(e.key, e.valor)}
-                  sexo={sexo}
-                />
-              );
-              if (!selecionando) return <View key={e.key}>{chip}</View>;
-              return (
-                <TouchableOpacity
-                  key={e.key}
-                  style={[styles.labChipSel, sel && styles.labChipSelOn]}
-                  onPress={() => toggleSel(k)}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons
-                    name={sel ? "checkmark-circle" : "ellipse-outline"}
-                    size={16}
-                    color={sel ? ClinicalColors.primary : ClinicalColors.textMuted}
-                  />
-                  {chip}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+          {gruposHoje.map((grupo) => (
+            <View key={grupo.grupo} style={styles.labGrupo}>
+              <Text style={styles.labGrupoLabel}>{grupo.grupo}</Text>
+              <View style={styles.labHojeWrap}>
+                {grupo.itens.map((e) => {
+                  const k = e.key.toLowerCase();
+                  const sel = selecionados.has(k);
+                  const chip = (
+                    <LabHojeChip
+                      label={e.label}
+                      exameKey={e.key}
+                      valor={e.valor}
+                      setaStr={seta(e.key, e.valor)}
+                      sexo={sexo}
+                    />
+                  );
+                  if (!selecionando) return <View key={e.key}>{chip}</View>;
+                  return (
+                    <TouchableOpacity
+                      key={e.key}
+                      style={[styles.labChipSel, sel && styles.labChipSelOn]}
+                      onPress={() => toggleSel(k)}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons
+                        name={sel ? "checkmark-circle" : "ellipse-outline"}
+                        size={16}
+                        color={sel ? ClinicalColors.primary : ClinicalColors.textMuted}
+                      />
+                      {chip}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          ))}
           {selecionando && (
             <View style={styles.labSelBar}>
               <TouchableOpacity
@@ -3928,7 +3908,13 @@ function LabsPorData({
           {(verTodos ? datasAnteriores : datasAnteriores.slice(0, 4)).map((d) => {
             const itens = porData.get(d) || [];
             return (
-              <View key={d} style={styles.labPrevLinha}>
+              // BUG 3: tocar abre o modal com TODOS os exames daquela data.
+              <TouchableOpacity
+                key={d}
+                style={styles.labPrevLinha}
+                onPress={() => setDataDetalhe(d)}
+                activeOpacity={0.6}
+              >
                 <Text style={styles.labPrevData}>{rotuloDiaMes(d)}</Text>
                 {/* BUG 13: abreviação + seta colorida por referência, inline. */}
                 <Text style={styles.labPrevValores} numberOfLines={2}>
@@ -3943,7 +3929,12 @@ function LabsPorData({
                     );
                   })}
                 </Text>
-              </View>
+                <Ionicons
+                  name="chevron-forward"
+                  size={15}
+                  color={ClinicalColors.textMuted}
+                />
+              </TouchableOpacity>
             );
           })}
           {datasAnteriores.length > 4 && (
@@ -3959,6 +3950,51 @@ function LabsPorData({
       {datas.length === 0 && !form && (
         <Text style={styles.vazioTexto}>Nenhum resultado ainda.</Text>
       )}
+
+      {/* BUG 3: detalhe de uma data — TODOS os exames, agrupados por tipo. */}
+      <Modal
+        visible={!!dataDetalhe}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setDataDetalhe(null)}
+      >
+        <View style={styles.labModalFundo}>
+          <View style={styles.labModalCaixa}>
+            <View style={styles.labModalTopo}>
+              <Text style={styles.labModalTitulo}>
+                {dataDetalhe ? rotuloDiaMes(dataDetalhe) : ""}
+              </Text>
+              <TouchableOpacity onPress={() => setDataDetalhe(null)} hitSlop={8}>
+                <Ionicons name="close" size={22} color={ClinicalColors.textMuted} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={{ maxHeight: 460 }}>
+              {GRUPOS_LAB.map((g) => {
+                const itensG = (dataDetalhe ? porData.get(dataDetalhe) || [] : []).filter(
+                  (x) => grupoLab(x.exame) === g,
+                );
+                if (!itensG.length) return null;
+                return (
+                  <View key={g} style={styles.labGrupo}>
+                    <Text style={styles.labGrupoLabel}>{g}</Text>
+                    {itensG.map((x, i) => {
+                      const { seta, cor } = setaRefLab(x.exame, x.valor);
+                      return (
+                        <View key={i} style={styles.labModalLinha}>
+                          <Text style={styles.labModalNome}>{abreviarLab(x.exame)}</Text>
+                          <Text style={[styles.labModalValor, { color: cor }]}>
+                            {valorNumerico(x.valor) ?? x.valor} {seta}
+                          </Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -5631,7 +5667,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   labPrevBox: { gap: 8 },
-  labPrevLinha: { flexDirection: "row", gap: 10 },
+  labPrevLinha: { flexDirection: "row", alignItems: "center", gap: 10 },
   labPrevData: {
     fontSize: 13,
     fontWeight: "600",
@@ -5640,6 +5676,46 @@ const styles = StyleSheet.create({
   },
   labPrevValores: { flex: 1, fontSize: 13, color: ClinicalColors.textSecondary, lineHeight: 19 },
   labVerMais: { fontSize: 13, color: ClinicalColors.primary, fontWeight: "600", marginTop: 2 },
+  // BUG 1: grupos de labs (HEMOGRAMA / BIOQUÍMICA / LÍQUOR / ...).
+  labGrupo: { marginBottom: 10 },
+  labGrupoLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: ClinicalColors.textMuted,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  // BUG 3: modal de detalhe de uma data.
+  labModalFundo: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "flex-end",
+  },
+  labModalCaixa: {
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: Radius.card,
+    borderTopRightRadius: Radius.card,
+    padding: 20,
+    paddingBottom: 32,
+  },
+  labModalTopo: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 14,
+  },
+  labModalTitulo: { fontSize: 18, fontWeight: "700", color: ClinicalColors.text },
+  labModalLinha: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 6,
+    borderBottomWidth: BorderWidth.hairline,
+    borderBottomColor: ClinicalColors.border,
+  },
+  labModalNome: { fontSize: 14, color: ClinicalColors.text },
+  labModalValor: { fontSize: 14, fontWeight: "700" },
   labAddBtn: {
     backgroundColor: ClinicalColors.background,
     borderColor: ClinicalColors.primary,
