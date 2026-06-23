@@ -329,6 +329,26 @@ async function initDB() {
     );
   `);
 
+  // === Referências laboratoriais (ABIM 2026) ===
+  // Faixas de normalidade por exame e sexo, fonte pública ABIM. Alimenta a
+  // classificação dos labs (baixo/normal/alto → seta/cor) em todas as telas.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS labs_referencia (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      codigo VARCHAR(50) NOT NULL,
+      nome VARCHAR(200) NOT NULL,
+      sexo VARCHAR(10) DEFAULT 'ambos',
+      valor_min DECIMAL(10,3),
+      valor_max DECIMAL(10,3),
+      unidade VARCHAR(50) NOT NULL,
+      fonte VARCHAR(100) DEFAULT 'ABIM 2026',
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+  `);
+  await pool.query(
+    "CREATE INDEX IF NOT EXISTS idx_labs_ref_codigo ON labs_referencia(codigo, sexo);",
+  );
+
   console.log("PostgreSQL — tabelas verificadas/criadas.");
 }
 
