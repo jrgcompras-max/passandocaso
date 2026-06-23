@@ -20,6 +20,7 @@ const ORDEM = [
   { chave: "labsAlterados", label: "Labs alterados", tipo: "labs-seta" },
   { chave: "imagem", label: "Imagem", tipo: "exame-laudo" },
   { chave: "antibioticos", label: "Antibióticos", tipo: "badge-atb" },
+  { chave: "medicamentos", label: "Medicamentos em uso", tipo: "lista-bullet" },
   { chave: "avaliacao", label: "Avaliação", tipo: "lista-bullet-azul" },
   { chave: "conduta", label: "Conduta proposta", tipo: "numerada" },
   { chave: "escores", label: "Escores", tipo: "escores", soSeToggle: true },
@@ -32,6 +33,7 @@ const REGRAS = [
   "Labs: só fora do normal, com seta ↑/↓.",
   "Imagem: nome + laudo; se houver marca-texto, mostra SÓ os trechos destacados.",
   "Antibióticos: só se houver ATB cadastrado; badge ATB + nome + D+.",
+  "Medicamentos em uso: demais medicamentos da prescrição (exceto ATBs).",
   'Conduta SEMPRE "Conduta proposta" (round = discutir/validar), numerada.',
   "Escores: só se o toggle de escores estiver ativado (default deste botão: OFF).",
 ];

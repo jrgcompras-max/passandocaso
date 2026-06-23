@@ -2350,11 +2350,11 @@ const CHIPS_EXAME: { secao: string; campo: CampoExame; label: string; chips: str
   },
   {
     secao: "cardiovascular", campo: "cardiovascular", label: "Cardiovascular",
-    chips: ["AC RR 2T BNF sem sopros", "taquicárdico", "bulhas normofonéticas", "TEC < 2s", "bradicárdico", "ritmo irregular", "sopro sistólico", "B3 presente", "pulsos cheios e simétricos", "turgência jugular"],
+    chips: ["RR 2T BNF sem sopros", "taquicárdico", "bulhas normofonéticas", "TEC < 2s", "bradicárdico", "ritmo irregular", "sopro sistólico", "B3 presente", "pulsos cheios e simétricos", "turgência jugular"],
   },
   {
     secao: "respiratorio", campo: "respiratorio", label: "Respiratório",
-    chips: ["AP MV+ bilat simétrico", "eupneico", "sem ruídos adventícios", "taquipneico", "dispneico", "estertores crepitantes", "sibilos difusos", "roncos", "MV reduzido globalmente", "MV reduzido em base", "uso de musculatura acessória"],
+    chips: ["MV+ bilat simétrico", "eupneico", "sem ruídos adventícios", "taquipneico", "dispneico", "estertores crepitantes", "sibilos difusos", "roncos", "MV reduzido globalmente", "MV reduzido em base", "uso de musculatura acessória"],
   },
   {
     secao: "abdominal", campo: "abdominal", label: "Abdominal",
@@ -2411,7 +2411,11 @@ const juntarTermos = (arr: string[]) =>
 // BUG 1: sinônimos de chips renomeados — o valor salvo antigo colapsa no chip
 // atual, para não sobrar "texto solto" abaixo dos chips após renomear um chip.
 const SINONIMOS_CHIP: { re: RegExp; novo: string }[] = [
-  { re: /AP\s+MV\+?\s*bilat\.?\s*sim[ée]trico\s+sem\s+RA/gi, novo: "AP MV+ bilat simétrico" },
+  // Ordem: variantes mais específicas primeiro. Os prefixos AC/AP saíram dos
+  // chips (BUG 1) — o prefixo é adicionado só na geração da Evolução Médica.
+  { re: /AP\s+MV\+?\s*bilat\.?\s*sim[ée]trico\s+sem\s+RA/gi, novo: "MV+ bilat simétrico" },
+  { re: /AP\s+MV\+?\s*bilat\.?\s*sim[ée]trico/gi, novo: "MV+ bilat simétrico" },
+  { re: /AC\s+RR\s+2T\s+BNF\s+sem\s+sopros/gi, novo: "RR 2T BNF sem sopros" },
 ];
 function normalizarChipsLegado(v: string): string {
   let t = v || "";

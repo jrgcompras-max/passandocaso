@@ -25,6 +25,7 @@ export type CasoData = {
   labsAlterados: LabAlterado[];
   imagem: ImagemCaso[];
   antibioticos: string[];
+  medicamentos: string[];
   avaliacao: string[];
   conduta: string[];
 };
@@ -119,6 +120,24 @@ function antibioticos(p: Paciente): string[] {
   const sec = p.secoes?.prescricaoHospitalar;
   for (const a of (sec?.anotacoes as Anotacao[]) || []) {
     if (a.categoria === "atb" || KW_ATB.test(a.texto || "")) out.push(a.texto.trim());
+  }
+  return [...new Set(out)].filter(Boolean);
+}
+
+/**
+ * Medicamentos em uso (BUG 2): TODOS os medicamentos da Prescrição Hospitalar
+ * EXCETO antibióticos (esses ficam na seção "Antibióticos"). Inclui antivirais,
+ * antifúngicos, sintomáticos, etc. — antes só os ATBs apareciam no Passar o Caso.
+ */
+function medicamentosEmUso(p: Paciente): string[] {
+  const out: string[] = [];
+  for (const m of p.medicamentos || []) {
+    if (!ehAntibiotico(m.texto, m.classe)) out.push(m.texto.trim());
+  }
+  const sec = p.secoes?.prescricaoHospitalar;
+  for (const a of (sec?.anotacoes as Anotacao[]) || []) {
+    if (a.categoria === "atb" || KW_ATB.test(a.texto || "")) continue;
+    out.push(a.texto.trim());
   }
   return [...new Set(out)].filter(Boolean);
 }
@@ -282,6 +301,7 @@ export function montarCaso(paciente: Paciente, hoje: string): CasoData {
     labsAlterados: labsAlterados(paciente),
     imagem: imagemCaso(paciente),
     antibioticos: antibioticos(paciente),
+    medicamentos: medicamentosEmUso(paciente),
     avaliacao: avaliacao.length ? avaliacao : fallback ? [fallback] : [],
     conduta,
   };

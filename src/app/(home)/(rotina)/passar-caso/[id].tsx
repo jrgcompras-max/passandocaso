@@ -205,6 +205,17 @@ export default function PassarCaso() {
               </Card>
             )}
 
+            {caso.medicamentos.length > 0 && (
+              <Card label="Medicamentos em uso">
+                {caso.medicamentos.map((m, i) => (
+                  <View key={i} style={s.bulletLinha}>
+                    <Text style={s.bullet}>•</Text>
+                    <Text style={s.bulletTexto}>{m}</Text>
+                  </View>
+                ))}
+              </Card>
+            )}
+
             {caso.avaliacao.length > 0 && (
               <Card label="Avaliação">
                 <Bullets itens={caso.avaliacao} />
