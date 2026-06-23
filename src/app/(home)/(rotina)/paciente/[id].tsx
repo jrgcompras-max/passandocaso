@@ -2039,8 +2039,11 @@ function SecaoExpansivel({
               ))}
 
               {/* SSVV/Prescrição: o componente estruturado (extra) é a fonte; o
-                  conteúdo extraído só aparece se houver texto (retrocompat). */}
-              {!(
+                  conteúdo extraído só aparece se houver texto (retrocompat).
+                  Labs (BUG 4): "Resultados por data" é a ÚNICA estrutura — nunca
+                  mostra "Informações do sistema" (evita estrutura paralela). */}
+              {secaoId !== "examesLaboratoriais" &&
+              !(
                 (secaoId === "sinaisVitaisIntercorrencias" ||
                   secaoId === "prescricaoHospitalar") &&
                 !extraido.trim()
@@ -3176,6 +3179,71 @@ const LAB_CAMPOS: { key: string; label: string; unidade: string; alias: RegExp }
 // Labs onde a queda é o "ruim" (para a cor da seta de tendência).
 const LAB_INVERTIDOS = /^(hb|ht|plaq)$/i;
 
+// Abreviações clínicas (nome completo OU sigla → sigla) para exibição compacta
+// em "Resultados por data" (BUG 13.1). Ordem importa (BD/BI antes de BT).
+const LAB_ABREV: { re: RegExp; abbr: string }[] = [
+  { re: /hemoglob|^hb$/i, abbr: "Hb" },
+  { re: /hemat[oó]cr|^ht$/i, abbr: "Ht" },
+  { re: /leuc[oó]|^lt$/i, abbr: "LT" },
+  { re: /bast[õo]|^bast/i, abbr: "Bast" },
+  { re: /plaquet|^plaq$|^plt$/i, abbr: "Plaq" },
+  { re: /prote[ií]na c|^pcr$/i, abbr: "PCR" },
+  { re: /creatin|^cr$/i, abbr: "Cr" },
+  { re: /ur[eé]ia|^u$/i, abbr: "U" },
+  { re: /pot[aá]ssio|^k$/i, abbr: "K" },
+  { re: /s[oó]dio|^na$/i, abbr: "Na" },
+  { re: /magn[eé]sio|^mg$/i, abbr: "Mg" },
+  { re: /bilirrubina\s*d|^bd$/i, abbr: "BD" },
+  { re: /bilirrubina\s*i|^bi$/i, abbr: "BI" },
+  { re: /bilirrubina|^bt$/i, abbr: "BT" },
+  { re: /aspartato|^tgo$|^ast$/i, abbr: "TGO" },
+  { re: /alanina|^tgp$|^alt$/i, abbr: "TGP" },
+  { re: /fosfatase|^fa$/i, abbr: "FA" },
+  { re: /gama|^ggt$/i, abbr: "GGT" },
+  { re: /albumin|^alb$/i, abbr: "Alb" },
+  { re: /^inr$|rni/i, abbr: "INR" },
+  { re: /atividade de protromb|^tap$/i, abbr: "TAP" },
+  { re: /^ttpa$|tromboplastina/i, abbr: "TTPA" },
+  { re: /filtra[çc]|^tfg$/i, abbr: "TFG" },
+  { re: /hemossedimenta|^vhs$/i, abbr: "VHS" },
+  { re: /desidrogenase l|^ldh$/i, abbr: "LDH" },
+  { re: /glic/i, abbr: "Glic" },
+];
+function abreviarLab(nome: string): string {
+  const n = nome.trim();
+  return LAB_ABREV.find((a) => a.re.test(n))?.abbr ?? n;
+}
+
+// Faixas de referência p/ seta colorida (BUG 13.2): ↑ alto (vermelho),
+// ↓ baixo (azul), → normal (cinza). Determinístico (sem chamada de rede).
+const LAB_REF: { re: RegExp; min: number; max: number }[] = [
+  { re: /hemoglob|^hb$/i, min: 12, max: 17 },
+  { re: /hemat[oó]cr|^ht$/i, min: 36, max: 52 },
+  { re: /leuc[oó]|^lt$/i, min: 4000, max: 11000 },
+  { re: /plaquet|^plaq$/i, min: 150000, max: 450000 },
+  { re: /prote[ií]na c|^pcr$/i, min: 0, max: 5 },
+  { re: /s[oó]dio|^na$/i, min: 135, max: 145 },
+  { re: /pot[aá]ssio|^k$/i, min: 3.5, max: 5.0 },
+  { re: /creatin|^cr$/i, min: 0.6, max: 1.3 },
+  { re: /ur[eé]ia|^u$/i, min: 10, max: 50 },
+  { re: /magn[eé]sio|^mg$/i, min: 1.6, max: 2.6 },
+  { re: /bilirrubina\s*d|^bd$/i, min: 0, max: 0.3 },
+  { re: /bilirrubina|^bt$/i, min: 0, max: 1.2 },
+  { re: /albumin|^alb$/i, min: 3.5, max: 5.0 },
+  { re: /fosfatase|^fa$/i, min: 40, max: 130 },
+  { re: /gama|^ggt$/i, min: 10, max: 60 },
+  { re: /^inr$|rni/i, min: 0.8, max: 1.2 },
+  { re: /glic/i, min: 70, max: 140 },
+];
+function setaRefLab(nome: string, valor: string): { seta: string; cor: string } {
+  const ref = LAB_REF.find((r) => r.re.test(nome.trim()));
+  const v = valorNumerico(valor);
+  if (!ref || v == null) return { seta: "", cor: ClinicalColors.textSecondary };
+  if (v > ref.max) return { seta: "↑", cor: "#A32D2D" };
+  if (v < ref.min) return { seta: "↓", cor: "#1A6B8A" };
+  return { seta: "→", cor: "#64748B" };
+}
+
 /** Une o valor numérico à unidade do campo, p/ armazenar no resultadosLab. */
 function valorComUnidade(campo: { unidade: string }, valor: string): string {
   const v = valor.trim();
@@ -3389,7 +3457,7 @@ function LabsPorData({
         })),
         ...(porData.get(hoje) || [])
           .filter((x) => !LAB_CAMPOS.some((c) => c.key.toLowerCase() === x.exame.toLowerCase()))
-          .map((x) => ({ label: x.exame, key: x.exame, valor: x.valor })),
+          .map((x) => ({ label: abreviarLab(x.exame), key: x.exame, valor: x.valor })),
       ]
     : [];
 
@@ -3600,14 +3668,22 @@ function LabsPorData({
       {datasAnteriores.length > 0 && (
         <View style={styles.labPrevBox}>
           {(verTodos ? datasAnteriores : datasAnteriores.slice(0, 4)).map((d) => {
-            const vals = (porData.get(d) || [])
-              .map((x) => `${x.exame} ${valorNumerico(x.valor) ?? x.valor}`)
-              .join(" · ");
+            const itens = porData.get(d) || [];
             return (
               <View key={d} style={styles.labPrevLinha}>
                 <Text style={styles.labPrevData}>{rotuloDiaMes(d)}</Text>
+                {/* BUG 13: abreviação + seta colorida por referência, inline. */}
                 <Text style={styles.labPrevValores} numberOfLines={2}>
-                  {vals}
+                  {itens.map((x, i) => {
+                    const { seta, cor } = setaRefLab(x.exame, x.valor);
+                    return (
+                      <Text key={i}>
+                        {i > 0 ? "   " : ""}
+                        {abreviarLab(x.exame)} {valorNumerico(x.valor) ?? x.valor}
+                        {seta ? <Text style={{ color: cor }}>{seta}</Text> : null}
+                      </Text>
+                    );
+                  })}
                 </Text>
               </View>
             );
