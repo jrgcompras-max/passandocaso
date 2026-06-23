@@ -50,6 +50,11 @@ import { formatarNome } from "@/lib/formatarNome";
 import { gerarResumoIA } from "@/lib/gerarResumoIA";
 import { converterParaJpegBase64 } from "@/lib/imagem";
 import { abreviarLab, agruparPorExame, type ExameSerie, GRUPOS_LAB, grupoLab, TENDENCIA_INFO } from "@/lib/lab";
+import {
+  carregarReferencias,
+  classificarLabSync,
+  DISCLAIMER_ABIM,
+} from "@/lib/labsReferencia";
 import { EscoresClinicosSecao } from "@/components/EscoresClinicosSecao";
 import {
   buscarInteracoes,
@@ -3446,34 +3451,16 @@ const LAB_INVERTIDOS = /^(hb|ht|plaq)$/i;
 
 // Abreviação dos labs: fonte única em @/lib/lab (abreviarLab), incluindo LÍQUOR.
 
-// Faixas de referência p/ seta colorida (BUG 13.2): ↑ alto (vermelho),
-// ↓ baixo (azul), → normal (cinza). Determinístico (sem chamada de rede).
-const LAB_REF: { re: RegExp; min: number; max: number }[] = [
-  { re: /hemoglob|^hb$/i, min: 12, max: 17 },
-  { re: /hemat[oó]cr|^ht$/i, min: 36, max: 52 },
-  { re: /leuc[oó]|^lt$/i, min: 4000, max: 11000 },
-  { re: /plaquet|^plaq$/i, min: 150000, max: 450000 },
-  { re: /prote[ií]na c|^pcr$/i, min: 0, max: 5 },
-  { re: /s[oó]dio|^na$/i, min: 135, max: 145 },
-  { re: /pot[aá]ssio|^k$/i, min: 3.5, max: 5.0 },
-  { re: /creatin|^cr$/i, min: 0.6, max: 1.3 },
-  { re: /ur[eé]ia|^u$/i, min: 10, max: 50 },
-  { re: /magn[eé]sio|^mg$/i, min: 1.6, max: 2.6 },
-  { re: /bilirrubina\s*d|^bd$/i, min: 0, max: 0.3 },
-  { re: /bilirrubina|^bt$/i, min: 0, max: 1.2 },
-  { re: /albumin|^alb$/i, min: 3.5, max: 5.0 },
-  { re: /fosfatase|^fa$/i, min: 40, max: 130 },
-  { re: /gama|^ggt$/i, min: 10, max: 60 },
-  { re: /^inr$|rni/i, min: 0.8, max: 1.2 },
-  { re: /glic/i, min: 70, max: 140 },
-];
-function setaRefLab(nome: string, valor: string): { seta: string; cor: string } {
-  const ref = LAB_REF.find((r) => r.re.test(nome.trim()));
-  const v = valorNumerico(valor);
-  if (!ref || v == null) return { seta: "", cor: ClinicalColors.textSecondary };
-  if (v > ref.max) return { seta: "↑", cor: "#A32D2D" };
-  if (v < ref.min) return { seta: "↓", cor: "#1A6B8A" };
-  return { seta: "→", cor: "#64748B" };
+// Seta colorida por referência (↑ alto/vermelho, ↓ baixo/azul, → normal/cinza).
+// Fonte ÚNICA: tabela labs_referencia (ABIM 2026), via cache de @/lib/labsReferencia.
+// Exame sem referência cadastrada → sem seta (string vazia).
+function setaRefLab(
+  nome: string,
+  valor: string,
+  sexo?: "M" | "F" | null,
+): { seta: string; cor: string } {
+  const c = classificarLabSync(abreviarLab(nome), valor, sexo);
+  return { seta: c.status === "sem_referencia" ? "" : c.seta, cor: c.cor };
 }
 
 /** Une o valor numérico à unidade do campo, p/ armazenar no resultadosLab. */
@@ -3564,6 +3551,12 @@ function LabsPorData({
   // FEATURE 1: seleção múltipla das entradas de hoje (excluir em massa).
   const [selecionando, setSelecionando] = useState(false);
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
+  // Carrega as referências ABIM (cache) e re-renderiza quando prontas, p/ as
+  // setas das datas anteriores (classificação síncrona) aparecerem.
+  const [, setRefVersao] = useState(0);
+  useEffect(() => {
+    carregarReferencias().then(() => setRefVersao((v) => v + 1));
+  }, []);
   const toggleSel = (k: string) =>
     setSelecionados((p) => {
       const n = new Set(p);
@@ -3837,9 +3830,7 @@ function LabsPorData({
               </TouchableOpacity>
             </View>
           )}
-          <Text style={styles.labRefFonte}>
-            Referências: LOINC{sexo ? " · ajustadas por sexo" : ""} · avalie clinicamente
-          </Text>
+          <Text style={styles.labRefFonte}>{DISCLAIMER_ABIM}</Text>
         </View>
       )}
 
@@ -3926,7 +3917,7 @@ function LabsPorData({
                 {/* BUG 13: abreviação + seta colorida por referência, inline. */}
                 <Text style={styles.labPrevValores} numberOfLines={2}>
                   {itens.map((x, i) => {
-                    const { seta, cor } = setaRefLab(x.exame, x.valor);
+                    const { seta, cor } = setaRefLab(x.exame, x.valor, sexo);
                     return (
                       <Text key={i}>
                         {i > 0 ? "   " : ""}
@@ -3958,6 +3949,12 @@ function LabsPorData({
         <Text style={styles.vazioTexto}>Nenhum resultado ainda.</Text>
       )}
 
+      {/* Disclaimer ABIM (obrigatório) — garante exibição quando não há painel
+          de hoje (só datas anteriores). */}
+      {!temHoje && datas.length > 0 && (
+        <Text style={styles.labRefFonte}>{DISCLAIMER_ABIM}</Text>
+      )}
+
       {/* BUG 3: detalhe de uma data — TODOS os exames, agrupados por tipo. */}
       <Modal
         visible={!!dataDetalhe}
@@ -3985,7 +3982,7 @@ function LabsPorData({
                   <View key={g} style={styles.labGrupo}>
                     <Text style={styles.labGrupoLabel}>{g}</Text>
                     {itensG.map((x, i) => {
-                      const { seta, cor } = setaRefLab(x.exame, x.valor);
+                      const { seta, cor } = setaRefLab(x.exame, x.valor, sexo);
                       return (
                         <View key={i} style={styles.labModalLinha}>
                           <Text style={styles.labModalNome}>{abreviarLab(x.exame)}</Text>

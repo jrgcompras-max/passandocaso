@@ -13,6 +13,7 @@ const interacoesFda = require("./interacoesFda");
 const chipsRouter = require("./chips");
 const { analisarTendencias } = require("./alertasTendencia");
 const ontologia = require("./ontologia");
+const labsReferencia = require("./labsReferencia");
 const icd11 = require("./icd11");
 const { parseJsonIA } = require("./iaJson");
 const {
@@ -1175,12 +1176,36 @@ app.get("/api/alertas/:pacienteId", auth.autenticar, async (req, res) => {
 // Referência laboratorial oficial (LOINC) por nome do exame, ajustada por sexo.
 app.get("/api/ontologia/referencia/:lab", auth.autenticar, async (req, res) => {
   try {
-    const ref = await ontologia.referenciaLab(req.params.lab, req.query.sexo);
+    // ABIM 2026 é a fonte preferencial; cai no acervo LOINC se não houver.
+    const ref =
+      (await labsReferencia.referenciaLab(req.params.lab, req.query.sexo)) ||
+      (await ontologia.referenciaLab(req.params.lab, req.query.sexo));
     if (!ref) return res.json({ encontrado: false });
     res.json({ encontrado: true, ...ref });
   } catch (e) {
     console.error("Erro em /api/ontologia/referencia:", e);
     res.status(500).json({ erro: e.message || "Falha ao buscar referência." });
+  }
+});
+
+/** Todas as referências laboratoriais (ABIM 2026) — o app cacheia e classifica. */
+app.get("/api/labs/referencia", auth.autenticar, async (_req, res) => {
+  try {
+    res.json({ referencias: await labsReferencia.listarReferencias() });
+  } catch (e) {
+    console.error("Erro em /api/labs/referencia:", e);
+    res.status(500).json({ erro: e.message || "Falha ao listar referências." });
+  }
+});
+
+/** Classifica um valor pontual (baixo/normal/alto → seta/cor). */
+app.get("/api/labs/classificar", auth.autenticar, async (req, res) => {
+  try {
+    const { codigo, valor, sexo } = req.query;
+    res.json(await labsReferencia.classificarLab(codigo, valor, sexo));
+  } catch (e) {
+    console.error("Erro em /api/labs/classificar:", e);
+    res.status(500).json({ erro: e.message || "Falha ao classificar." });
   }
 });
 

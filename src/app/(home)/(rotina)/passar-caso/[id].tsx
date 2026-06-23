@@ -8,6 +8,7 @@ import { ClinicalColors as C, Radius } from "@/constants/clinicalTheme";
 import { diaDeInternacao, hojeISO } from "@/lib/datas";
 import { calcularEscores } from "@/lib/escoresClinicos";
 import { formatarNome } from "@/lib/formatarNome";
+import { DISCLAIMER_ABIM } from "@/lib/labsReferencia";
 import { type CasoData, montarCaso } from "@/lib/passarCaso";
 import { resumirHdaUmaLinha } from "@/lib/resumirHda";
 import { useAuth } from "@/store/AuthContext";
@@ -174,6 +175,7 @@ export default function PassarCaso() {
                     </Text>
                   </View>
                 ))}
+                <Text style={s.disclaimer}>{DISCLAIMER_ABIM}</Text>
               </Card>
             )}
 
