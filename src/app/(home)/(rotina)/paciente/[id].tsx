@@ -2704,6 +2704,78 @@ const PROBLEMA_VAZIO: Omit<Problema, "id"> = {
  * média/amarelo, baixa/verde) e formulário inline para adicionar/editar.
  * A persistência fica a cargo do componente pai (via onChange).
  */
+/**
+ * Seleção múltipla para exclusão em massa (FEATURE 1), reaproveitada pelas seções
+ * de lista (Problemas, Pendências, Medicamentos, Anotações). Cada seção tem seu
+ * próprio modo de seleção, com barra inline ao fim do conteúdo da seção.
+ */
+function useSelecaoMultipla() {
+  const [selecionando, setSelecionando] = useState(false);
+  const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
+  const alternar = (id: string) =>
+    setSelecionados((p) => {
+      const n = new Set(p);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  const sair = () => {
+    setSelecionando(false);
+    setSelecionados(new Set());
+  };
+  return { selecionando, setSelecionando, selecionados, setSelecionados, alternar, sair };
+}
+
+/** Botão "Selecionar"/"Cancelar" para o cabeçalho de uma seção. */
+function BotaoSelecionar({ ativo, onPress }: { ativo: boolean; onPress: () => void }) {
+  return (
+    <TouchableOpacity onPress={onPress} hitSlop={8} style={styles.selBotao}>
+      <Text style={styles.selBotaoTexto}>{ativo ? "Cancelar" : "Selecionar"}</Text>
+    </TouchableOpacity>
+  );
+}
+
+/** Indicador (círculo) de checkbox dos itens em modo seleção. */
+function CheckSelecao({ on }: { on: boolean }) {
+  return (
+    <View style={[styles.selCheck, on && styles.selCheckOn]}>
+      {on && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
+    </View>
+  );
+}
+
+/** Barra inferior "Selecionar todos / Excluir (N)" do modo seleção. */
+function BarraSelecao({
+  n,
+  total,
+  onTodos,
+  onExcluir,
+}: {
+  n: number;
+  total: number;
+  onTodos: () => void;
+  onExcluir: () => void;
+}) {
+  const todos = total > 0 && n === total;
+  return (
+    <View style={styles.selBarra}>
+      <TouchableOpacity onPress={onTodos} hitSlop={8}>
+        <Text style={styles.selBarraTodos}>
+          {todos ? "Limpar seleção" : "Selecionar todos"}
+        </Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.selBarraExcluir, !n && styles.selBarraExcluirOff]}
+        onPress={onExcluir}
+        disabled={!n}
+      >
+        <Ionicons name="trash-outline" size={15} color="#FFFFFF" />
+        <Text style={styles.selBarraExcluirTexto}>Excluir ({n})</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 function ProblemasSecao({
   problemas,
   onChange,
@@ -2711,6 +2783,7 @@ function ProblemasSecao({
   problemas: Problema[];
   onChange: (lista: Problema[]) => void;
 }) {
+  const sel = useSelecaoMultipla();
   const [aberto, setAberto] = useState(true);
   const [editId, setEditId] = useState<string | null>(null);
   const [mostrarForm, setMostrarForm] = useState(false);
@@ -2765,6 +2838,25 @@ function ProblemasSecao({
     ]);
   };
 
+  const excluirSelecionados = () => {
+    if (!sel.selecionados.size) return;
+    Alert.alert(
+      "Excluir problemas",
+      `Remover ${sel.selecionados.size} problema${sel.selecionados.size > 1 ? "s" : ""}? Esta ação não pode ser desfeita.`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: `Excluir (${sel.selecionados.size})`,
+          style: "destructive",
+          onPress: () => {
+            onChange(problemas.filter((x) => !sel.selecionados.has(x.id)));
+            sel.sair();
+          },
+        },
+      ],
+    );
+  };
+
   return (
     <View style={styles.secao}>
       <View style={styles.secaoHeader}>
@@ -2778,9 +2870,17 @@ function ProblemasSecao({
           </Text>
           <Ionicons name={aberto ? "chevron-up" : "chevron-down"} size={18} color={ClinicalColors.chevron} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.botaoMais} onPress={abrirNovo} hitSlop={8}>
-          <Text style={styles.botaoMaisTexto}>+</Text>
-        </TouchableOpacity>
+        {aberto && problemas.length > 0 && (
+          <BotaoSelecionar
+            ativo={sel.selecionando}
+            onPress={() => (sel.selecionando ? sel.sair() : sel.setSelecionando(true))}
+          />
+        )}
+        {!sel.selecionando && (
+          <TouchableOpacity style={styles.botaoMais} onPress={abrirNovo} hitSlop={8}>
+            <Text style={styles.botaoMaisTexto}>+</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {aberto && (
@@ -2791,18 +2891,27 @@ function ProblemasSecao({
 
           {problemas.map((p) => {
             const cor = PrioridadeColors[p.prioridade];
-            return (
-              <View key={p.id} style={[styles.problemaCard, { borderLeftColor: cor.text }]}>
+            const on = sel.selecionados.has(p.id);
+            const card = (
+              <View
+                style={[
+                  styles.problemaCard,
+                  { borderLeftColor: cor.text },
+                  sel.selecionando && { flex: 1 },
+                ]}
+              >
                 <View style={styles.problemaTopo}>
                   <Text style={styles.problemaTitulo}>{p.titulo}</Text>
-                  <View style={styles.anotacaoAcoes}>
-                    <TouchableOpacity onPress={() => abrirEdicao(p)} hitSlop={8}>
-                      <Ionicons name="pencil" size={16} color={ClinicalColors.primary} />
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => excluir(p)} hitSlop={8}>
-                      <Ionicons name="trash-outline" size={16} color={ClinicalColors.danger} />
-                    </TouchableOpacity>
-                  </View>
+                  {!sel.selecionando && (
+                    <View style={styles.anotacaoAcoes}>
+                      <TouchableOpacity onPress={() => abrirEdicao(p)} hitSlop={8}>
+                        <Ionicons name="pencil" size={16} color={ClinicalColors.primary} />
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => excluir(p)} hitSlop={8}>
+                        <Ionicons name="trash-outline" size={16} color={ClinicalColors.danger} />
+                      </TouchableOpacity>
+                    </View>
+                  )}
                 </View>
                 <View style={styles.problemaMeta}>
                   <Text
@@ -2833,9 +2942,36 @@ function ProblemasSecao({
                 )}
               </View>
             );
+            if (!sel.selecionando) return <View key={p.id}>{card}</View>;
+            return (
+              <TouchableOpacity
+                key={p.id}
+                style={styles.selLinha}
+                onPress={() => sel.alternar(p.id)}
+                activeOpacity={0.7}
+              >
+                <CheckSelecao on={on} />
+                {card}
+              </TouchableOpacity>
+            );
           })}
 
-          {mostrarForm && (
+          {sel.selecionando && (
+            <BarraSelecao
+              n={sel.selecionados.size}
+              total={problemas.length}
+              onTodos={() =>
+                sel.setSelecionados(
+                  sel.selecionados.size === problemas.length
+                    ? new Set()
+                    : new Set(problemas.map((p) => p.id)),
+                )
+              }
+              onExcluir={excluirSelecionados}
+            />
+          )}
+
+          {mostrarForm && !sel.selecionando && (
             <View style={styles.formInline}>
               <TextInput
                 style={styles.campoInput}
@@ -2941,6 +3077,7 @@ function PendenciasSecao({
   const [mostrarForm, setMostrarForm] = useState(false);
   const [descForm, setDescForm] = useState("");
   const [prioForm, setPrioForm] = useState<Prioridade>("media");
+  const sel = useSelecaoMultipla();
 
   const abertas = pendencias.filter((p) => !p.feito).length;
 
@@ -2972,6 +3109,25 @@ function PendenciasSecao({
     onChange(pendencias.filter((x) => x.id !== p.id));
   };
 
+  const excluirSelecionados = () => {
+    if (!sel.selecionados.size) return;
+    Alert.alert(
+      "Excluir pendências",
+      `Remover ${sel.selecionados.size} pendência${sel.selecionados.size > 1 ? "s" : ""}? Esta ação não pode ser desfeita.`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: `Excluir (${sel.selecionados.size})`,
+          style: "destructive",
+          onPress: () => {
+            onChange(pendencias.filter((x) => !sel.selecionados.has(x.id)));
+            sel.sair();
+          },
+        },
+      ],
+    );
+  };
+
   return (
     <View style={styles.secao}>
       <View style={styles.secaoHeader}>
@@ -2985,9 +3141,17 @@ function PendenciasSecao({
           </Text>
           <Ionicons name={aberto ? "chevron-up" : "chevron-down"} size={18} color={ClinicalColors.chevron} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.botaoMais} onPress={abrirNovo} hitSlop={8}>
-          <Text style={styles.botaoMaisTexto}>+</Text>
-        </TouchableOpacity>
+        {aberto && pendencias.length > 0 && (
+          <BotaoSelecionar
+            ativo={sel.selecionando}
+            onPress={() => (sel.selecionando ? sel.sair() : sel.setSelecionando(true))}
+          />
+        )}
+        {!sel.selecionando && (
+          <TouchableOpacity style={styles.botaoMais} onPress={abrirNovo} hitSlop={8}>
+            <Text style={styles.botaoMaisTexto}>+</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {aberto && (
@@ -2998,6 +3162,24 @@ function PendenciasSecao({
 
           {pendencias.map((p) => {
             const cor = PrioridadeColors[p.prioridade];
+            if (sel.selecionando) {
+              const on = sel.selecionados.has(p.id);
+              return (
+                <TouchableOpacity
+                  key={p.id}
+                  style={styles.pendenciaLinha}
+                  onPress={() => sel.alternar(p.id)}
+                  activeOpacity={0.7}
+                >
+                  <CheckSelecao on={on} />
+                  <Text
+                    style={[styles.pendenciaTexto, p.feito && styles.pendenciaFeita]}
+                  >
+                    {p.descricao}
+                  </Text>
+                </TouchableOpacity>
+              );
+            }
             return (
               <View key={p.id} style={styles.pendenciaLinha}>
                 <TouchableOpacity onPress={() => alternar(p)} hitSlop={8}>
@@ -3027,7 +3209,22 @@ function PendenciasSecao({
             );
           })}
 
-          {mostrarForm && (
+          {sel.selecionando && (
+            <BarraSelecao
+              n={sel.selecionados.size}
+              total={pendencias.length}
+              onTodos={() =>
+                sel.setSelecionados(
+                  sel.selecionados.size === pendencias.length
+                    ? new Set()
+                    : new Set(pendencias.map((p) => p.id)),
+                )
+              }
+              onExcluir={excluirSelecionados}
+            />
+          )}
+
+          {mostrarForm && !sel.selecionando && (
             <View style={styles.formInline}>
               <TextInput
                 style={styles.campoInput}
@@ -4128,6 +4325,25 @@ function PrescricaoSecao({
   const [editClasseId, setEditClasseId] = useState<string | null>(null);
   const [classeDraft, setClasseDraft] = useState("");
   const inputAddRef = useRef<TextInput>(null);
+  const sel = useSelecaoMultipla();
+  const excluirSelecionados = () => {
+    if (!sel.selecionados.size) return;
+    Alert.alert(
+      "Excluir medicamentos",
+      `Remover ${sel.selecionados.size} medicamento${sel.selecionados.size > 1 ? "s" : ""}? Esta ação não pode ser desfeita.`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: `Excluir (${sel.selecionados.size})`,
+          style: "destructive",
+          onPress: () => {
+            onChange(medicamentos.filter((x) => !sel.selecionados.has(x.id)));
+            sel.sair();
+          },
+        },
+      ],
+    );
+  };
 
   // Foca o campo ao abrir "Adicionar" pelo cabeçalho da seção.
   useEffect(() => {
@@ -4207,9 +4423,17 @@ function PrescricaoSecao({
 
   return (
     <View style={styles.prescBox}>
-      <Text style={[styles.campoLabel, styles.campoLabelEspacado]}>
-        Medicamentos
-      </Text>
+      <View style={styles.medLabelLinha}>
+        <Text style={[styles.campoLabel, styles.campoLabelEspacado]}>
+          Medicamentos
+        </Text>
+        {medicamentos.length > 0 && (
+          <BotaoSelecionar
+            ativo={sel.selecionando}
+            onPress={() => (sel.selecionando ? sel.sair() : sel.setSelecionando(true))}
+          />
+        )}
+      </View>
       {tfg && (
         <Text style={styles.tfgNota}>
           TFG estimada: {tfg.tfg} mL/min/1,73m² · {tfg.estadio} ({tfg.descricao}) · {tfg.fonte}
@@ -4251,8 +4475,9 @@ function PrescricaoSecao({
           pos.ajusteRenal.tfgCorte != null &&
           tfg.tfg < pos.ajusteRenal.tfgCorte
         );
-        return (
-          <View key={m.id} style={styles.medRow}>
+        const on = sel.selecionados.has(m.id);
+        const card = (
+          <View style={[styles.medRow, sel.selecionando && { flex: 1 }]}>
             <View style={styles.medInfo}>
               <View style={styles.medTituloLinha}>
                 <Text style={styles.medTexto}>{m.texto}</Text>
@@ -4313,7 +4538,7 @@ function PrescricaoSecao({
                 <Text style={styles.medAjusteObs}>{pos.ajusteRenal.recomendacao}</Text>
               )}
             </View>
-            {editando && (
+            {editando && !sel.selecionando && (
               <TouchableOpacity
                 onPress={() => onChange(medicamentos.filter((x) => x.id !== m.id))}
                 hitSlop={8}
@@ -4323,9 +4548,36 @@ function PrescricaoSecao({
             )}
           </View>
         );
+        if (!sel.selecionando) return <View key={m.id}>{card}</View>;
+        return (
+          <TouchableOpacity
+            key={m.id}
+            style={styles.selLinha}
+            onPress={() => sel.alternar(m.id)}
+            activeOpacity={0.7}
+          >
+            <CheckSelecao on={on} />
+            {card}
+          </TouchableOpacity>
+        );
       })}
 
-      {interacoes.length > 0 && (
+      {sel.selecionando && (
+        <BarraSelecao
+          n={sel.selecionados.size}
+          total={medicamentos.length}
+          onTodos={() =>
+            sel.setSelecionados(
+              sel.selecionados.size === medicamentos.length
+                ? new Set()
+                : new Set(medicamentos.map((m) => m.id)),
+            )
+          }
+          onExcluir={excluirSelecionados}
+        />
+      )}
+
+      {interacoes.length > 0 && !sel.selecionando && (
         <View style={styles.interacoesCard}>
           <Text style={styles.interacoesTitulo}>Interações identificadas ({interacoes.length})</Text>
           {interacoes.map((it, i) => (
@@ -4805,6 +5057,50 @@ const styles = StyleSheet.create({
   },
   botaoSalvarAnotacaoDesativado: { opacity: 0.5 },
   botaoSalvarConfirmado: { backgroundColor: "#2E7D32" },
+  // Seleção múltipla (FEATURE 1) — compartilhado pelas seções de lista.
+  selBotao: { paddingHorizontal: 6, paddingVertical: 4 },
+  selBotaoTexto: { color: ClinicalColors.primary, fontSize: 14, fontWeight: "600" },
+  selLinha: { flexDirection: "row", alignItems: "center" },
+  selCheck: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: ClinicalColors.border,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10,
+  },
+  selCheckOn: {
+    backgroundColor: ClinicalColors.primary,
+    borderColor: ClinicalColors.primary,
+  },
+  selBarra: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: BorderWidth.hairline,
+    borderTopColor: ClinicalColors.border,
+  },
+  selBarraTodos: { color: ClinicalColors.primary, fontSize: 14, fontWeight: "600" },
+  selBarraExcluir: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#991B1B",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: Radius.badge,
+  },
+  selBarraExcluirOff: { opacity: 0.4 },
+  selBarraExcluirTexto: { color: "#FFFFFF", fontSize: 14, fontWeight: "700" },
+  medLabelLinha: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
   botaoSalvarAnotacaoTexto: {
     color: ClinicalColors.textOnPrimary,
     fontSize: 14,
