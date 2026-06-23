@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ClinicalColors as C, Radius } from "@/constants/clinicalTheme";
@@ -67,7 +67,7 @@ export default function PassarCaso() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { carregado, getPaciente } = usePacientes();
+  const { carregado, getPaciente, atualizarEvolucao } = usePacientes();
   const { usuario } = useAuth();
   const paciente = getPaciente(id);
   const escoresAtivado = usuario?.features_ativas?.escores !== false;
@@ -81,6 +81,23 @@ export default function PassarCaso() {
     () => (paciente && escoresAtivado ? calcularEscores(paciente, hoje).filter((e) => e.calculavel) : []),
     [paciente, hoje, escoresAtivado],
   );
+
+  // FEATURE 2: edição inline da "Conduta proposta" (mesmo dado que a Conduta do
+  // Dia da ficha — condutaDoDia). Itens = linhas; numeração é automática na exibição.
+  const [editandoConduta, setEditandoConduta] = useState(false);
+  const [condutaItens, setCondutaItens] = useState<string[]>([]);
+  const salvarConduta = (lista: string[]) => {
+    const txt = lista.map((t) => t.trim()).filter(Boolean).join("\n");
+    atualizarEvolucao(id, hoje, { condutaDoDia: txt });
+  };
+  const abrirEdicaoConduta = () => {
+    setCondutaItens(caso?.conduta.length ? [...caso.conduta] : [""]);
+    setEditandoConduta(true);
+  };
+  const fecharEdicaoConduta = () => {
+    salvarConduta(condutaItens);
+    setEditandoConduta(false);
+  };
 
   // HDA: resumo via API (uma linha clínica). Mostra o resumo local até chegar.
   const [hdaResumo, setHdaResumo] = useState<string | null>(null);
@@ -222,16 +239,64 @@ export default function PassarCaso() {
               </Card>
             )}
 
-            {caso.conduta.length > 0 && (
-              <Card label="Conduta proposta">
-                {caso.conduta.map((c, i) => (
-                  <View key={i} style={s.bulletLinha}>
-                    <Text style={s.numero}>{i + 1}.</Text>
-                    <Text style={s.bulletTexto}>{c}</Text>
+            <Card label="Conduta proposta">
+              {editandoConduta ? (
+                <>
+                  {condutaItens.map((item, i) => (
+                    <View key={i} style={s.condutaEditLinha}>
+                      <Text style={s.numero}>{i + 1}.</Text>
+                      <TextInput
+                        style={s.condutaInput}
+                        value={item}
+                        onChangeText={(t) =>
+                          setCondutaItens((prev) =>
+                            prev.map((x, j) => (j === i ? t : x)),
+                          )
+                        }
+                        placeholder="Conduta…"
+                        placeholderTextColor={C.textMuted}
+                        multiline
+                        autoFocus={i === condutaItens.length - 1 && !item}
+                      />
+                      <TouchableOpacity
+                        onPress={() =>
+                          setCondutaItens((prev) => prev.filter((_, j) => j !== i))
+                        }
+                        hitSlop={8}
+                      >
+                        <Ionicons name="close-circle" size={20} color={C.textMuted} />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                  <View style={s.condutaAcoes}>
+                    <TouchableOpacity
+                      style={s.condutaAddBtn}
+                      onPress={() => setCondutaItens((prev) => [...prev, ""])}
+                      hitSlop={8}
+                    >
+                      <Ionicons name="add" size={16} color={C.primary} />
+                      <Text style={s.condutaAddTxt}>Adicionar item</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={s.condutaConcluir} onPress={fecharEdicaoConduta}>
+                      <Text style={s.condutaConcluirTxt}>Concluir</Text>
+                    </TouchableOpacity>
                   </View>
-                ))}
-              </Card>
-            )}
+                </>
+              ) : (
+                <TouchableOpacity activeOpacity={0.6} onPress={abrirEdicaoConduta}>
+                  {caso.conduta.length > 0 ? (
+                    caso.conduta.map((c, i) => (
+                      <View key={i} style={s.bulletLinha}>
+                        <Text style={s.numero}>{i + 1}.</Text>
+                        <Text style={s.bulletTexto}>{c}</Text>
+                      </View>
+                    ))
+                  ) : (
+                    <Text style={s.condutaVazia}>Toque para adicionar a conduta proposta.</Text>
+                  )}
+                </TouchableOpacity>
+              )}
+            </Card>
 
             {escores.length > 0 && (
               <Card label="Escores">
@@ -304,4 +369,30 @@ const s = StyleSheet.create({
   imgExameTexto: { fontSize: 14, color: C.textSecondary, lineHeight: 20 },
   imgExameMarcado: { color: C.text },
   disclaimer: { fontSize: 11, color: C.textMuted, fontStyle: "italic", marginTop: 8 },
+  // FEATURE 2: edição inline da Conduta proposta.
+  condutaVazia: { fontSize: 14, color: C.textMuted, fontStyle: "italic", paddingVertical: 4 },
+  condutaEditLinha: { flexDirection: "row", alignItems: "flex-start", gap: 8, paddingVertical: 3 },
+  condutaInput: {
+    flex: 1,
+    fontSize: 15,
+    color: C.text,
+    lineHeight: 21,
+    padding: 0,
+    paddingTop: 0,
+  },
+  condutaAcoes: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 10,
+  },
+  condutaAddBtn: { flexDirection: "row", alignItems: "center", gap: 4 },
+  condutaAddTxt: { color: C.primary, fontSize: 14, fontWeight: "600" },
+  condutaConcluir: {
+    backgroundColor: C.primary,
+    borderRadius: Radius.badge,
+    paddingHorizontal: 16,
+    paddingVertical: 7,
+  },
+  condutaConcluirTxt: { color: "#FFFFFF", fontSize: 14, fontWeight: "700" },
 });
