@@ -30,12 +30,8 @@ import {
     type StatusType,
 } from "@/constants/clinicalTheme";
 import {
-  DISPOSITIVOS,
   EVOLUCAO_VAZIA,
-  OPC_ALIMENTACAO,
   OPC_CONSCIENCIA,
-  OPC_DIURESE,
-  OPC_EVACUACAO,
   OPC_ORIENTACAO,
   type Opcao,
 } from "@/constants/evolucao";
@@ -2368,31 +2364,32 @@ const CHIPS_EXAME: { secao: string; campo: CampoExame; label: string; chips: str
   },
 ];
 
-// FEATURE 2: seção "Alimentação e eliminações" (chips + texto livre). Os 4
-// primeiros são os de uso frequente; o restante aparece em "ver mais". O
-// conteúdo compõe o *S: da Evolução Médica (não o *O:).
+// FEATURE 2 / BUG 2: "Alimentação e Eliminações" em três subseções de chips
+// (Alimentação · Diurese · Evacuação). O conteúdo compõe o *S: da Evolução
+// Médica (não o *O:). Cada subseção é um ExameComChips próprio.
 const CHIPS_ALIMENTACAO = [
   "aceitando dieta",
-  "diarreia",
-  "oligúrico",
-  "diurese preservada",
   "dieta zero",
   "jejum",
-  "náuseas",
-  "vômitos",
-  "sem evacuações",
-  "evacuou",
+  "dieta enteral",
+  "NPT",
+  "sonda nasoenteral",
+];
+const CHIPS_DIURESE = [
+  "oligúrico",
+  "diurese preservada",
   "anúrico",
   "hematúria",
   "colúria",
   "piúria",
+  "sonda vesical",
+];
+const CHIPS_EVACUACAO = [
+  "evacuou",
+  "sem evacuações",
+  "diarreia",
   "melena",
   "enterorragia",
-  "sonda vesical",
-  "diurese por sonda",
-  "sonda nasoenteral",
-  "dieta enteral",
-  "NPT",
   "estomia funcionante",
 ];
 
@@ -2404,6 +2401,17 @@ const CHIPS_ALIMENTACAO = [
 /** Junta termos em texto (trim, sem vazios, separados por vírgula). */
 const juntarTermos = (arr: string[]) =>
   arr.map((t) => t.trim()).filter(Boolean).join(", ");
+
+// BUG 1: sinônimos de chips renomeados — o valor salvo antigo colapsa no chip
+// atual, para não sobrar "texto solto" abaixo dos chips após renomear um chip.
+const SINONIMOS_CHIP: { re: RegExp; novo: string }[] = [
+  { re: /AP\s+MV\+?\s*bilat\.?\s*sim[ée]trico\s+sem\s+RA/gi, novo: "AP MV+ bilat simétrico" },
+];
+function normalizarChipsLegado(v: string): string {
+  let t = v || "";
+  for (const s of SINONIMOS_CHIP) t = t.replace(s.re, s.novo);
+  return t;
+}
 
 function ExameComChips({
   label,
@@ -2442,7 +2450,7 @@ function ExameComChips({
 
   // Separa o conteúdo do campo em: chips selecionados × texto livre (achados
   // não listados). A caixa de texto mostra SÓ o texto livre (Feature 1).
-  const tokens = valor.split(/\s*[,;]\s*/).map((t) => t.trim()).filter(Boolean);
+  const tokens = normalizarChipsLegado(valor).split(/\s*[,;]\s*/).map((t) => t.trim()).filter(Boolean);
   const chipsSelecionados = tokens.filter((t) => normConhecidos.has(normMerge(t)));
   const selecionadoNorm = new Set(chipsSelecionados.map(normMerge));
   const livre = juntarTermos(tokens.filter((t) => !normConhecidos.has(normMerge(t))));
@@ -2581,15 +2589,6 @@ function EvolucaoBeiraLeitoSecao({
     aplicar({ [campo]: evo[campo] === valor ? null : valor });
   };
 
-  const toggleDispositivo = (d: string) => {
-    const marcado = evo.dispositivos.includes(d);
-    aplicar({
-      dispositivos: marcado
-        ? evo.dispositivos.filter((x) => x !== d)
-        : [...evo.dispositivos, d],
-    });
-  };
-
   return (
     <View style={styles.secao}>
       <TouchableOpacity
@@ -2603,6 +2602,43 @@ function EvolucaoBeiraLeitoSecao({
 
       {aberto && (
         <View style={styles.secaoBody}>
+          {/* BUG 2: Alimentação e Eliminações em 3 subseções de chips, ANTES do
+              exame físico (e do Estado Geral). Compõem o *S: da Evolução Médica. */}
+          <Text style={styles.evoGrupo}>Alimentação e Eliminações</Text>
+          <ExameComChips
+            label="Alimentação"
+            secao="ae_alimentacao"
+            chips={CHIPS_ALIMENTACAO}
+            pessoais={chipsPessoais["ae_alimentacao"] ?? []}
+            globais={chipsGlobais["ae_alimentacao"] ?? []}
+            valor={evo.aeAlimentacao ?? ""}
+            onChange={(t) => aplicar({ aeAlimentacao: t }, false)}
+            onBlur={() => onSalvar(evo)}
+            onLog={registrarTermos}
+          />
+          <ExameComChips
+            label="Diurese"
+            secao="ae_diurese"
+            chips={CHIPS_DIURESE}
+            pessoais={chipsPessoais["ae_diurese"] ?? []}
+            globais={chipsGlobais["ae_diurese"] ?? []}
+            valor={evo.aeDiurese ?? ""}
+            onChange={(t) => aplicar({ aeDiurese: t }, false)}
+            onBlur={() => onSalvar(evo)}
+            onLog={registrarTermos}
+          />
+          <ExameComChips
+            label="Evacuação"
+            secao="ae_evacuacao"
+            chips={CHIPS_EVACUACAO}
+            pessoais={chipsPessoais["ae_evacuacao"] ?? []}
+            globais={chipsGlobais["ae_evacuacao"] ?? []}
+            valor={evo.aeEvacuacao ?? ""}
+            onChange={(t) => aplicar({ aeEvacuacao: t }, false)}
+            onBlur={() => onSalvar(evo)}
+            onLog={registrarTermos}
+          />
+
           <Text style={styles.evoGrupo}>Estado Geral</Text>
           <ToggleLinha
             label="Nível de consciência"
@@ -2624,63 +2660,6 @@ function EvolucaoBeiraLeitoSecao({
             onBlur={() => onSalvar(evo)}
           />
 
-          <Text style={styles.evoGrupo}>Alimentação e Eliminações</Text>
-          <ToggleLinha
-            label="Alimentação"
-            opcoes={OPC_ALIMENTACAO}
-            valor={evo.alimentacao}
-            onSelecionar={(v) => selecionarUnico("alimentacao", v)}
-          />
-          <ToggleLinha
-            label="Diurese"
-            opcoes={OPC_DIURESE}
-            valor={evo.diurese}
-            onSelecionar={(v) => selecionarUnico("diurese", v)}
-          />
-          <ToggleLinha
-            label="Evacuação"
-            opcoes={OPC_EVACUACAO}
-            valor={evo.evacuacao}
-            onSelecionar={(v) => selecionarUnico("evacuacao", v)}
-          />
-
-          <Text style={styles.evoGrupo}>Invasões e Dispositivos</Text>
-          <View style={styles.chipsWrap}>
-            {DISPOSITIVOS.map((d) => {
-              const ativo = evo.dispositivos.includes(d);
-              return (
-                <TouchableOpacity
-                  key={d}
-                  onPress={() => toggleDispositivo(d)}
-                  style={[styles.toggleChip, ativo && styles.toggleChipAtivo]}
-                >
-                  <Text
-                    style={[
-                      styles.toggleChipTexto,
-                      ativo && styles.toggleChipTextoAtivo,
-                    ]}
-                  >
-                    {ativo ? "☑ " : "☐ "}
-                    {d}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-          {evo.dispositivos.map((d) => (
-            <View key={d} style={styles.evoObsDispositivo}>
-              <CampoLeitura
-                label={d}
-                value={evo.dispositivosObs[d] ?? ""}
-                onChange={(t) =>
-                  aplicar({ dispositivosObs: { ...evo.dispositivosObs, [d]: t } })
-                }
-                placeholder="Observações..."
-                multiline
-              />
-            </View>
-          ))}
-
           <Text style={styles.evoGrupo}>Exame Físico</Text>
           {CHIPS_EXAME.map((cfg) => (
             <ExameComChips
@@ -2696,20 +2675,6 @@ function EvolucaoBeiraLeitoSecao({
               onLog={registrarTermos}
             />
           ))}
-
-          {/* FEATURE 2: alimentação e eliminações (compõe o *S:, não o *O:). */}
-          <Text style={styles.evoGrupo}>Alimentação e Eliminações</Text>
-          <ExameComChips
-            label="Alimentação e eliminações"
-            secao="alimentacao_eliminacoes"
-            chips={CHIPS_ALIMENTACAO}
-            pessoais={chipsPessoais["alimentacao_eliminacoes"] ?? []}
-            globais={chipsGlobais["alimentacao_eliminacoes"] ?? []}
-            valor={evo.alimentacaoEliminacoes ?? ""}
-            onChange={(t) => aplicar({ alimentacaoEliminacoes: t }, false)}
-            onBlur={() => onSalvar(evo)}
-            onLog={registrarTermos}
-          />
         </View>
       )}
     </View>

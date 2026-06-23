@@ -287,10 +287,17 @@ export function montarTextoEvolucao(paciente: Paciente, hoje: string): string {
     ...((svSec?.anotacoes as Anotacao[]) || []).map((x) => (x.texto || "").trim()),
   ].filter(Boolean);
   // FEATURE 2: alimentação e eliminações compõem o *S: junto com as queixas.
+  const ae = [
+    evo?.aeAlimentacao?.trim() || "",
+    evo?.aeDiurese?.trim() || "",
+    evo?.aeEvacuacao?.trim() || "",
+  ]
+    .filter(Boolean)
+    .join(", ");
   const sPartes = [
     sConsc,
     evo?.estadoGeral?.trim() || "",
-    evo?.alimentacaoEliminacoes?.trim() || "",
+    ae,
     ...intercorr,
   ].filter(Boolean);
   const s = sPartes.length ? `*S: ${sPartes.join(". ")}` : null;
