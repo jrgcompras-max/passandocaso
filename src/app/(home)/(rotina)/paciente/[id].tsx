@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
@@ -98,6 +98,26 @@ import {
   type SecaoId,
   type SinaisVitaisDia,
 } from "@/types/paciente";
+
+// FEATURE 1: accordion da ficha — uma seção aberta por vez. O estado fica no
+// componente pai (Paciente) e cada seção usa useSecaoAccordion(id) no lugar do
+// useState local. Mantém a mesma assinatura de setAberto (não muda os call sites).
+const AccordionContext = createContext<{
+  abertaId: string | null;
+  setAbertaId: (next: string | null) => void;
+}>({ abertaId: null, setAbertaId: () => {} });
+
+function useSecaoAccordion(
+  id: string,
+): [boolean, (next: boolean | ((v: boolean) => boolean)) => void] {
+  const { abertaId, setAbertaId } = useContext(AccordionContext);
+  const aberto = abertaId === id;
+  const setAberto = (next: boolean | ((v: boolean) => boolean)) => {
+    const novo = typeof next === "function" ? next(aberto) : next;
+    setAbertaId(novo ? id : null);
+  };
+  return [aberto, setAberto];
+}
 
 const STATUS_OPCOES = Object.keys(StatusColors) as StatusType[];
 const STATUS_CLINICO_OPCOES = Object.keys(StatusClinicoColors) as StatusClinico[];
@@ -343,6 +363,9 @@ export default function Paciente() {
       vivo = false;
     };
   }, [id]);
+
+  // FEATURE 1: accordion — id da única seção aberta (null = todas fechadas).
+  const [secaoAberta, setSecaoAberta] = useState<string | null>(null);
 
   // Destaque de interações GRAVES no header (scroll até a Prescrição ao tocar).
   const scrollRef = useRef<KeyboardAwareScrollView>(null);
@@ -761,6 +784,9 @@ export default function Paciente() {
       paciente.status === "altaRealizada");
 
   return (
+    <AccordionContext.Provider
+      value={{ abertaId: secaoAberta, setAbertaId: setSecaoAberta }}
+    >
     <KeyboardAwareScrollView
       ref={scrollRef}
       style={styles.container}
@@ -1104,6 +1130,7 @@ export default function Paciente() {
         </>
       )}
     </KeyboardAwareScrollView>
+    </AccordionContext.Provider>
   );
 }
 
@@ -1724,7 +1751,7 @@ function SecaoExpansivel({
     onProgresso: (msg: string) => void,
   ) => Promise<{ aviso?: string } | void>;
 }) {
-  const [aberto, setAberto] = useState(false);
+  const [aberto, setAberto] = useSecaoAccordion(secaoId);
   const [rascunho, setRascunho] = useState("");
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [extraindo, setExtraindo] = useState(false);
@@ -2543,7 +2570,7 @@ function EvolucaoBeiraLeitoSecao({
   evolucao: EvolucaoBeiraLeito;
   onSalvar: (evo: EvolucaoBeiraLeito) => void;
 }) {
-  const [aberto, setAberto] = useState(false);
+  const [aberto, setAberto] = useSecaoAccordion("beiraLeito");
   const [evo, setEvo] = useState(evolucao);
   // Chips aprendidos (Feature 2): pessoais (do médico) e globais (aprovados).
   const [chipsPessoais, setChipsPessoais] = useState<Record<string, string[]>>({});
@@ -2702,7 +2729,7 @@ function CondutaSecao({
   evolucao: EvolucaoBeiraLeito;
   onSalvar: (evo: EvolucaoBeiraLeito) => void;
 }) {
-  const [aberto, setAberto] = useState(false);
+  const [aberto, setAberto] = useSecaoAccordion("conduta");
   const [evo, setEvo] = useState(evolucao);
   useEffect(() => setEvo(evolucao), [evolucao]);
 
@@ -2862,7 +2889,7 @@ function ProblemasSecao({
   onChange: (lista: Problema[]) => void;
 }) {
   const sel = useSelecaoMultipla();
-  const [aberto, setAberto] = useState(true);
+  const [aberto, setAberto] = useSecaoAccordion("problemas");
   const [editId, setEditId] = useState<string | null>(null);
   const [mostrarForm, setMostrarForm] = useState(false);
   const [form, setForm] = useState<Omit<Problema, "id">>(PROBLEMA_VAZIO);
@@ -3151,7 +3178,7 @@ function PendenciasSecao({
   pendencias: Pendencia[];
   onChange: (lista: Pendencia[]) => void;
 }) {
-  const [aberto, setAberto] = useState(true);
+  const [aberto, setAberto] = useSecaoAccordion("pendencias");
   const [mostrarForm, setMostrarForm] = useState(false);
   const [descForm, setDescForm] = useState("");
   const [prioForm, setPrioForm] = useState<Prioridade>("media");
@@ -3382,7 +3409,7 @@ function ResumoRapidoSecao({
   gerando: boolean;
   onGerar: () => void;
 }) {
-  const [aberto, setAberto] = useState(false);
+  const [aberto, setAberto] = useSecaoAccordion("resumoRapido");
   const temResumo = !!resumo;
 
   const alternar = () => {
@@ -4315,7 +4342,7 @@ function ChecklistAltaSecao({
   checklist: Record<string, boolean>;
   onChange: (c: Record<string, boolean>) => void;
 }) {
-  const [aberto, setAberto] = useState(true);
+  const [aberto, setAberto] = useSecaoAccordion("checklistAlta");
   const feitos = CHECKLIST_ALTA.filter((i) => checklist[i.id]).length;
 
   return (
