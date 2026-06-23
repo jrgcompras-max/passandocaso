@@ -204,7 +204,8 @@ function deriveBlocos(secao, d) {
     if (naoVazio(d.fr)) itens.push(`FR ${d.fr}`);
     if (naoVazio(d.sato2)) itens.push(`SatO2 ${d.sato2}`);
     if (naoVazio(d.temp)) itens.push(`Tax ${d.temp}`);
-    if (naoVazio(d.glasgow)) itens.push(`Glasgow ${d.glasgow}`);
+    // Glasgow NÃO entra nos Sinais Vitais (BUG 12): fica só no exame Neurológico
+    // da Evolução Beira-Leito, para não duplicar.
     if (naoVazio(d.glicemia)) itens.push(`HGT ${d.glicemia}`);
     if (naoVazio(d.diurese)) itens.push(`Diurese ${d.diurese}`);
     return bloco("Sinais vitais", itens);

@@ -108,7 +108,11 @@ export default function PassarCaso() {
         <Text style={s.sub}>{paciente ? subtitulo(paciente) : carregado ? "Paciente não encontrado" : "Carregando…"}</Text>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
+      {/* paddingBottom cobre a tab bar (altura 64 + insets) + 16 de margem,
+          para a última seção (Conduta proposta) não ficar escondida. */}
+      <ScrollView
+        contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 80 }}
+      >
         {!caso ? null : (
           <>
             {!!caso.hda && (

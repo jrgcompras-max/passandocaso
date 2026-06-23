@@ -2635,15 +2635,23 @@ function CondutaSecao({
   };
   useEffect(() => cancelarTimer, []);
 
+  // Feedback do botão "Salvar" explícito (BUG 8): mostra "Salvo ✓" por um tempo.
+  const [salvo, setSalvo] = useState(false);
   const aoDigitar = (t: string) => {
     const proximo = { ...evo, condutaDoDia: t };
     setEvo(proximo);
+    setSalvo(false);
     cancelarTimer();
     timerRef.current = setTimeout(() => onSalvar(proximo), 800);
   };
   const salvarAgora = () => {
     cancelarTimer();
     onSalvar(evo);
+  };
+  // Salvar explícito: persiste e confirma visualmente (dado clínico crítico).
+  const salvarExplicito = () => {
+    salvarAgora();
+    setSalvo(true);
   };
 
   return (
@@ -2664,6 +2672,15 @@ function CondutaSecao({
             onChangeText={aoDigitar}
             onBlur={salvarAgora}
           />
+          <TouchableOpacity
+            style={[styles.botaoSalvarAnotacao, salvo && styles.botaoSalvarConfirmado]}
+            onPress={salvarExplicito}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.botaoSalvarAnotacaoTexto}>
+              {salvo ? "Salvo ✓" : "Salvar conduta"}
+            </Text>
+          </TouchableOpacity>
         </View>
       )}
     </View>
@@ -4711,6 +4728,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   botaoSalvarAnotacaoDesativado: { opacity: 0.5 },
+  botaoSalvarConfirmado: { backgroundColor: "#2E7D32" },
   botaoSalvarAnotacaoTexto: {
     color: ClinicalColors.textOnPrimary,
     fontSize: 14,
