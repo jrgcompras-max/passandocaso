@@ -1809,6 +1809,82 @@ function SecaoExpansivel({
   // Enquanto uma anotação está em edição, o card dela some até salvar de novo.
   const anotacoesVisiveis = anotacoes.filter((a) => a.id !== editandoId);
 
+  // Seleção múltipla das anotações (FEATURE 1).
+  const selAnot = useSelecaoMultipla();
+  const excluirAnotacoesSelecionadas = () => {
+    if (!selAnot.selecionados.size) return;
+    Alert.alert(
+      "Excluir anotações",
+      `Remover ${selAnot.selecionados.size} anotação(ões)? Esta ação não pode ser desfeita.`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: `Excluir (${selAnot.selecionados.size})`,
+          style: "destructive",
+          onPress: () => {
+            onSalvarAnotacoes(
+              anotacoes.filter((a) => !selAnot.selecionados.has(a.id)),
+            );
+            selAnot.sair();
+          },
+        },
+      ],
+    );
+  };
+
+  /** Card de anotação (com/sem chip de categoria), com modo seleção. */
+  const renderAnotacao = (a: Anotacao, comCategoria: boolean) => {
+    const conteudo = (
+      <View style={styles.anotacaoConteudo}>
+        {!!a.horario && <Text style={styles.anotacaoHorario}>{a.horario}</Text>}
+        <Text style={styles.anotacaoTexto}>{a.texto}</Text>
+        {comCategoria &&
+          categorias &&
+          (() => {
+            const cat = categorias.find((c) => c.chave === a.categoria);
+            return cat ? (
+              <TouchableOpacity
+                onPress={() => alternarCategoria(a)}
+                style={[styles.anotacaoCategoria, { backgroundColor: cat.cor }]}
+              >
+                <Text style={styles.anotacaoCategoriaTexto}>{cat.label}</Text>
+              </TouchableOpacity>
+            ) : (
+              <Text style={styles.anotacaoClassificando}>classificando…</Text>
+            );
+          })()}
+      </View>
+    );
+    if (selAnot.selecionando) {
+      return (
+        <TouchableOpacity
+          key={a.id}
+          style={[styles.anotacaoCard, styles.selLinha]}
+          onPress={() => selAnot.alternar(a.id)}
+          activeOpacity={0.7}
+        >
+          <CheckSelecao on={selAnot.selecionados.has(a.id)} />
+          {conteudo}
+        </TouchableOpacity>
+      );
+    }
+    return (
+      <View key={a.id} style={styles.anotacaoCard}>
+        {conteudo}
+        {editando && (
+          <View style={styles.anotacaoAcoes}>
+            <TouchableOpacity onPress={() => editarAnotacao(a)} hitSlop={8}>
+              <Ionicons name="pencil" size={16} color={ClinicalColors.primary} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => excluirAnotacao(a)} hitSlop={8}>
+              <Ionicons name="trash-outline" size={16} color={ClinicalColors.danger} />
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+    );
+  };
+
   const processarUri = async (uri: string) => {
     setExtraindo(true);
     setErro(null);
@@ -1934,26 +2010,44 @@ function SecaoExpansivel({
           {secaoId === "prescricaoHospitalar" &&
             (typeof extra === "function" ? extra(editando) : extra)}
 
-          <Text style={styles.campoLabel}>Anotações</Text>
-          <TextInput
-            style={styles.anotacoesInput}
-            value={rascunho}
-            onChangeText={setRascunho}            placeholder="Digite uma anotação..."
-            placeholderTextColor={ClinicalColors.textMuted}
-            multiline
-          />
-          <TouchableOpacity
-            style={[
-              styles.botaoSalvarAnotacao,
-              !rascunho.trim() && styles.botaoSalvarAnotacaoDesativado,
-            ]}
-            onPress={salvarAnotacao}
-            disabled={!rascunho.trim()}
-          >
-            <Text style={styles.botaoSalvarAnotacaoTexto}>
-              {editandoId ? "Atualizar anotação" : "Salvar anotação"}
-            </Text>
-          </TouchableOpacity>
+          <View style={styles.medLabelLinha}>
+            <Text style={styles.campoLabel}>Anotações</Text>
+            {secaoId !== "comorbidadesMedicacoes" &&
+              anotacoesVisiveis.length > 0 && (
+                <BotaoSelecionar
+                  ativo={selAnot.selecionando}
+                  onPress={() =>
+                    selAnot.selecionando
+                      ? selAnot.sair()
+                      : selAnot.setSelecionando(true)
+                  }
+                />
+              )}
+          </View>
+          {!selAnot.selecionando && (
+            <>
+              <TextInput
+                style={styles.anotacoesInput}
+                value={rascunho}
+                onChangeText={setRascunho}
+                placeholder="Digite uma anotação..."
+                placeholderTextColor={ClinicalColors.textMuted}
+                multiline
+              />
+              <TouchableOpacity
+                style={[
+                  styles.botaoSalvarAnotacao,
+                  !rascunho.trim() && styles.botaoSalvarAnotacaoDesativado,
+                ]}
+                onPress={salvarAnotacao}
+                disabled={!rascunho.trim()}
+              >
+                <Text style={styles.botaoSalvarAnotacaoTexto}>
+                  {editandoId ? "Atualizar anotação" : "Salvar anotação"}
+                </Text>
+              </TouchableOpacity>
+            </>
+          )}
 
           {secaoId === "comorbidadesMedicacoes" ? (
             // Unificado: foto + anotações no mesmo formato (bullets), agrupados.
@@ -1966,26 +2060,21 @@ function SecaoExpansivel({
             />
           ) : secaoId === "imagem" ? (
             <>
-              {anotacoesVisiveis.map((a) => (
-                <View key={a.id} style={styles.anotacaoCard}>
-                  <View style={styles.anotacaoConteudo}>
-                    {!!a.horario && (
-                      <Text style={styles.anotacaoHorario}>{a.horario}</Text>
-                    )}
-                    <Text style={styles.anotacaoTexto}>{a.texto}</Text>
-                  </View>
-                  {editando && (
-                    <View style={styles.anotacaoAcoes}>
-                      <TouchableOpacity onPress={() => editarAnotacao(a)} hitSlop={8}>
-                        <Ionicons name="pencil" size={16} color={ClinicalColors.primary} />
-                      </TouchableOpacity>
-                      <TouchableOpacity onPress={() => excluirAnotacao(a)} hitSlop={8}>
-                        <Ionicons name="trash-outline" size={16} color={ClinicalColors.danger} />
-                      </TouchableOpacity>
-                    </View>
-                  )}
-                </View>
-              ))}
+              {anotacoesVisiveis.map((a) => renderAnotacao(a, false))}
+              {selAnot.selecionando && (
+                <BarraSelecao
+                  n={selAnot.selecionados.size}
+                  total={anotacoesVisiveis.length}
+                  onTodos={() =>
+                    selAnot.setSelecionados(
+                      selAnot.selecionados.size === anotacoesVisiveis.length
+                        ? new Set()
+                        : new Set(anotacoesVisiveis.map((a) => a.id)),
+                    )
+                  }
+                  onExcluir={excluirAnotacoesSelecionadas}
+                />
+              )}
               <ImagemSecao
                 extraido={extraido}
                 editando={editando}
@@ -1994,49 +2083,21 @@ function SecaoExpansivel({
             </>
           ) : (
             <>
-              {anotacoesVisiveis.map((a) => (
-                <View key={a.id} style={styles.anotacaoCard}>
-                  <View style={styles.anotacaoConteudo}>
-                    {!!a.horario && (
-                      <Text style={styles.anotacaoHorario}>{a.horario}</Text>
-                    )}
-                    <Text style={styles.anotacaoTexto}>{a.texto}</Text>
-                    {categorias &&
-                      (() => {
-                        const cat = categorias.find(
-                          (c) => c.chave === a.categoria,
-                        );
-                        return cat ? (
-                          <TouchableOpacity
-                            onPress={() => alternarCategoria(a)}
-                            style={[
-                              styles.anotacaoCategoria,
-                              { backgroundColor: cat.cor },
-                            ]}
-                          >
-                            <Text style={styles.anotacaoCategoriaTexto}>
-                              {cat.label}
-                            </Text>
-                          </TouchableOpacity>
-                        ) : (
-                          <Text style={styles.anotacaoClassificando}>
-                            classificando…
-                          </Text>
-                        );
-                      })()}
-                  </View>
-                  {editando && (
-                    <View style={styles.anotacaoAcoes}>
-                      <TouchableOpacity onPress={() => editarAnotacao(a)} hitSlop={8}>
-                        <Ionicons name="pencil" size={16} color={ClinicalColors.primary} />
-                      </TouchableOpacity>
-                      <TouchableOpacity onPress={() => excluirAnotacao(a)} hitSlop={8}>
-                        <Ionicons name="trash-outline" size={16} color={ClinicalColors.danger} />
-                      </TouchableOpacity>
-                    </View>
-                  )}
-                </View>
-              ))}
+              {anotacoesVisiveis.map((a) => renderAnotacao(a, true))}
+              {selAnot.selecionando && (
+                <BarraSelecao
+                  n={selAnot.selecionados.size}
+                  total={anotacoesVisiveis.length}
+                  onTodos={() =>
+                    selAnot.setSelecionados(
+                      selAnot.selecionados.size === anotacoesVisiveis.length
+                        ? new Set()
+                        : new Set(anotacoesVisiveis.map((a) => a.id)),
+                    )
+                  }
+                  onExcluir={excluirAnotacoesSelecionadas}
+                />
+              )}
 
               {/* SSVV/Prescrição: o componente estruturado (extra) é a fonte; o
                   conteúdo extraído só aparece se houver texto (retrocompat).
