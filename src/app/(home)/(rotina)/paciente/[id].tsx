@@ -2368,6 +2368,34 @@ const CHIPS_EXAME: { secao: string; campo: CampoExame; label: string; chips: str
   },
 ];
 
+// FEATURE 2: seção "Alimentação e eliminações" (chips + texto livre). Os 4
+// primeiros são os de uso frequente; o restante aparece em "ver mais". O
+// conteúdo compõe o *S: da Evolução Médica (não o *O:).
+const CHIPS_ALIMENTACAO = [
+  "aceitando dieta",
+  "diarreia",
+  "oligúrico",
+  "diurese preservada",
+  "dieta zero",
+  "jejum",
+  "náuseas",
+  "vômitos",
+  "sem evacuações",
+  "evacuou",
+  "anúrico",
+  "hematúria",
+  "colúria",
+  "piúria",
+  "melena",
+  "enterorragia",
+  "sonda vesical",
+  "diurese por sonda",
+  "sonda nasoenteral",
+  "dieta enteral",
+  "NPT",
+  "estomia funcionante",
+];
+
 /**
  * Campo de exame físico com chips clicáveis (top 4 + "ver mais") e caixa de texto
  * para achados não listados. Os chips inserem/removem seu texto no conteúdo do
@@ -2668,6 +2696,20 @@ function EvolucaoBeiraLeitoSecao({
               onLog={registrarTermos}
             />
           ))}
+
+          {/* FEATURE 2: alimentação e eliminações (compõe o *S:, não o *O:). */}
+          <Text style={styles.evoGrupo}>Alimentação e Eliminações</Text>
+          <ExameComChips
+            label="Alimentação e eliminações"
+            secao="alimentacao_eliminacoes"
+            chips={CHIPS_ALIMENTACAO}
+            pessoais={chipsPessoais["alimentacao_eliminacoes"] ?? []}
+            globais={chipsGlobais["alimentacao_eliminacoes"] ?? []}
+            valor={evo.alimentacaoEliminacoes ?? ""}
+            onChange={(t) => aplicar({ alimentacaoEliminacoes: t }, false)}
+            onBlur={() => onSalvar(evo)}
+            onLog={registrarTermos}
+          />
         </View>
       )}
     </View>

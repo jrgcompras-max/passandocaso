@@ -9,8 +9,8 @@ import {
   type SecaoId,
 } from "@/types/paciente";
 
-import { limparDataEmTexto } from "./datas";
-import { agruparPorExame } from "./lab";
+import { formatarDataBR, limparDataEmTexto } from "./datas";
+import { abreviarLab, agruparPorExame, grupoLab } from "./lab";
 
 type Bloco = { titulo: string; itens: string[] };
 
@@ -154,17 +154,64 @@ function prescricao(p: Paciente): { atb: string[]; emUso: string[] } {
   return { atb: semDuplicar(atb), emUso: semDuplicar(emUso) };
 }
 
-/** Culturas pendentes (pendências não-feitas que mencionam cultura). */
-function culturasPendentes(p: Paciente): string[] {
-  return (p.pendencias || [])
-    .filter((x) => !x.feito && /cultura|hemocult|urocult/i.test(x.descricao || ""))
-    .map((x) => x.descricao.trim());
+// FEATURE 1: reconhecimento de culturas (sigla canônica) por nome/variações.
+const CULTURA_MAP: { re: RegExp; sigla: string }[] = [
+  { re: /hemocult|^hmc\b|\bhemo\b/i, sigla: "HMC" },
+  { re: /urocult|^urc\b|\buro\b/i, sigla: "URC" },
+  { re: /cult.*cateter|\bcateter\b|\bcat\b/i, sigla: "Cult cateter" },
+  { re: /cult.*escarro|\bescarro\b/i, sigla: "Cult escarro" },
+  { re: /cult.*l[ií]quor|cult.*lcr/i, sigla: "Cult LCR" },
+  { re: /cult.*ferida|\bferida\b/i, sigla: "Cult ferida" },
+  { re: /swab/i, sigla: "Swab" },
+  { re: /cultura/i, sigla: "Cultura" },
+];
+function siglaCultura(nome: string): string | null {
+  return CULTURA_MAP.find((c) => c.re.test(nome || ""))?.sigla ?? null;
+}
+const RESULTADO_PENDENTE = /aguard|coletad|pendente|em andamento|sem resultado|solicitad/i;
+
+/** Formata uma cultura: "HMC 21/06 — E. coli" ou "HMC coletada 21/06, aguardando". */
+function fmtCultura(sigla: string, dataISO: string | undefined, valor: string): string {
+  const dia = dataISO ? formatarDataBR(dataISO).slice(0, 5) : "";
+  const v = (valor || "").trim();
+  if (!v || RESULTADO_PENDENTE.test(v)) {
+    return `${sigla}${dia ? ` coletada ${dia}` : ""}, aguardando`;
+  }
+  return `${sigla}${dia ? ` ${dia}` : ""} — ${v}`;
 }
 
-/** Linha compacta dos exames laboratoriais (valor mais recente por exame). */
+/**
+ * Culturais para a Evolução Médica (FEATURE 1). Reconhece culturas anotadas:
+ * resultados em resultadosLab (com data + resultado) e pendências não-feitas
+ * (aguardando). Normaliza variações (hemocultura/HMC/hemo, urocultura/URC/uro…).
+ */
+function culturais(p: Paciente): string[] {
+  const out: string[] = [];
+  const siglasVistas = new Set<string>();
+  // 1) Resultados (resultadosLab) reconhecidos como cultura — data + resultado.
+  for (const r of p.resultadosLab || []) {
+    const sigla = siglaCultura(r.exame);
+    if (!sigla) continue;
+    out.push(fmtCultura(sigla, r.data, r.valor));
+    siglasVistas.add(sigla);
+  }
+  // 2) Pendências não-feitas que mencionam cultura (aguardando) — sem duplicar.
+  for (const x of p.pendencias || []) {
+    if (x.feito) continue;
+    const sigla = siglaCultura(x.descricao || "");
+    if (!sigla || siglasVistas.has(sigla)) continue;
+    out.push(`${sigla} coletada, aguardando`);
+    siglasVistas.add(sigla);
+  }
+  return out;
+}
+
+/** Linha compacta dos exames laboratoriais (valor mais recente por exame).
+ * Abrevia os nomes (Hb, Ht, …) e exclui culturas (vão para "- Culturais:"). */
 function laboratorioLinha(p: Paciente): string {
   return agruparPorExame(p.resultadosLab || [])
-    .map((s) => `${s.exame} ${s.pontos[s.pontos.length - 1].valor}`)
+    .filter((s) => grupoLab(s.exame) !== "CULTURAS")
+    .map((s) => `${abreviarLab(s.exame)} ${s.pontos[s.pontos.length - 1].valor}`)
     .join(" / ");
 }
 
@@ -209,7 +256,7 @@ export function montarTextoEvolucao(paciente: Paciente, hoje: string): string {
 
   // — Antibióticos / Culturais (ATB só se cadastrado; senão --). —
   const { atb } = prescricao(paciente);
-  const culturas = culturasPendentes(paciente);
+  const culturas = culturais(paciente);
   const blocoTrat = [
     `- Antibióticos: ${atb.length ? atb.join(", ") : "--"}`,
     `- Culturais: ${culturas.length ? culturas.join(", ") : "---"}`,
@@ -239,7 +286,13 @@ export function montarTextoEvolucao(paciente: Paciente, hoje: string): string {
     sv?.intercorrencias?.trim() || "",
     ...((svSec?.anotacoes as Anotacao[]) || []).map((x) => (x.texto || "").trim()),
   ].filter(Boolean);
-  const sPartes = [sConsc, evo?.estadoGeral?.trim() || "", ...intercorr].filter(Boolean);
+  // FEATURE 2: alimentação e eliminações compõem o *S: junto com as queixas.
+  const sPartes = [
+    sConsc,
+    evo?.estadoGeral?.trim() || "",
+    evo?.alimentacaoEliminacoes?.trim() || "",
+    ...intercorr,
+  ].filter(Boolean);
   const s = sPartes.length ? `*S: ${sPartes.join(". ")}` : null;
 
   // — Sinais vitais (omite campos vazios; some se não houver nenhum) —

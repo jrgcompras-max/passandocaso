@@ -171,6 +171,8 @@ export type EvolucaoBeiraLeito = {
   extremidades?: string;
   /** Pele e mucosas (exame físico). */
   pele?: string;
+  /** Alimentação e eliminações (chips + texto livre); compõe o *S:. (FEATURE 2) */
+  alimentacaoEliminacoes?: string;
   condutaDoDia: string;
 };
 
