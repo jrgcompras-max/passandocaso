@@ -174,6 +174,8 @@ const REF_LAB: { re: RegExp; min: number; max: number }[] = [
 ];
 function labsAlterados(p: Paciente): LabAlterado[] {
   const out: LabAlterado[] = [];
+  // Pediátrico (idade < 18): faixas de referência são de adultos → não classifica.
+  if (p.idade != null && p.idade < 18) return out;
   for (const s of agruparPorExame(p.resultadosLab || [])) {
     const ref = REF_LAB.find((r) => r.re.test(s.exame.trim()));
     if (!ref) continue;

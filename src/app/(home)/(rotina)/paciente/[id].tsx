@@ -1016,6 +1016,7 @@ export default function Paciente() {
                 <LabsPorData
                   resultados={paciente?.resultadosLab ?? []}
                   sexo={paciente?.sexo ?? null}
+                  idade={paciente?.idade ?? null}
                   onChange={(lista) =>
                     atualizarPaciente(id, { resultadosLab: lista })
                   }
@@ -3458,8 +3459,9 @@ function setaRefLab(
   nome: string,
   valor: string,
   sexo?: "M" | "F" | null,
+  idade?: number | null,
 ): { seta: string; cor: string } {
-  const c = classificarLabSync(abreviarLab(nome), valor, sexo);
+  const c = classificarLabSync(abreviarLab(nome), valor, sexo, idade);
   return { seta: c.status === "sem_referencia" ? "" : c.seta, cor: c.cor };
 }
 
@@ -3487,12 +3489,14 @@ function LabHojeChip({
   valor,
   setaStr,
   sexo,
+  idade,
 }: {
   label: string;
   exameKey: string;
   valor: string;
   setaStr: string | null;
   sexo?: "M" | "F" | null;
+  idade?: number | null;
 }) {
   const [ref, setRef] = useState<ReferenciaLab | null>(null);
   useEffect(() => {
@@ -3506,7 +3510,9 @@ function LabHojeChip({
   }, [exameKey, sexo]);
 
   const num = valorNumerico(valor);
-  const status = ref ? statusReferencia(num, ref) : "normal";
+  // Pediátrico (idade < 18): tabela ABIM é de adultos → não interpreta (sem cor).
+  const pediatrico = idade != null && idade < 18;
+  const status = ref && !pediatrico ? statusReferencia(num, ref) : "normal";
   const cor =
     status === "atencao"
       ? "#E65100"
@@ -3532,11 +3538,13 @@ function LabHojeChip({
 function LabsPorData({
   resultados,
   sexo,
+  idade,
   onChange,
   onAposSalvar,
 }: {
   resultados: ResultadoLab[];
   sexo?: "M" | "F" | null;
+  idade?: number | null;
   onChange: (l: ResultadoLab[]) => void;
   onAposSalvar?: (novos: ResultadoLab[]) => void;
 }) {
@@ -3781,6 +3789,7 @@ function LabsPorData({
                       valor={e.valor}
                       setaStr={seta(e.key, e.valor)}
                       sexo={sexo}
+                      idade={idade}
                     />
                   );
                   if (!selecionando) return <View key={e.key}>{chip}</View>;
@@ -3917,7 +3926,7 @@ function LabsPorData({
                 {/* BUG 13: abreviação + seta colorida por referência, inline. */}
                 <Text style={styles.labPrevValores} numberOfLines={2}>
                   {itens.map((x, i) => {
-                    const { seta, cor } = setaRefLab(x.exame, x.valor, sexo);
+                    const { seta, cor } = setaRefLab(x.exame, x.valor, sexo, idade);
                     return (
                       <Text key={i}>
                         {i > 0 ? "   " : ""}
@@ -3982,7 +3991,7 @@ function LabsPorData({
                   <View key={g} style={styles.labGrupo}>
                     <Text style={styles.labGrupoLabel}>{g}</Text>
                     {itensG.map((x, i) => {
-                      const { seta, cor } = setaRefLab(x.exame, x.valor, sexo);
+                      const { seta, cor } = setaRefLab(x.exame, x.valor, sexo, idade);
                       return (
                         <View key={i} style={styles.labModalLinha}>
                           <Text style={styles.labModalNome}>{abreviarLab(x.exame)}</Text>

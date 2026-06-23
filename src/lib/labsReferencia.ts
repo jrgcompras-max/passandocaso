@@ -65,7 +65,10 @@ export function classificarLabSync(
   codigo: string,
   valor: string,
   sexo?: "M" | "F" | null,
+  idade?: number | null,
 ): ClassificacaoLab {
+  // Tabela ABIM é de adultos: pediátrico (idade conhecida < 18) não interpreta.
+  if (idade != null && idade < 18) return SEM_REF;
   if (!cache || !cache.length) return SEM_REF;
   const chave = (codigo || "").trim().toLowerCase();
   if (!chave) return SEM_REF;

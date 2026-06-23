@@ -1201,8 +1201,8 @@ app.get("/api/labs/referencia", auth.autenticar, async (_req, res) => {
 /** Classifica um valor pontual (baixo/normal/alto → seta/cor). */
 app.get("/api/labs/classificar", auth.autenticar, async (req, res) => {
   try {
-    const { codigo, valor, sexo } = req.query;
-    res.json(await labsReferencia.classificarLab(codigo, valor, sexo));
+    const { codigo, valor, sexo, idade } = req.query;
+    res.json(await labsReferencia.classificarLab(codigo, valor, sexo, idade));
   } catch (e) {
     console.error("Erro em /api/labs/classificar:", e);
     res.status(500).json({ erro: e.message || "Falha ao classificar." });

@@ -52,7 +52,10 @@ async function referenciaLab(lab, sexo) {
 }
 
 /** Classifica um valor: baixo/normal/alto → seta/cor (briefing, seção 3). */
-async function classificarLab(codigo, valor, sexo) {
+async function classificarLab(codigo, valor, sexo, idade) {
+  // Tabela ABIM é de adultos: pediátrico (idade conhecida < 18) não interpreta.
+  const idadeNum = idade != null && idade !== "" ? Number(idade) : null;
+  if (idadeNum != null && !Number.isNaN(idadeNum) && idadeNum < 18) return SEM_REF;
   const ref = await referenciaPorCodigo(codigo, sexo);
   if (!ref) return SEM_REF;
   const v = numero(valor);
