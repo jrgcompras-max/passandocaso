@@ -253,15 +253,21 @@ export function montarTextoEvolucao(paciente: Paciente, hoje: string): string {
   const ssvv = ssvvPartes.length ? `SSVV: ${ssvvPartes.join(" | ")}` : null;
 
   // — Objetivo: estado geral (REG/BEG/MEG) + aparelhos (sem consciência/orientação) —
+  // Prefixo só é adicionado se o texto ainda não começa com ele (evita "AP AP ...").
+  const comPrefixo = (texto: string | undefined, prefixo: string): string | null => {
+    const t = (texto || "").trim();
+    if (!t) return null;
+    return new RegExp(`^${prefixo}\\b`, "i").test(t) ? t : `${prefixo} ${t}`;
+  };
   const oCorpo = [
     evo?.estadoGeralExame?.trim() || null,
     evo?.neurologico?.trim() || null,
-    evo?.cardiovascular?.trim() ? `AC ${evo.cardiovascular.trim()}` : null,
-    evo?.respiratorio?.trim() ? `AP ${evo.respiratorio.trim()}` : null,
-    evo?.abdominal?.trim() ? `Abdome ${evo.abdominal.trim()}` : null,
-    evo?.mmii?.trim() ? `MMII ${evo.mmii.trim()}` : null,
-    evo?.extremidades?.trim() ? `Extremidades ${evo.extremidades.trim()}` : null,
-    evo?.pele?.trim() ? `Pele ${evo.pele.trim()}` : null,
+    comPrefixo(evo?.cardiovascular, "AC"),
+    comPrefixo(evo?.respiratorio, "AP"),
+    comPrefixo(evo?.abdominal, "Abdome"),
+    comPrefixo(evo?.mmii, "MMII"),
+    comPrefixo(evo?.extremidades, "Extremidades"),
+    comPrefixo(evo?.pele, "Pele"),
   ].filter(Boolean);
   const o = oCorpo.length ? `*O: ${oCorpo.join("\n")}` : null;
 

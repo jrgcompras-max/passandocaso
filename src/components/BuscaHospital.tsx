@@ -2,7 +2,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -108,7 +110,10 @@ export function BuscaHospital({
 
   return (
     <Modal visible={visivel} animationType="slide" onRequestClose={fechar}>
-      <View style={[styles.container, { paddingTop: insets.top + 12 }]}>
+      <KeyboardAvoidingView
+        style={[styles.container, { paddingTop: insets.top + 12 }]}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
         <View style={styles.topo}>
           <Text style={styles.titulo}>{titulo}</Text>
           <TouchableOpacity onPress={fechar} hitSlop={8}>
@@ -212,7 +217,7 @@ export function BuscaHospital({
             </View>
           )}
         </ScrollView>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

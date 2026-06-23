@@ -2352,7 +2352,7 @@ const CHIPS_EXAME: { secao: string; campo: CampoExame; label: string; chips: str
   },
   {
     secao: "respiratorio", campo: "respiratorio", label: "Respiratório",
-    chips: ["AP MV+ bilat simétrico sem RA", "eupneico", "sem ruídos adventícios", "taquipneico", "dispneico", "estertores crepitantes", "sibilos difusos", "roncos", "MV reduzido globalmente", "MV reduzido em base", "uso de musculatura acessória"],
+    chips: ["AP MV+ bilat simétrico", "eupneico", "sem ruídos adventícios", "taquipneico", "dispneico", "estertores crepitantes", "sibilos difusos", "roncos", "MV reduzido globalmente", "MV reduzido em base", "uso de musculatura acessória"],
   },
   {
     secao: "abdominal", campo: "abdominal", label: "Abdominal",
