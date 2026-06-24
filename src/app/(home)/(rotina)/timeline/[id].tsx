@@ -7,111 +7,258 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ClinicalColors as C, Radius } from "@/constants/clinicalTheme";
 import { formatarNome } from "@/lib/formatarNome";
-import { abreviarLab } from "@/lib/lab";
+import { abreviarLab, GRUPOS_LAB, grupoLab } from "@/lib/lab";
+import {
+  classificarLabSync,
+  DISCLAIMER_ABIM,
+  carregarReferencias,
+} from "@/lib/labsReferencia";
 import {
   listarEvolucaoDiaria,
   type RegistroDiario,
 } from "@/lib/salvarEvolucaoDiaria";
 import { usePacientes } from "@/store/PacientesContext";
 
-const DIAS_SEM = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
-// Labs onde a queda é ruim (subir = vermelho): default. Invertidos: queda ruim.
-const INVERTIDOS = /^(hb|hemoglob|ht|hematocr|plaq)/i;
+const AZUL = C.primary;
+const VERMELHO = "#D14343";
 
 function partes(data: string) {
-  // O backend serializa a coluna DATE como ISO com horário (ex.:
-  // "2026-06-20T00:00:00.000Z"). Pegamos só "YYYY-MM-DD" (10 primeiros chars) e
-  // construímos a data no fuso LOCAL — evita "NaN"/"undefined" e o off-by-one de
-  // UTC (data aparecendo um dia antes).
+  // Backend serializa DATE como ISO com horário; pega só "YYYY-MM-DD" e monta no
+  // fuso LOCAL (evita o off-by-one de UTC).
   const [y, m, d] = String(data ?? "").slice(0, 10).split("-").map(Number);
   return { y, m, d, dt: new Date(y, m - 1, d) };
 }
-function rotuloData(data: string) {
-  const { d, m, dt } = partes(data);
-  return `${DIAS_SEM[dt.getDay()]}, ${d} ${MESES[m - 1]}`;
-}
-function diaInternacao(dataEntrada: string | undefined, data: string) {
-  if (!dataEntrada) return null;
-  const e = partes(dataEntrada).dt.getTime();
-  const r = partes(data).dt.getTime();
-  if (isNaN(e) || isNaN(r)) return null;
-  return Math.floor((r - e) / 86_400_000) + 1;
+/** "15/06" para os rótulos de data. */
+function rotuloCurto(data: string) {
+  const { d, m } = partes(data);
+  return `${String(d).padStart(2, "0")}/${MESES[m - 1]}`;
 }
 function num(v: unknown): number | null {
   const m = String(v ?? "").replace(",", ".").match(/-?\d+(\.\d+)?/);
   return m ? parseFloat(m[0]) : null;
 }
 
-/** Seta de tendência de um lab comparando com o valor do dia anterior. */
-function seta(exame: string, atual: string, anterior?: string) {
-  const a = num(atual);
-  const p = num(anterior);
-  if (a == null || p == null) return null;
-  const delta = a - p;
-  if (Math.abs(delta) < Math.abs(p) * 0.1) return { icone: "→", cor: C.textMuted };
-  const subiu = delta > 0;
-  const invertido = INVERTIDOS.test(exame);
-  // bom = verde, ruim = vermelho
-  const ruim = invertido ? !subiu : subiu;
-  return { icone: subiu ? "↑" : "↓", cor: ruim ? "#FF3B30" : "#34C759" };
-}
+/**
+ * Gráfico de linha desenhado só com Views (sem react-native-svg): cada segmento
+ * é um retângulo fino rotacionado entre dois pontos. Suporta várias linhas
+ * (ex.: PA sistólica + diastólica) com escala Y compartilhada.
+ */
+function GraficoLinha({
+  linhas,
+  largura,
+  altura,
+  espessura = 2,
+  pontos = false,
+}: {
+  linhas: { valores: number[]; cor: string }[];
+  largura: number;
+  altura: number;
+  espessura?: number;
+  pontos?: boolean;
+}) {
+  const todos = linhas.flatMap((l) => l.valores);
+  if (!todos.length) return <View style={{ width: largura, height: altura }} />;
+  const min = Math.min(...todos);
+  const max = Math.max(...todos);
+  const amp = max - min;
+  const pad = espessura + 1;
+  const py = (v: number) => {
+    const frac = amp === 0 ? 0.5 : (v - min) / amp; // série constante → meio
+    return pad + (1 - frac) * (altura - 2 * pad);
+  };
 
-const O2_ROTULO: Record<string, string> = {
-  ar: "Ar ambiente",
-  cateter: "Cateter",
-  mascara: "Máscara",
-  vm: "VM",
-};
-
-/** Linhas variável→valor dos sinais vitais (com unidades; omite vazios). */
-function ssvvRows(sv: RegistroDiario["sinais_vitais"]): { label: string; valor: string }[] {
-  if (!sv) return [];
-  const v = (s?: string | null) => String(s ?? "").trim();
-  const linhas: { label: string; valor: string }[] = [];
-  if (v(sv.paSist) && v(sv.paDiast)) linhas.push({ label: "PA", valor: `${v(sv.paSist)}/${v(sv.paDiast)} mmHg` });
-  if (v(sv.fc)) linhas.push({ label: "FC", valor: `${v(sv.fc)} bpm` });
-  if (v(sv.fr)) linhas.push({ label: "FR", valor: `${v(sv.fr)} irpm` });
-  if (v(sv.sato2)) {
-    const modo = sv.o2 ? O2_ROTULO[String(sv.o2)] : "";
-    linhas.push({ label: "SatO₂", valor: `${v(sv.sato2)}%${modo ? ` (${modo})` : ""}` });
-  } else if (sv.o2 && O2_ROTULO[String(sv.o2)]) {
-    linhas.push({ label: "O₂", valor: O2_ROTULO[String(sv.o2)] });
-  }
-  if (v(sv.temp)) linhas.push({ label: "Tax", valor: `${v(sv.temp)}°C` });
-  if (v(sv.glicemia)) linhas.push({ label: "Glicemia", valor: `${v(sv.glicemia)} mg/dL` });
-  if (v(sv.diurese)) linhas.push({ label: "Diurese", valor: `${v(sv.diurese)} mL/24h` });
-  return linhas;
-}
-
-/** Mini sparkline com Views (sem dependência nativa). */
-function Sparkline({ titulo, valores, unidade }: { titulo: string; valores: number[]; unidade?: string }) {
-  if (valores.length < 2) return null;
-  const min = Math.min(...valores);
-  const max = Math.max(...valores);
-  const amp = max - min || 1;
-  const ult = valores[valores.length - 1];
   return (
-    <View style={styles.spark}>
-      <Text style={styles.sparkTitulo}>{titulo}</Text>
-      <View style={styles.sparkBarras}>
-        {valores.slice(-10).map((v, i) => (
-          <View
-            key={i}
-            style={[styles.sparkBarra, { height: 6 + ((v - min) / amp) * 26 }]}
-          />
-        ))}
+    <View style={{ width: largura, height: altura }}>
+      {linhas.map((l, li) => {
+        const vs = l.valores;
+        if (vs.length === 1) {
+          return (
+            <View
+              key={li}
+              style={{
+                position: "absolute",
+                left: largura / 2 - 3,
+                top: py(vs[0]) - 3,
+                width: 6,
+                height: 6,
+                borderRadius: 3,
+                backgroundColor: l.cor,
+              }}
+            />
+          );
+        }
+        const dx = vs.length > 1 ? largura / (vs.length - 1) : 0;
+        const pts = vs.map((v, i) => ({ x: i * dx, y: py(v) }));
+        return (
+          <View key={li} style={StyleSheet.absoluteFill}>
+            {pts.slice(1).map((b, i) => {
+              const a = pts[i];
+              const len = Math.hypot(b.x - a.x, b.y - a.y);
+              const ang = Math.atan2(b.y - a.y, b.x - a.x);
+              const mx = (a.x + b.x) / 2;
+              const my = (a.y + b.y) / 2;
+              return (
+                <View
+                  key={i}
+                  style={{
+                    position: "absolute",
+                    left: mx - len / 2,
+                    top: my - espessura / 2,
+                    width: len,
+                    height: espessura,
+                    borderRadius: espessura / 2,
+                    backgroundColor: l.cor,
+                    transform: [{ rotate: `${ang}rad` }],
+                  }}
+                />
+              );
+            })}
+            {pontos &&
+              pts.map((p, i) => (
+                <View
+                  key={`p${i}`}
+                  style={{
+                    position: "absolute",
+                    left: p.x - 2.5,
+                    top: p.y - 2.5,
+                    width: 5,
+                    height: 5,
+                    borderRadius: 2.5,
+                    backgroundColor: l.cor,
+                  }}
+                />
+              ))}
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+// ── Sinais vitais: definição dos parâmetros e leitura das séries ──────────────
+type SerieVital = { valores: number[]; ultimo: string | null };
+const VITAIS: { key: string; label: string; unidade: string }[] = [
+  { key: "pa", label: "PA", unidade: "mmHg" },
+  { key: "fc", label: "FC", unidade: "bpm" },
+  { key: "temp", label: "Tax", unidade: "°C" },
+  { key: "sato2", label: "SatO₂", unidade: "%" },
+  { key: "fr", label: "FR", unidade: "irpm" },
+];
+
+function CardVital({
+  cfg,
+  pa,
+  serie,
+  largura,
+}: {
+  cfg: { key: string; label: string; unidade: string };
+  pa?: { sist: number[]; diast: number[]; ultimo: string | null };
+  serie?: SerieVital;
+  largura: number;
+}) {
+  const ehPA = cfg.key === "pa";
+  const ultimo = ehPA ? pa?.ultimo : serie?.ultimo;
+  const linhas = ehPA
+    ? [
+        { valores: pa?.sist ?? [], cor: AZUL },
+        { valores: pa?.diast ?? [], cor: "#7FB3E0" },
+      ]
+    : [{ valores: serie?.valores ?? [], cor: AZUL }];
+
+  return (
+    <View style={styles.vitalCard}>
+      <View style={styles.vitalTopo}>
+        <Text style={styles.vitalLabel}>{cfg.label}</Text>
+        <Text style={styles.vitalValor}>
+          {ultimo ?? "—"}
+          <Text style={styles.vitalUnidade}> {cfg.unidade}</Text>
+        </Text>
       </View>
-      <Text style={styles.sparkValor}>
-        {ult}
-        {unidade || ""}
-      </Text>
+      <GraficoLinha linhas={linhas} largura={largura} altura={72} />
+    </View>
+  );
+}
+
+// ── Labs: linha por exame com sparkline (cor ABIM) e expansão ─────────────────
+function LinhaLab({
+  nome,
+  serie,
+  sexo,
+  idade,
+  aberto,
+  onToggle,
+  largura,
+}: {
+  nome: string;
+  serie: { data: string; valor: string }[];
+  sexo?: "M" | "F";
+  idade?: number;
+  aberto: boolean;
+  onToggle: () => void;
+  largura: number;
+}) {
+  const valores = serie.map((p) => num(p.valor)).filter((n): n is number => n != null);
+  const ultimo = serie[serie.length - 1];
+  const c = classificarLabSync(nome, ultimo?.valor ?? "", sexo, idade);
+  const fora = c.status === "alto" || c.status === "baixo";
+  const cor = fora ? VERMELHO : AZUL;
+
+  return (
+    <View>
+      <TouchableOpacity style={styles.labRow} onPress={onToggle} activeOpacity={0.6}>
+        <Text style={styles.labNome}>{abreviarLab(nome)}</Text>
+        <Text style={[styles.labValor, fora && { color: VERMELHO }]}>
+          {num(ultimo?.valor) ?? ultimo?.valor}
+          {c.seta !== "→" ? ` ${c.seta}` : ""}
+        </Text>
+        <View style={styles.labSpark}>
+          <GraficoLinha
+            linhas={[{ valores, cor }]}
+            largura={64}
+            altura={26}
+            espessura={1.5}
+          />
+        </View>
+        <Ionicons
+          name={aberto ? "chevron-up" : "chevron-down"}
+          size={15}
+          color={C.textMuted}
+        />
+      </TouchableOpacity>
+
+      {aberto && (
+        <View style={styles.labExpand}>
+          <GraficoLinha
+            linhas={[{ valores, cor }]}
+            largura={largura}
+            altura={120}
+            espessura={2}
+            pontos
+          />
+          <View style={styles.labHist}>
+            {serie.map((p, i) => {
+              const cc = classificarLabSync(nome, p.valor, sexo, idade);
+              const f = cc.status === "alto" || cc.status === "baixo";
+              return (
+                <View key={i} style={styles.labHistLinha}>
+                  <Text style={styles.labHistData}>{rotuloCurto(p.data)}</Text>
+                  <Text style={[styles.labHistValor, f && { color: VERMELHO }]}>
+                    {num(p.valor) ?? p.valor}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -120,13 +267,22 @@ export default function TimelineScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const { getPaciente } = usePacientes();
   const paciente = getPaciente(id);
+  const sexo = paciente?.sexo ?? undefined;
+  const idade = paciente?.idade ?? undefined;
 
   const [dias, setDias] = useState(7);
   const [registros, setRegistros] = useState<RegistroDiario[]>([]);
   const [carregando, setCarregando] = useState(true);
-  const [aberto, setAberto] = useState<string | null>(null);
+  const [refsOk, setRefsOk] = useState(false);
+  const [labAberto, setLabAberto] = useState<string | null>(null);
+
+  // Carrega as referências ABIM (cache global) uma vez.
+  useEffect(() => {
+    carregarReferencias().finally(() => setRefsOk(true));
+  }, []);
 
   useEffect(() => {
     let vivo = true;
@@ -142,50 +298,80 @@ export default function TimelineScreen() {
     };
   }, [id, dias]);
 
-  // Séries ASC para os sparklines.
-  const series = useMemo(() => {
-    const asc = [...registros].reverse();
-    const colher = (fn: (r: RegistroDiario) => unknown) =>
-      asc.map((r) => num(fn(r))).filter((n): n is number => n != null);
-    const lab = (nome: RegExp) =>
-      asc
-        .map((r) => {
-          const labs = r.exames_laboratoriais || {};
-          const k = Object.keys(labs).find((x) => nome.test(x));
-          return k ? num(labs[k]) : null;
-        })
-        .filter((n): n is number => n != null);
-    return {
-      pa: colher((r) => r.sinais_vitais?.paSist),
-      fc: colher((r) => r.sinais_vitais?.fc),
-      sato2: colher((r) => r.sinais_vitais?.sato2),
-      pcr: lab(/pcr|prote[íi]na c/i),
-      cr: lab(/^cr|creatin/i),
-    };
-  }, [registros]);
+  const larguraGrafico = width - 64; // padding da tela (16) + do card (16) dos dois lados
 
-  // Cards de dia, com placeholders para até 2 dias vazios entre registros.
-  const itens = useMemo(() => {
-    const out: any[] = [];
-    for (let i = 0; i < registros.length; i++) {
-      out.push({ tipo: "dia", reg: registros[i], ant: registros[i + 1] });
-      const prox = registros[i + 1];
-      if (prox) {
-        const diff = Math.round(
-          (partes(registros[i].data).dt.getTime() - partes(prox.data).dt.getTime()) / 86_400_000,
-        );
-        const faltam = diff - 1;
-        if (faltam >= 1 && faltam <= 2) {
-          for (let k = 1; k <= faltam; k++) {
-            const t = new Date(partes(registros[i].data).dt.getTime() - k * 86_400_000);
-            const ds = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
-            out.push({ tipo: "vazio", data: ds });
-          }
+  // Séries ASC (mais antigo → mais recente) para os gráficos.
+  const asc = useMemo(() => [...registros].reverse(), [registros]);
+
+  // Sinais vitais por parâmetro.
+  const vitais = useMemo(() => {
+    const sv = (r: RegistroDiario) => r.sinais_vitais;
+    const serie = (fn: (s: RegistroDiario["sinais_vitais"]) => string | null | undefined): SerieVital => {
+      const valores = asc.map((r) => num(fn(sv(r)))).filter((n): n is number => n != null);
+      let ultimo: string | null = null;
+      for (let i = asc.length - 1; i >= 0; i--) {
+        const x = fn(sv(asc[i]));
+        if (x != null && String(x).trim()) {
+          ultimo = String(x).trim();
+          break;
         }
       }
+      return { valores, ultimo };
+    };
+    const sist = asc.map((r) => num(sv(r)?.paSist)).filter((n): n is number => n != null);
+    const diast = asc.map((r) => num(sv(r)?.paDiast)).filter((n): n is number => n != null);
+    let paUltimo: string | null = null;
+    for (let i = asc.length - 1; i >= 0; i--) {
+      const s = sv(asc[i]);
+      if (s?.paSist?.trim() && s?.paDiast?.trim()) {
+        paUltimo = `${s.paSist.trim()}/${s.paDiast.trim()}`;
+        break;
+      }
     }
-    return out;
-  }, [registros]);
+    const outros: Record<string, SerieVital> = {
+      fc: serie((s) => s?.fc),
+      temp: serie((s) => s?.temp),
+      sato2: serie((s) => s?.sato2),
+      fr: serie((s) => s?.fr),
+    };
+    return { pa: { sist, diast, ultimo: paUltimo }, outros };
+  }, [asc]);
+
+  // Labs agrupados por tipo, cada um com sua série temporal.
+  const gruposLab = useMemo(() => {
+    const mapa = new Map<string, { data: string; valor: string }[]>();
+    const nomeCanonico = new Map<string, string>(); // chave → nome original p/ classificar
+    for (const r of asc) {
+      const labs = r.exames_laboratoriais || {};
+      for (const [nome, valor] of Object.entries(labs)) {
+        if (!String(valor ?? "").trim()) continue;
+        const chave = abreviarLab(nome);
+        if (!nomeCanonico.has(chave)) nomeCanonico.set(chave, nome);
+        const arr = mapa.get(chave) ?? [];
+        arr.push({ data: r.data, valor: String(valor) });
+        mapa.set(chave, arr);
+      }
+    }
+    // Agrupa as chaves por grupoLab, na ordem canônica.
+    const porGrupo = new Map<string, { chave: string; nome: string; serie: { data: string; valor: string }[] }[]>();
+    for (const [chave, serie] of mapa) {
+      const nome = nomeCanonico.get(chave) || chave;
+      const g = grupoLab(nome);
+      const lista = porGrupo.get(g) ?? [];
+      lista.push({ chave, nome, serie });
+      porGrupo.set(g, lista);
+    }
+    return GRUPOS_LAB.filter((g) => porGrupo.has(g)).map((g) => ({
+      grupo: g,
+      labs: (porGrupo.get(g) || []).sort((a, b) => a.chave.localeCompare(b.chave)),
+    }));
+  }, [asc]);
+
+  const vitaisComDados = VITAIS.filter((cfg) =>
+    cfg.key === "pa"
+      ? vitais.pa.sist.length > 0 || vitais.pa.diast.length > 0
+      : (vitais.outros[cfg.key]?.valores.length ?? 0) > 0,
+  );
 
   return (
     <View style={styles.container}>
@@ -210,7 +396,7 @@ export default function TimelineScreen() {
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 80 }}>
-        {carregando ? (
+        {carregando || !refsOk ? (
           <ActivityIndicator color={C.primary} style={{ marginTop: 40 }} />
         ) : registros.length === 0 ? (
           <Text style={styles.vazio}>
@@ -219,145 +405,56 @@ export default function TimelineScreen() {
           </Text>
         ) : (
           <>
-            {/* Tendências (sparklines) */}
-            {(series.pa.length > 1 ||
-              series.fc.length > 1 ||
-              series.sato2.length > 1 ||
-              series.pcr.length > 1 ||
-              series.cr.length > 1) && (
-              <View style={styles.sparkCard}>
-                <Text style={styles.secaoLabel}>Tendências</Text>
-                <View style={styles.sparkRow}>
-                  <Sparkline titulo="PA sist" valores={series.pa} />
-                  <Sparkline titulo="FC" valores={series.fc} />
-                  <Sparkline titulo="SatO₂" valores={series.sato2} unidade="%" />
-                  <Sparkline titulo="PCR" valores={series.pcr} />
-                  <Sparkline titulo="Creat" valores={series.cr} />
-                </View>
+            {/* SEÇÃO 1 — SINAIS VITAIS */}
+            {vitaisComDados.length > 0 && (
+              <View style={styles.secao}>
+                <Text style={styles.secaoLabel}>Sinais Vitais</Text>
+                {vitaisComDados.map((cfg) => (
+                  <CardVital
+                    key={cfg.key}
+                    cfg={cfg}
+                    pa={cfg.key === "pa" ? vitais.pa : undefined}
+                    serie={cfg.key === "pa" ? undefined : vitais.outros[cfg.key]}
+                    largura={larguraGrafico}
+                  />
+                ))}
               </View>
             )}
 
-            {itens.map((it, idx) =>
-              it.tipo === "vazio" ? (
-                <View key={`v-${it.data}-${idx}`} style={styles.vazioDia}>
-                  <Text style={styles.vazioDiaTxt}>{rotuloData(it.data)} · sem registro</Text>
-                </View>
-              ) : (
-                <CardDia
-                  key={it.reg.data}
-                  reg={it.reg}
-                  ant={it.ant}
-                  dia={diaInternacao(paciente?.dataEntrada, it.reg.data)}
-                  expandido={aberto === it.reg.data}
-                  onToggle={() => setAberto(aberto === it.reg.data ? null : it.reg.data)}
-                />
-              ),
+            {/* SEÇÃO 2 — LABS */}
+            {gruposLab.length > 0 && (
+              <View style={styles.secao}>
+                <Text style={styles.secaoLabel}>Labs</Text>
+                {gruposLab.map(({ grupo, labs }) => (
+                  <View key={grupo} style={styles.grupoCard}>
+                    <Text style={styles.grupoLabel}>{grupo}</Text>
+                    {labs.map(({ chave, nome, serie }) => (
+                      <LinhaLab
+                        key={chave}
+                        nome={nome}
+                        serie={serie}
+                        sexo={sexo}
+                        idade={idade}
+                        aberto={labAberto === chave}
+                        onToggle={() => setLabAberto(labAberto === chave ? null : chave)}
+                        largura={larguraGrafico - 24}
+                      />
+                    ))}
+                  </View>
+                ))}
+                <Text style={styles.disclaimer}>{DISCLAIMER_ABIM}</Text>
+              </View>
+            )}
+
+            {vitaisComDados.length === 0 && gruposLab.length === 0 && (
+              <Text style={styles.vazio}>
+                Sem sinais vitais ou labs registrados no período.
+              </Text>
             )}
           </>
         )}
       </ScrollView>
     </View>
-  );
-}
-
-function CardDia({
-  reg,
-  ant,
-  dia,
-  expandido,
-  onToggle,
-}: {
-  reg: RegistroDiario;
-  ant?: RegistroDiario;
-  dia: number | null;
-  expandido: boolean;
-  onToggle: () => void;
-}) {
-  const labs = reg.exames_laboratoriais || {};
-  const labsAnt = ant?.exames_laboratoriais || {};
-  const labEntries = Object.entries(labs);
-  const ssvv = ssvvRows(reg.sinais_vitais);
-
-  return (
-    <TouchableOpacity style={styles.card} onPress={onToggle} activeOpacity={0.7}>
-      <Text style={styles.cardData}>
-        {rotuloData(reg.data)}
-        {dia != null ? ` · Dia ${dia} de internação` : ""}
-      </Text>
-
-      {ssvv.length > 0 && (
-        <>
-          <View style={styles.sep} />
-          <View style={styles.linhaLabel}>
-            <Text style={styles.miniLabel}>SSVV</Text>
-            <View style={styles.ssvvLista}>
-              {ssvv.map((l) => (
-                <View key={l.label} style={styles.ssvvRow}>
-                  <Text style={styles.ssvvRowLabel}>{l.label}</Text>
-                  <Text style={styles.ssvvRowValor}>{l.valor}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
-        </>
-      )}
-
-      {labEntries.length > 0 && (
-        <>
-          <View style={styles.sep} />
-          <View style={styles.linhaLabel}>
-            <Text style={styles.miniLabel}>Labs</Text>
-            <View style={styles.labsWrap}>
-              {(expandido ? labEntries : labEntries.slice(0, 4)).map(([k, v]) => {
-                const s = seta(k, v, labsAnt[k]);
-                return (
-                  <Text key={k} style={styles.labItem}>
-                    {abreviarLab(k)} {v}
-                    {s ? <Text style={{ color: s.cor }}> {s.icone}</Text> : null}
-                  </Text>
-                );
-              })}
-            </View>
-          </View>
-        </>
-      )}
-
-      {!!reg.conduta && (
-        <>
-          <View style={styles.sep} />
-          <View style={styles.linhaLabel}>
-            <Text style={styles.miniLabel}>Conduta</Text>
-            <Text style={styles.linhaTexto} numberOfLines={expandido ? undefined : 2}>
-              {reg.conduta}
-            </Text>
-          </View>
-        </>
-      )}
-
-      {expandido && (
-        <>
-          {!!reg.evolucao_beira_leito?.estadoGeralExame && (
-            <DetalheExp label="Exame" texto={reg.evolucao_beira_leito.estadoGeralExame} />
-          )}
-          {!!reg.exames_imagem && <DetalheExp label="Imagem" texto={reg.exames_imagem} />}
-          {!!(reg.problemas_ativos && reg.problemas_ativos.length) && (
-            <DetalheExp label="Problemas" texto={reg.problemas_ativos.join(", ")} />
-          )}
-        </>
-      )}
-    </TouchableOpacity>
-  );
-}
-
-function DetalheExp({ label, texto }: { label: string; texto: string }) {
-  return (
-    <>
-      <View style={styles.sep} />
-      <View style={styles.linhaLabel}>
-        <Text style={styles.miniLabel}>{label}</Text>
-        <Text style={styles.linhaTexto}>{texto}</Text>
-      </View>
-    </>
   );
 }
 
@@ -374,35 +471,38 @@ const styles = StyleSheet.create({
   pillTxt: { fontSize: 14, fontWeight: "600", color: C.textMuted },
   pillTxtAtivo: { color: "#fff" },
   vazio: { color: C.textMuted, fontSize: 15, textAlign: "center", marginTop: 40, lineHeight: 22, paddingHorizontal: 16 },
+
+  secao: { marginBottom: 16 },
   secaoLabel: {
     fontSize: 11, fontWeight: "600", color: C.textMuted, textTransform: "uppercase",
     letterSpacing: 0.5, marginBottom: 10,
   },
-  sparkCard: { backgroundColor: C.surface, borderRadius: Radius.card, padding: 16, marginBottom: 12 },
-  sparkRow: { flexDirection: "row", flexWrap: "wrap", gap: 16 },
-  spark: { alignItems: "center", minWidth: 56 },
-  sparkTitulo: { fontSize: 11, color: C.textMuted, marginBottom: 4 },
-  sparkBarras: { flexDirection: "row", alignItems: "flex-end", gap: 2, height: 32 },
-  sparkBarra: { width: 4, borderRadius: 2, backgroundColor: C.primary },
-  sparkValor: { fontSize: 13, fontWeight: "700", color: C.text, marginTop: 4 },
-  card: { backgroundColor: C.surface, borderRadius: Radius.card, padding: 16, marginBottom: 8 },
-  cardData: { fontSize: 15, fontWeight: "700", color: C.text },
-  sep: { height: 0.5, backgroundColor: C.border, marginVertical: 10 },
-  linhaLabel: { flexDirection: "row", gap: 10 },
-  miniLabel: {
-    width: 56, fontSize: 11, fontWeight: "600", color: C.textMuted,
-    textTransform: "uppercase", letterSpacing: 0.5, paddingTop: 1,
+
+  // Sinais vitais
+  vitalCard: { backgroundColor: C.surface, borderRadius: Radius.card, padding: 16, marginBottom: 8 },
+  vitalTopo: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", marginBottom: 10 },
+  vitalLabel: { fontSize: 14, fontWeight: "600", color: C.textMuted, textTransform: "uppercase", letterSpacing: 0.5 },
+  vitalValor: { fontSize: 22, fontWeight: "700", color: C.text },
+  vitalUnidade: { fontSize: 13, fontWeight: "500", color: C.textMuted },
+
+  // Labs
+  grupoCard: { backgroundColor: C.surface, borderRadius: Radius.card, padding: 12, marginBottom: 8 },
+  grupoLabel: {
+    fontSize: 11, fontWeight: "700", color: C.textMuted, textTransform: "uppercase",
+    letterSpacing: 0.5, marginBottom: 6,
   },
-  linhaTexto: { flex: 1, fontSize: 14.5, color: C.textSecondary, lineHeight: 20 },
-  ssvvLista: { flex: 1, gap: 2 },
-  ssvvRow: { flexDirection: "row", alignItems: "baseline" },
-  ssvvRowLabel: { width: 72, fontSize: 13, color: C.textMuted },
-  ssvvRowValor: { flex: 1, fontSize: 14.5, fontWeight: "600", color: C.text },
-  labsWrap: { flex: 1, flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  labItem: { fontSize: 14.5, color: C.textSecondary },
-  vazioDia: {
-    borderWidth: 1, borderColor: C.border, borderStyle: "dashed",
-    borderRadius: Radius.card, paddingVertical: 10, alignItems: "center", marginBottom: 8,
+  labRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 7 },
+  labNome: { width: 72, fontSize: 14.5, fontWeight: "600", color: C.text },
+  labValor: { flex: 1, fontSize: 14.5, fontWeight: "700", color: C.text },
+  labSpark: { width: 64 },
+  labExpand: { paddingTop: 8, paddingBottom: 6 },
+  labHist: { marginTop: 10, gap: 2 },
+  labHistLinha: {
+    flexDirection: "row", justifyContent: "space-between",
+    paddingVertical: 4, borderTopWidth: 0.5, borderTopColor: C.border,
   },
-  vazioDiaTxt: { fontSize: 12, color: C.textMuted },
+  labHistData: { fontSize: 13, color: C.textMuted },
+  labHistValor: { fontSize: 14, fontWeight: "600", color: C.text },
+
+  disclaimer: { fontSize: 11, color: C.textMuted, fontStyle: "italic", marginTop: 4 },
 });
