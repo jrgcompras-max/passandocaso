@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ClinicalColors as C, Radius } from "@/constants/clinicalTheme";
@@ -126,10 +127,15 @@ export default function PassarCaso() {
         <Text style={s.sub}>{paciente ? subtitulo(paciente) : carregado ? "Paciente não encontrado" : "Carregando…"}</Text>
       </View>
 
-      {/* paddingBottom cobre a tab bar (altura 64 + insets) + 16 de margem,
-          para a última seção (Conduta proposta) não ficar escondida. */}
-      <ScrollView
+      {/* KeyboardAwareScrollView: rola até o campo focado (ex.: Conduta proposta
+          inline) para o teclado não cobri-lo. paddingBottom cobre a tab bar
+          (altura 64 + insets) + margem. */}
+      <KeyboardAwareScrollView
         contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 80 }}
+        keyboardShouldPersistTaps="handled"
+        enableOnAndroid
+        enableAutomaticScroll
+        extraScrollHeight={20}
       >
         {!caso ? null : (
           <>
@@ -315,7 +321,7 @@ export default function PassarCaso() {
             )}
           </>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </View>
   );
 }

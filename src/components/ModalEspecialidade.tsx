@@ -2,13 +2,13 @@ import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import {
   Modal,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ClinicalColors as C, Radius } from "@/constants/clinicalTheme";
@@ -56,7 +56,13 @@ export function ModalEspecialidade({
     <Modal visible={visivel} animationType="slide" onRequestClose={onPular}>
       <View style={[styles.container, { paddingTop: insets.top + 16 }]}>
         <Text style={styles.titulo}>{titulo}</Text>
-        <ScrollView contentContainerStyle={{ paddingBottom: 12 }}>
+        <KeyboardAwareScrollView
+          contentContainerStyle={{ paddingBottom: 12 }}
+          keyboardShouldPersistTaps="handled"
+          enableOnAndroid
+          enableAutomaticScroll
+          extraScrollHeight={20}
+        >
           {ESPECIALIDADES.map((e) => {
             const ativo = sel === e.rotulo;
             return (
@@ -88,7 +94,7 @@ export function ModalEspecialidade({
               autoFocus
             />
           )}
-        </ScrollView>
+        </KeyboardAwareScrollView>
 
         <View style={[styles.rodape, { paddingBottom: insets.bottom + 8 }]}>
           <TouchableOpacity style={styles.btnSec} onPress={onPular}>

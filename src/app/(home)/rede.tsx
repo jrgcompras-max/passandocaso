@@ -6,7 +6,9 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -355,7 +357,10 @@ export default function RedeScreen() {
       />
 
       <Modal visible={onboard} animationType="fade" transparent onRequestClose={fecharOnboard}>
-        <View style={styles.modalBg}>
+        <KeyboardAvoidingView
+          style={styles.modalBg}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
           <View style={styles.modalCard}>
             <Ionicons name="people" size={44} color={C.primary} style={{ alignSelf: "center" }} />
             <Text style={[styles.modalTitulo, { textAlign: "center", marginTop: 8 }]}>
@@ -391,7 +396,7 @@ export default function RedeScreen() {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -418,7 +423,10 @@ function ModalEntradaTexto({
   const [valor, setValor] = useState("");
   return (
     <Modal visible={visivel} animationType="fade" transparent onRequestClose={onFechar}>
-      <View style={styles.modalBg}>
+      <KeyboardAvoidingView
+        style={styles.modalBg}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
         <View style={styles.modalCard}>
           <Text style={styles.modalTitulo}>{titulo}</Text>
           <Text style={styles.modalRotulo}>{rotulo}</Text>
@@ -445,7 +453,7 @@ function ModalEntradaTexto({
             </TouchableOpacity>
           </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

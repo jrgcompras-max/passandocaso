@@ -3,7 +3,9 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -120,7 +122,10 @@ export function PassarPlantaoModal({
 
   return (
     <Modal visible={visivel} animationType="slide" onRequestClose={onFechar}>
-      <View style={[styles.container, { paddingTop: insets.top + 12 }]}>
+      <KeyboardAvoidingView
+        style={[styles.container, { paddingTop: insets.top + 12 }]}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
         <View style={styles.topo}>
           <TouchableOpacity onPress={onFechar} hitSlop={8}>
             <Ionicons name="close" size={26} color={C.textMuted} />
@@ -274,7 +279,7 @@ export function PassarPlantaoModal({
             </View>
           </>
         )}
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

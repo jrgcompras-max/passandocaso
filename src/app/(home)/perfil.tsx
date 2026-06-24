@@ -3,7 +3,6 @@ import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   Alert,
-  ScrollView,
   StyleSheet,
   Switch,
   Text,
@@ -11,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ModalEspecialidade } from "@/components/ModalEspecialidade";
@@ -169,7 +169,13 @@ export default function PerfilScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 100 }} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView
+        contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
+        keyboardShouldPersistTaps="handled"
+        enableOnAndroid
+        enableAutomaticScroll
+        extraScrollHeight={20}
+      >
         {/* IDENTIDADE */}
         <View style={styles.identidade}>
           <TouchableOpacity
@@ -324,7 +330,7 @@ export default function PerfilScreen() {
         <TouchableOpacity style={styles.sairBtn} onPress={() => void sair()}>
           <Text style={styles.sairTxt}>Sair da conta</Text>
         </TouchableOpacity>
-      </ScrollView>
+      </KeyboardAwareScrollView>
 
       <ModalEspecialidade
         visivel={espModal}
