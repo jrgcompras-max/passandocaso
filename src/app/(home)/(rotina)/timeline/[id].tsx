@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ClinicalColors as C, Radius } from "@/constants/clinicalTheme";
 import { formatarNome } from "@/lib/formatarNome";
-import { abreviarLab, GRUPOS_LAB, grupoLab } from "@/lib/lab";
+import { abreviarLab, GRUPOS_LAB, grupoLab, ordemLab } from "@/lib/lab";
 import {
   classificarLabSync,
   DISCLAIMER_ABIM,
@@ -366,7 +366,9 @@ export default function TimelineScreen() {
     }
     return GRUPOS_LAB.filter((g) => porGrupo.has(g)).map((g) => ({
       grupo: g,
-      labs: (porGrupo.get(g) || []).sort((a, b) => a.chave.localeCompare(b.chave)),
+      labs: (porGrupo.get(g) || []).sort(
+        (a, b) => ordemLab(a.chave) - ordemLab(b.chave) || a.chave.localeCompare(b.chave),
+      ),
     }));
   }, [paciente?.resultadosLab, cutoff]);
 

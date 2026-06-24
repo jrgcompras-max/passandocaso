@@ -82,6 +82,65 @@ export function abreviarLab(nome: string): string {
   return LAB_ABREV.find((a) => a.re.test(n))?.abbr ?? n;
 }
 
+/**
+ * Ordem clínica canônica dos labs (BUG 8): hemograma → eletrólitos → função
+ * renal → inflamatório → glicemia → hepático → coagulação → lactato →
+ * gasometria → enzimas → outros. Fonte ÚNICA usada em todas as telas. Casa por
+ * sigla OU nome completo. `ordemLab` retorna o índice (menor = primeiro).
+ */
+const ORDEM_LAB: RegExp[] = [
+  /\bhb\b|hemoglob/i,
+  /\bht\b|hemat[oó]cr/i,
+  /\blt\b|leuc[oó]/i,
+  /\bplaq\b|\bplt\b|plaquet/i,
+  /hem[aá]cias|eritr[oó]cit/i,
+  /\bhcm\b/i,
+  /\bchcm\b/i,
+  /\bvcm\b/i,
+  /\brdw\b/i,
+  /\bbast/i,
+  /\bseg\b|segment/i,
+  /\blinf/i,
+  /\bmon[oó]/i,
+  /\beos/i,
+  /\bbas[oó]f/i,
+  /\bna\b|s[oó]dio/i,
+  /\bk\b|pot[aá]ssio/i,
+  /\bcl\b|cloreto/i,
+  /\bmg\b|magn[eé]sio/i,
+  /\bur?\b|ur[eé]ia/i,
+  /\bcr\b|creatin/i,
+  /\btfg\b|filtra[çc]|clearance/i,
+  /\bpcr\b|prote[ií]na c/i,
+  /\bvhs\b|hemossed/i,
+  /glic|glucose/i,
+  /hba1c|glicada/i,
+  /\btgo\b|aspartato|\bast\b/i,
+  /\btgp\b|alanina|\balt\b/i,
+  /\bfa\b|fosfatase/i,
+  /\bggt\b|gama/i,
+  /\bbt\b|bilirrubina t/i,
+  /\bbd\b|bilirrubina d/i,
+  /\bbi\b|bilirrubina i/i,
+  /\balb/i,
+  /\binr\b|rni/i,
+  /\btap\b|protromb/i,
+  /\bttpa\b|tromboplastina/i,
+  /lactato/i,
+  /\bph\b/i,
+  /pco2/i,
+  /\bpo2\b/i,
+  /hco3|bicarbon/i,
+  /\bsato2\b|satura[çc]/i,
+  /\bldh\b|desidrogenase/i,
+  /\bcpk\b|\bck\b/i,
+];
+export function ordemLab(nome: string): number {
+  const t = (nome || "").trim();
+  const i = ORDEM_LAB.findIndex((re) => re.test(t));
+  return i === -1 ? ORDEM_LAB.length : i;
+}
+
 /** Grupos de labs, na ordem de exibição. */
 export const GRUPOS_LAB = [
   "HEMOGRAMA",

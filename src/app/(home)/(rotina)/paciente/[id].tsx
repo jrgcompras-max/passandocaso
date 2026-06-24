@@ -50,7 +50,7 @@ import { extrairDadosImagem } from "@/lib/extrairDadosImagem";
 import { formatarNome } from "@/lib/formatarNome";
 import { gerarResumoIA } from "@/lib/gerarResumoIA";
 import { converterParaJpegBase64 } from "@/lib/imagem";
-import { abreviarLab, agruparPorExame, type ExameSerie, GRUPOS_LAB, grupoLab, TENDENCIA_INFO } from "@/lib/lab";
+import { abreviarLab, agruparPorExame, type ExameSerie, GRUPOS_LAB, grupoLab, ordemLab, TENDENCIA_INFO } from "@/lib/lab";
 import {
   carregarReferencias,
   classificarLabSync,
@@ -3734,9 +3734,12 @@ function LabsPorData({
     : [];
 
   // BUG 1: agrupa as entradas de hoje por tipo (HEMOGRAMA / BIOQUÍMICA / ...).
+  // BUG 8: dentro do grupo, ordem clínica (Hb, Ht, LT, Plaq, Na, K…).
   const gruposHoje = GRUPOS_LAB.map((g) => ({
     grupo: g,
-    itens: entradasHoje.filter((e) => grupoLab(e.key) === g),
+    itens: entradasHoje
+      .filter((e) => grupoLab(e.key) === g)
+      .sort((a, b) => ordemLab(a.key) - ordemLab(b.key)),
   })).filter((x) => x.itens.length > 0);
 
   const dataAnteriorMaisRecente = datasAnteriores[0];
@@ -4020,9 +4023,9 @@ function LabsPorData({
             </View>
             <ScrollView style={{ maxHeight: 460 }}>
               {GRUPOS_LAB.map((g) => {
-                const itensG = (dataDetalhe ? porData.get(dataDetalhe) || [] : []).filter(
-                  (x) => grupoLab(x.exame) === g,
-                );
+                const itensG = (dataDetalhe ? porData.get(dataDetalhe) || [] : [])
+                  .filter((x) => grupoLab(x.exame) === g)
+                  .sort((a, b) => ordemLab(a.exame) - ordemLab(b.exame)); // BUG 8
                 if (!itensG.length) return null;
                 return (
                   <View key={g} style={styles.labGrupo}>

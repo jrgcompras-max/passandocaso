@@ -10,7 +10,7 @@ import {
 } from "@/types/paciente";
 
 import { formatarDataBR, limparDataEmTexto } from "./datas";
-import { abreviarLab, agruparPorExame, grupoLab } from "./lab";
+import { abreviarLab, agruparPorExame, grupoLab, ordemLab } from "./lab";
 
 type Bloco = { titulo: string; itens: string[] };
 
@@ -211,6 +211,7 @@ function culturais(p: Paciente): string[] {
 function laboratorioLinha(p: Paciente): string {
   return agruparPorExame(p.resultadosLab || [])
     .filter((s) => grupoLab(s.exame) !== "CULTURAS")
+    .sort((a, b) => ordemLab(a.exame) - ordemLab(b.exame)) // ordem clínica (BUG 8)
     .map((s) => `${abreviarLab(s.exame)} ${s.pontos[s.pontos.length - 1].valor}`)
     .join(" / ");
 }

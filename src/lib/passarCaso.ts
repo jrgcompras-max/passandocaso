@@ -1,6 +1,6 @@
 import { type Anotacao, type Paciente } from "@/types/paciente";
 
-import { abreviarLab, agruparPorExame } from "./lab";
+import { abreviarLab, agruparPorExame, ordemLab } from "./lab";
 
 /**
  * Construtor de dados do "Passar o Caso" (visual rico, fica no app). Estrutura e
@@ -204,7 +204,7 @@ function labsAlterados(p: Paciente): LabAlterado[] {
     if (v > ref.max) out.push({ exame: abreviarLab(s.exame), valor: ultimo.valor, seta: "alta" });
     else if (v < ref.min) out.push({ exame: abreviarLab(s.exame), valor: ultimo.valor, seta: "baixa" });
   }
-  return out;
+  return out.sort((a, b) => ordemLab(a.exame) - ordemLab(b.exame)); // ordem clínica (BUG 8)
 }
 
 /** Quebra um laudo em frases (igual à tela; sem lookbehind p/ Hermes). */

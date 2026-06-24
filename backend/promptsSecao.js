@@ -81,10 +81,16 @@ const PROMPTS = {
     'Formato: {"hb":num,"ht":num,"lt":num,"plaq":num,"pcr":num,"na":num,"k":num,"cr":num,"ureia":num,"glicemia":num,"tgo":num,"tgp":num,"bt":num,"inr":num,"hba1c":num,"albumina":num,"data":"DD/MM ou null","outros":[{"nome":"Lactato","valor":"2,1 mmol/L"}]}. ' +
     REGRA,
   imagem:
-    "Extraia APENAS laudos de exames de IMAGEM (RX, TC, RM, USG, ECO, Doppler, etc.). " +
+    "Extraia laudos de QUALQUER exame ou procedimento com laudo: imagem (RX, TC, RM, " +
+    "USG, ECO, Doppler, mamografia, cintilografia, PET-CT), endoscopia digestiva alta, " +
+    "colonoscopia, broncoscopia, ecocardiograma, eletrocardiograma (ECG), " +
+    "espirometria, biópsia, anatomopatológico/histopatológico, e qualquer outro laudo " +
+    "de procedimento diagnóstico. " +
     "NÃO inclua: valores de exames laboratoriais, sinais vitais, medicamentos, " +
     "comorbidades, texto clínico nem identificação. " +
-    'Formato: {"exames":[{"nome":"TC de Crânio","data":"DD/MM/AAAA ou null","laudo":"texto resumido do laudo"}]}. ' +
+    'Formato: {"exames":[{"nome":"Colonoscopia","data":"DD/MM/AAAA ou null","laudo":"texto resumido do laudo"}]}. ' +
+    "O campo nome deve ser o NOME do exame/procedimento (ex.: 'EDA', 'Colonoscopia', " +
+    "'Ecocardiograma', 'TC de abdome', 'Anatomopatológico'). " +
     REGRA,
   prescricaoHospitalar:
     "Extraia APENAS medicamentos da prescrição hospitalar ATUAL (em uso nesta internação). " +
