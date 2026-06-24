@@ -275,6 +275,11 @@ function mergeBlocos(extraidoAtual: string, novos: Bloco[]): Bloco[] {
           vistos.add(n);
         }
       }
+      // FEATURE 3 / BUG 6: preserva o marca-texto ao re-escanear (merge dos
+      // trechos destacados do mesmo exame).
+      if (b.destacados?.length) {
+        alvo.destacados = [...new Set([...(alvo.destacados ?? []), ...b.destacados])];
+      }
     }
   };
   adicionar(blocosBrutos(extraidoAtual));
