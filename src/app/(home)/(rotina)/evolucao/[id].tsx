@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ClinicalColors, Radius } from "@/constants/clinicalTheme";
 import { diaDeInternacao, hojeISO } from "@/lib/datas";
@@ -34,6 +35,7 @@ function identificacaoLinha(p: Paciente): string {
 }
 
 export default function Evolucao() {
+  const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { carregado, getPaciente } = usePacientes();
   const paciente = getPaciente(id);
@@ -100,7 +102,10 @@ export default function Evolucao() {
 
       <ScrollView
         style={styles.editor}
-        contentContainerStyle={styles.editorConteudo}
+        contentContainerStyle={[
+          styles.editorConteudo,
+          { paddingBottom: insets.bottom + 100 },
+        ]}
       >
         {texto.trim() ? (
           <TextoComMarcadores texto={texto} />

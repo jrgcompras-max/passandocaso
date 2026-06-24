@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { BuscaHospital } from "@/components/BuscaHospital";
 import { ModalEspecialidade } from "@/components/ModalEspecialidade";
@@ -20,6 +21,7 @@ import { HOSPITAL_GERAL, useHospitais } from "@/store/HospitaisContext";
 
 export default function HospitaisScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { usuario, atualizarUsuario } = useAuth();
   const { hospitais, hospitalAtivo, selecionar, adicionarHospital, removerHospital } =
     useHospitais();
@@ -68,7 +70,7 @@ export default function HospitaisScreen() {
       <Text style={styles.titulo}>Hospitais</Text>
       <Text style={styles.subtitulo}>Selecione onde você está trabalhando hoje</Text>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: 120, paddingTop: 16 }}>
+      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 100, paddingTop: 16 }}>
         {hospitais.length > 0 && (
           <Text style={styles.secaoLabel}>Hospitais recentes</Text>
         )}

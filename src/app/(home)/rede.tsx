@@ -15,6 +15,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { PassarPlantaoModal } from "@/components/PassarPlantaoModal";
 import { ClinicalColors as C, Radius } from "@/constants/clinicalTheme";
@@ -38,6 +39,7 @@ function iniciais(nome: string) {
 type ModalAtivo = null | "buscar" | "convidar" | "criarGrupo" | "entrarGrupo";
 
 export default function RedeScreen() {
+  const insets = useSafeAreaInsets();
   const { hospitais, hospitalAtivo, selecionar } = useHospitais();
   const { usuario, atualizarUsuario } = useAuth();
   const { setRedeBadge, marcarRecebidos } = useAcoes();
@@ -156,7 +158,7 @@ export default function RedeScreen() {
     <View style={styles.container}>
       <Text style={styles.titulo}>Rede</Text>
       <ScrollView
-        contentContainerStyle={{ paddingBottom: 120 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
         refreshControl={<RefreshControl refreshing={atualizando} onRefresh={refresh} tintColor={C.primary} />}
       >
         {/* PASSAGENS PENDENTES */}

@@ -17,6 +17,7 @@ import {
     View,
 } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
     BorderWidth,
@@ -363,6 +364,8 @@ export default function Paciente() {
       vivo = false;
     };
   }, [id]);
+
+  const insets = useSafeAreaInsets();
 
   // FEATURE 1: accordion — id da única seção aberta (null = todas fechadas).
   const [secaoAberta, setSecaoAberta] = useState<string | null>(null);
@@ -790,7 +793,10 @@ export default function Paciente() {
     <KeyboardAwareScrollView
       ref={scrollRef}
       style={styles.container}
-      contentContainerStyle={styles.containerConteudo}
+      contentContainerStyle={[
+        styles.containerConteudo,
+        { paddingBottom: insets.bottom + 140 },
+      ]}
       keyboardShouldPersistTaps="handled"
       enableOnAndroid
       enableAutomaticScroll
@@ -4817,7 +4823,7 @@ const styles = StyleSheet.create({
   containerConteudo: {
     paddingTop: 8,
     paddingHorizontal: 16,
-    paddingBottom: 160,
+    // paddingBottom é aplicado inline com insets.bottom (clear da tab bar flutuante).
   },
   bannerRecebido: {
     flexDirection: "row",

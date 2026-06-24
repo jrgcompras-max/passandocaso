@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ModalEspecialidade } from "@/components/ModalEspecialidade";
 import { ClinicalColors as C, Radius } from "@/constants/clinicalTheme";
@@ -55,6 +56,7 @@ function iniciais(nome: string) {
 
 export default function PerfilScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { usuario, sair, atualizarUsuario } = useAuth();
 
   const [nomeEx, setNomeEx] = useState(usuario?.nome_exibicao || usuario?.nome || "");
@@ -167,7 +169,7 @@ export default function PerfilScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: 120 }} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 100 }} keyboardShouldPersistTaps="handled">
         {/* IDENTIDADE */}
         <View style={styles.identidade}>
           <TouchableOpacity

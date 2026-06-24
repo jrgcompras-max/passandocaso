@@ -209,7 +209,7 @@ export default function TimelineScreen() {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 80 }}>
         {carregando ? (
           <ActivityIndicator color={C.primary} style={{ marginTop: 40 }} />
         ) : registros.length === 0 ? (

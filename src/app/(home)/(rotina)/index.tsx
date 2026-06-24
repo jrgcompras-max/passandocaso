@@ -580,9 +580,10 @@ export default function Index() {
 
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={
-          pacientesHosp.length === 0 ? styles.vazioContainer : styles.listaConteudo
-        }
+        contentContainerStyle={[
+          pacientesHosp.length === 0 ? styles.vazioContainer : styles.listaConteudo,
+          { paddingBottom: insets.bottom + 96 },
+        ]}
         keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl refreshing={atualizando} onRefresh={aoAtualizar} />
