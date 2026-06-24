@@ -78,7 +78,7 @@ export default function PassarCaso() {
     [paciente, hoje],
   );
   const escores = useMemo(
-    () => (paciente && escoresAtivado ? calcularEscores(paciente, hoje).filter((e) => e.calculavel) : []),
+    () => (paciente && escoresAtivado ? calcularEscores(paciente, hoje).filter((e) => e.calculavel && e.aplicavel) : []),
     [paciente, hoje, escoresAtivado],
   );
 

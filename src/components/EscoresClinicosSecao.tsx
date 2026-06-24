@@ -42,19 +42,6 @@ const DISCLAIMER =
 
 const CHAVE_CONSENT = "escores_consentimento_v1";
 
-/** Há diagnóstico hepático na ficha? (gate do Child-Pugh) */
-function temDiagnosticoHepatico(p: Paciente): boolean {
-  const alvo = /cirrose|hepat|child|insufici[êe]ncia h|ascite|encefalopatia/i;
-  const fontes: string[] = [];
-  if (p.dadosClinicos?.comorbidades) fontes.push(p.dadosClinicos.comorbidades);
-  for (const pr of p.problemas || []) fontes.push(pr.titulo);
-  if (p.diagnosticoPrincipal) fontes.push(p.diagnosticoPrincipal);
-  if (p.motivoInternacao) fontes.push(p.motivoInternacao);
-  const sc = [p.secoes?.comorbidades?.extraido, p.secoes?.comorbidadesMedicacoes?.extraido];
-  for (const s of sc) if (s) fontes.push(s);
-  return alvo.test(fontes.join(" | "));
-}
-
 /** Descritor de input para um critério ausente (campo faltante). */
 type CampoFalt = {
   chave: string;
@@ -146,12 +133,14 @@ export function EscoresClinicosSecao({
   const [consentNecessario, setConsentNecessario] = useState(false);
   const [detalhe, setDetalhe] = useState<Escore | null>(null);
 
-  const mostrarHepatico = useMemo(() => temDiagnosticoHepatico(paciente), [paciente]);
-  // Todos os escores aplicáveis (Child-Pugh só com diagnóstico hepático).
-  const escores = useMemo(() => {
-    const todos = calcularEscores(paciente, hoje);
-    return todos.filter((e) => e.id !== "childPugh" || mostrarHepatico);
-  }, [paciente, hoje, mostrarHepatico]);
+  // Só os escores aplicáveis ao contexto clínico (CURB-65/SOFA sempre; Child-Pugh
+  // só com hepatopatia; CHA₂DS₂-VASc só com FA). A aplicabilidade é decidida em
+  // escoresClinicos.ts (campo `aplicavel`). Não filtra por `calculavel`: escores
+  // aplicáveis mas sem dados aparecem como "Dados insuficientes".
+  const escores = useMemo(
+    () => calcularEscores(paciente, hoje).filter((e) => e.aplicavel),
+    [paciente, hoje],
+  );
 
   // Consentimento de primeiro acesso (flag persistida no dispositivo).
   useEffect(() => {

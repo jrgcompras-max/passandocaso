@@ -34,6 +34,8 @@ export type Escore = {
   /** Sigla compacta para o "Passar o Caso". */
   sigla: string;
   calculavel: boolean;
+  /** Aplicável ao contexto clínico (diagnóstico justifica o escore). */
+  aplicavel: boolean;
   pontos: number;
   maxPontos: number;
   faixa: FaixaEscore;
@@ -106,6 +108,44 @@ function temComorbidade(texto: string, termos: string[]): boolean {
   return termos.some((t) => texto.includes(normalizar(t)));
 }
 
+/**
+ * Contexto clínico do paciente para filtrar escores por aplicabilidade:
+ * comorbidades + problemas ativos (já vêm de textoComorbidades) + hipóteses
+ * diagnósticas (diagnóstico principal / motivo de internação). Tudo normalizado.
+ */
+function textoContextoClinico(p: Paciente): string {
+  return normalizar(
+    [
+      textoComorbidades(p),
+      p.diagnosticoPrincipal || "",
+      p.motivoInternacao || "",
+    ].join(" | "),
+  );
+}
+
+/** Contexto indica Fibrilação Atrial? (CHA₂DS₂-VASc). */
+function temFibrilacaoAtrial(p: Paciente): boolean {
+  return /fibrila[cç][aã]o atrial|flutter atrial|\bfa\b|\bfaarv\b|\bfac\b/.test(
+    textoContextoClinico(p),
+  );
+}
+
+/** Contexto indica hepatopatia? (Child-Pugh). */
+function temHepatopatia(p: Paciente): boolean {
+  const txt = textoContextoClinico(p);
+  return temComorbidade(txt, [
+    "cirrose",
+    "hepat", // hepatite, hepatopatia, hepatocelular, doenca hepatica
+    "insuficiencia hepatica",
+    "hipertensao portal",
+    "encefalopatia",
+    "ascite",
+    "varizes esofag",
+    "child",
+    "dhc",
+  ]);
+}
+
 /** Vasopressor em uso (varredura da prescrição). */
 function temVasopressor(p: Paciente): boolean {
   const re = /noradrenalina|norepinefrina|vasopressina|dobutamina|dopamina|adrenalina|epinefrina/i;
@@ -167,6 +207,7 @@ function calcularCurb65(p: Paciente, hoje: string): Escore {
     nome: "CURB-65",
     sigla: "CURB-65",
     calculavel,
+    aplicavel: true, // aplicável a qualquer internação
     pontos,
     maxPontos: 5,
     faixa: faixaPorTercos(pontos, 2, 3),
@@ -262,6 +303,7 @@ function calcularSofa(p: Paciente, hoje: string): Escore {
     nome: "SOFA",
     sigla: "SOFA",
     calculavel,
+    aplicavel: true, // aplicável a qualquer internação
     pontos,
     maxPontos: 24,
     faixa: faixaPorTercos(pontos, 6, 10),
@@ -322,6 +364,7 @@ function calcularChildPugh(p: Paciente, hoje: string): Escore {
     nome: "Child-Pugh",
     sigla: "Child-Pugh",
     calculavel,
+    aplicavel: temHepatopatia(p), // só com diagnóstico hepático
     pontos,
     maxPontos: 15,
     faixa: classe === "A" ? "baixo" : classe === "B" ? "medio" : "alto",
@@ -373,6 +416,7 @@ function calcularChadsvasc(p: Paciente): Escore {
     nome: "CHA₂DS₂-VASc",
     sigla: "CHA2DS2-VASc",
     calculavel,
+    aplicavel: temFibrilacaoAtrial(p), // só com Fibrilação Atrial
     pontos,
     maxPontos: 9,
     faixa: faixaPorTercos(pontos, 1, 2),
@@ -397,9 +441,9 @@ export function calcularEscores(paciente: Paciente, hoje: string): Escore[] {
   ];
 }
 
-/** Apenas os escores com dados suficientes para calcular. */
+/** Escores com dados suficientes E aplicáveis ao contexto clínico do paciente. */
 export function escoresCalculaveis(paciente: Paciente, hoje: string): Escore[] {
-  return calcularEscores(paciente, hoje).filter((e) => e.calculavel);
+  return calcularEscores(paciente, hoje).filter((e) => e.calculavel && e.aplicavel);
 }
 
 /** Cor associada à faixa do escore (verde/amarelo/vermelho). */
