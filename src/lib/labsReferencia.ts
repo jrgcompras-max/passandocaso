@@ -26,8 +26,10 @@ export type ClassificacaoLab = {
   cor: string;
 };
 
-// Cores em hex (alto = vermelho, baixo = azul, normal/sem ref = cinza).
-const COR = { alto: "#A32D2D", baixo: "#1A6B8A", cinza: "#64748B" };
+// Cores em hex. Alto = vermelho, baixo = azul, normal = preto (cor padrão do
+// texto — antes era cinza, confundia com o azul do "baixo"; BUG 3). Sem
+// referência = cinza (estado neutro "não interpretado").
+const COR = { alto: "#A32D2D", baixo: "#1A6B8A", normal: "#000000", cinza: "#64748B" };
 const SEM_REF: ClassificacaoLab = { status: "sem_referencia", seta: "→", cor: COR.cinza };
 
 let cache: RefLab[] | null = null;
@@ -88,5 +90,5 @@ export function classificarLabSync(
     return { status: "baixo", seta: "↓", cor: COR.baixo };
   if (ref.valorMax != null && v > ref.valorMax)
     return { status: "alto", seta: "↑", cor: COR.alto };
-  return { status: "normal", seta: "→", cor: COR.cinza };
+  return { status: "normal", seta: "→", cor: COR.normal };
 }

@@ -20,11 +20,8 @@ import {
   DISCLAIMER_ABIM,
   carregarReferencias,
 } from "@/lib/labsReferencia";
-import {
-  listarEvolucaoDiaria,
-  type RegistroDiario,
-} from "@/lib/salvarEvolucaoDiaria";
 import { usePacientes } from "@/store/PacientesContext";
+import { type SinaisVitaisDia } from "@/types/paciente";
 
 const MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 const AZUL = C.primary;
@@ -172,6 +169,9 @@ function CardVital({
         { valores: pa?.diast ?? [], cor: "#7FB3E0" },
       ]
     : [{ valores: serie?.valores ?? [], cor: AZUL }];
+  const nPontos = ehPA
+    ? Math.max(pa?.sist.length ?? 0, pa?.diast.length ?? 0)
+    : serie?.valores.length ?? 0;
 
   return (
     <View style={styles.vitalCard}>
@@ -183,6 +183,9 @@ function CardVital({
         </Text>
       </View>
       <GraficoLinha linhas={linhas} largura={largura} altura={72} />
+      {nPontos < 2 && (
+        <Text style={styles.insuf}>dados insuficientes para tendência</Text>
+      )}
     </View>
   );
 }
@@ -209,13 +212,15 @@ function LinhaLab({
   const ultimo = serie[serie.length - 1];
   const c = classificarLabSync(nome, ultimo?.valor ?? "", sexo, idade);
   const fora = c.status === "alto" || c.status === "baixo";
+  // Linha do sparkline: azul dentro da referência ABIM, vermelha fora (BUG 4).
   const cor = fora ? VERMELHO : AZUL;
+  // Valor: alto = vermelho, baixo = azul, normal = preto (BUG 3) — c.cor já reflete.
 
   return (
     <View>
       <TouchableOpacity style={styles.labRow} onPress={onToggle} activeOpacity={0.6}>
         <Text style={styles.labNome}>{abreviarLab(nome)}</Text>
-        <Text style={[styles.labValor, fora && { color: VERMELHO }]}>
+        <Text style={[styles.labValor, { color: c.cor }]}>
           {num(ultimo?.valor) ?? ultimo?.valor}
           {c.seta !== "→" ? ` ${c.seta}` : ""}
         </Text>
@@ -243,14 +248,16 @@ function LinhaLab({
             espessura={2}
             pontos
           />
+          {valores.length < 2 && (
+            <Text style={styles.insuf}>dados insuficientes para tendência</Text>
+          )}
           <View style={styles.labHist}>
             {serie.map((p, i) => {
               const cc = classificarLabSync(nome, p.valor, sexo, idade);
-              const f = cc.status === "alto" || cc.status === "baixo";
               return (
                 <View key={i} style={styles.labHistLinha}>
                   <Text style={styles.labHistData}>{rotuloCurto(p.data)}</Text>
-                  <Text style={[styles.labHistValor, f && { color: VERMELHO }]}>
+                  <Text style={[styles.labHistValor, { color: cc.cor }]}>
                     {num(p.valor) ?? p.valor}
                   </Text>
                 </View>
@@ -274,8 +281,6 @@ export default function TimelineScreen() {
   const idade = paciente?.idade ?? undefined;
 
   const [dias, setDias] = useState(7);
-  const [registros, setRegistros] = useState<RegistroDiario[]>([]);
-  const [carregando, setCarregando] = useState(true);
   const [refsOk, setRefsOk] = useState(false);
   const [labAberto, setLabAberto] = useState<string | null>(null);
 
@@ -284,33 +289,33 @@ export default function TimelineScreen() {
     carregarReferencias().finally(() => setRefsOk(true));
   }, []);
 
-  useEffect(() => {
-    let vivo = true;
-    setCarregando(true);
-    listarEvolucaoDiaria(id, dias).then((r) => {
-      if (vivo) {
-        setRegistros(r);
-        setCarregando(false);
-      }
-    });
-    return () => {
-      vivo = false;
-    };
-  }, [id, dias]);
-
   const larguraGrafico = width - 64; // padding da tela (16) + do card (16) dos dois lados
 
-  // Séries ASC (mais antigo → mais recente) para os gráficos.
-  const asc = useMemo(() => [...registros].reverse(), [registros]);
+  // BUG 4: a fonte dos gráficos é o histórico POR DATA do próprio paciente
+  // (sinaisVitais + resultadosLab), que tem todos os valores por dia — e não os
+  // snapshots esparsos. Janela = últimos N dias (aba).
+  const cutoff = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - (dias - 1));
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }, [dias]);
 
-  // Sinais vitais por parâmetro.
+  // Sinais vitais por data (ASC) dentro da janela.
+  const svDias = useMemo(
+    () =>
+      Object.entries(paciente?.sinaisVitais ?? {})
+        .filter(([d]) => d.slice(0, 10) >= cutoff)
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([data, sv]) => ({ data, sv })),
+    [paciente?.sinaisVitais, cutoff],
+  );
+
   const vitais = useMemo(() => {
-    const sv = (r: RegistroDiario) => r.sinais_vitais;
-    const serie = (fn: (s: RegistroDiario["sinais_vitais"]) => string | null | undefined): SerieVital => {
-      const valores = asc.map((r) => num(fn(sv(r)))).filter((n): n is number => n != null);
+    const serie = (fn: (s: SinaisVitaisDia) => string | null | undefined): SerieVital => {
+      const valores = svDias.map(({ sv }) => num(fn(sv))).filter((n): n is number => n != null);
       let ultimo: string | null = null;
-      for (let i = asc.length - 1; i >= 0; i--) {
-        const x = fn(sv(asc[i]));
+      for (let i = svDias.length - 1; i >= 0; i--) {
+        const x = fn(svDias[i].sv);
         if (x != null && String(x).trim()) {
           ultimo = String(x).trim();
           break;
@@ -318,11 +323,11 @@ export default function TimelineScreen() {
       }
       return { valores, ultimo };
     };
-    const sist = asc.map((r) => num(sv(r)?.paSist)).filter((n): n is number => n != null);
-    const diast = asc.map((r) => num(sv(r)?.paDiast)).filter((n): n is number => n != null);
+    const sist = svDias.map(({ sv }) => num(sv?.paSist)).filter((n): n is number => n != null);
+    const diast = svDias.map(({ sv }) => num(sv?.paDiast)).filter((n): n is number => n != null);
     let paUltimo: string | null = null;
-    for (let i = asc.length - 1; i >= 0; i--) {
-      const s = sv(asc[i]);
+    for (let i = svDias.length - 1; i >= 0; i--) {
+      const s = svDias[i].sv;
       if (s?.paSist?.trim() && s?.paDiast?.trim()) {
         paUltimo = `${s.paSist.trim()}/${s.paDiast.trim()}`;
         break;
@@ -335,24 +340,22 @@ export default function TimelineScreen() {
       fr: serie((s) => s?.fr),
     };
     return { pa: { sist, diast, ultimo: paUltimo }, outros };
-  }, [asc]);
+  }, [svDias]);
 
-  // Labs agrupados por tipo, cada um com sua série temporal.
+  // Labs por exame (ASC) dentro da janela, agrupados por tipo na ordem canônica.
   const gruposLab = useMemo(() => {
+    const janela = (paciente?.resultadosLab ?? [])
+      .filter((r) => String(r.valor ?? "").trim() && r.data.slice(0, 10) >= cutoff)
+      .sort((a, b) => a.data.localeCompare(b.data));
     const mapa = new Map<string, { data: string; valor: string }[]>();
-    const nomeCanonico = new Map<string, string>(); // chave → nome original p/ classificar
-    for (const r of asc) {
-      const labs = r.exames_laboratoriais || {};
-      for (const [nome, valor] of Object.entries(labs)) {
-        if (!String(valor ?? "").trim()) continue;
-        const chave = abreviarLab(nome);
-        if (!nomeCanonico.has(chave)) nomeCanonico.set(chave, nome);
-        const arr = mapa.get(chave) ?? [];
-        arr.push({ data: r.data, valor: String(valor) });
-        mapa.set(chave, arr);
-      }
+    const nomeCanonico = new Map<string, string>();
+    for (const r of janela) {
+      const chave = abreviarLab(r.exame);
+      if (!nomeCanonico.has(chave)) nomeCanonico.set(chave, r.exame);
+      const arr = mapa.get(chave) ?? [];
+      arr.push({ data: r.data, valor: String(r.valor) });
+      mapa.set(chave, arr);
     }
-    // Agrupa as chaves por grupoLab, na ordem canônica.
     const porGrupo = new Map<string, { chave: string; nome: string; serie: { data: string; valor: string }[] }[]>();
     for (const [chave, serie] of mapa) {
       const nome = nomeCanonico.get(chave) || chave;
@@ -365,7 +368,7 @@ export default function TimelineScreen() {
       grupo: g,
       labs: (porGrupo.get(g) || []).sort((a, b) => a.chave.localeCompare(b.chave)),
     }));
-  }, [asc]);
+  }, [paciente?.resultadosLab, cutoff]);
 
   const vitaisComDados = VITAIS.filter((cfg) =>
     cfg.key === "pa"
@@ -396,12 +399,11 @@ export default function TimelineScreen() {
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 80 }}>
-        {carregando || !refsOk ? (
+        {!refsOk ? (
           <ActivityIndicator color={C.primary} style={{ marginTop: 40 }} />
-        ) : registros.length === 0 ? (
+        ) : vitaisComDados.length === 0 && gruposLab.length === 0 ? (
           <Text style={styles.vazio}>
-            Ainda não há registros. O histórico começa a partir do próximo
-            &quot;Passar o Caso&quot;.
+            Sem sinais vitais ou labs registrados nos últimos {dias} dias.
           </Text>
         ) : (
           <>
@@ -444,12 +446,6 @@ export default function TimelineScreen() {
                 ))}
                 <Text style={styles.disclaimer}>{DISCLAIMER_ABIM}</Text>
               </View>
-            )}
-
-            {vitaisComDados.length === 0 && gruposLab.length === 0 && (
-              <Text style={styles.vazio}>
-                Sem sinais vitais ou labs registrados no período.
-              </Text>
             )}
           </>
         )}
@@ -505,4 +501,5 @@ const styles = StyleSheet.create({
   labHistValor: { fontSize: 14, fontWeight: "600", color: C.text },
 
   disclaimer: { fontSize: 11, color: C.textMuted, fontStyle: "italic", marginTop: 4 },
+  insuf: { fontSize: 11, color: C.textMuted, fontStyle: "italic", marginTop: 6 },
 });
