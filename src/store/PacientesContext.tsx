@@ -4,6 +4,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -30,6 +31,9 @@ import {
 } from "@/types/paciente";
 
 const STORAGE_KEY = "@passandocaso/pacientes";
+// BUG 1: tombstone de exclusão — ids removidos localmente que NÃO devem voltar
+// pelo merge com o backend (cobre exclusão feita offline).
+const EXCLUIDOS_KEY = "@passandocaso/pacientesExcluidos";
 /** Última data (YYYY-MM-DD) em que o reset diário de status foi aplicado. */
 const RESET_STATUS_KEY = "@passandocaso/ultimoResetStatus";
 
@@ -185,22 +189,42 @@ const PacientesContext = createContext<PacientesContextValue | null>(null);
 export function PacientesProvider({ children }: { children: ReactNode }) {
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
   const [carregado, setCarregado] = useState(false);
+  // Tombstone de pacientes excluídos (BUG 1), persistido em AsyncStorage.
+  const excluidosRef = useRef<Set<string>>(new Set());
+  const persistExcluidos = () =>
+    AsyncStorage.setItem(
+      EXCLUIDOS_KEY,
+      JSON.stringify([...excluidosRef.current]),
+    ).catch(() => {});
 
   // Carrega do armazenamento local na montagem.
   useEffect(() => {
     let ativo = true;
     (async () => {
       try {
+        // Carrega o tombstone de exclusões antes de mesclar.
+        try {
+          const ex = await AsyncStorage.getItem(EXCLUIDOS_KEY);
+          if (ex) excluidosRef.current = new Set(JSON.parse(ex) as string[]);
+        } catch {
+          // sem tombstone salvo
+        }
         const bruto = await AsyncStorage.getItem(STORAGE_KEY);
         let lista = bruto ? migrarPacientes(JSON.parse(bruto)) : [];
         // Primeira execução (nada salvo): popula com os pacientes de exemplo
         // (migrados para garantir hospitalId = "geral").
         if (!lista.length) lista = migrarPacientes(gerarPacientesExemplo());
-        // Mescla com o backend (best-effort): pacientes só-remotos entram; o
-        // local tem prioridade nos conflitos.
+        // Busca o backend (fonte primária) e mescla, excluindo os do tombstone.
         try {
           const remoto = migrarPacientes(await buscarPacientes());
-          lista = mesclarPacientes(lista, remoto);
+          // Reenvia o DELETE para excluídos que o backend ainda devolve (ex.:
+          // exclusão feita offline) — limpa o servidor sem ressuscitar a lista.
+          for (const r of remoto) {
+            if (excluidosRef.current.has(r.id)) {
+              removerPacienteRemoto(r.id, r.hospitalId || "geral").catch(() => {});
+            }
+          }
+          lista = mesclarPacientes(lista, remoto, excluidosRef.current);
         } catch {
           // sem rede / backend indisponível: segue só com o cache local
         }
@@ -308,6 +332,8 @@ export function PacientesProvider({ children }: { children: ReactNode }) {
   ): AdicionarResultado => {
     const hoje = hojeISO();
     const id = cab.numeroProntuario?.trim() || `p-${Date.now()}`;
+    // Re-adicionar um prontuário antes excluído limpa o tombstone (BUG 1).
+    if (excluidosRef.current.delete(id)) persistExcluidos();
     const existente = pacientes.find((p) => p.id === id);
 
     if (existente) {
@@ -422,8 +448,11 @@ export function PacientesProvider({ children }: { children: ReactNode }) {
 
   const removerPaciente = (id: string) => {
     const hospitalId = pacientes.find((p) => p.id === id)?.hospitalId || "geral";
+    // Tombstone: marca como excluído para o merge não trazer de volta (BUG 1).
+    excluidosRef.current.add(id);
+    persistExcluidos();
     setPacientes((prev) => prev.filter((p) => p.id !== id));
-    // Remove também no backend (best-effort) — o sync por upsert não apaga.
+    // Remove também no backend (soft delete; o sync por upsert não apaga).
     removerPacienteRemoto(id, hospitalId).catch((e) =>
       console.log("Falha ao remover paciente no backend:", e),
     );

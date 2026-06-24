@@ -50,9 +50,13 @@ export async function removerPacienteRemoto(
 export function mesclarPacientes(
   local: Paciente[],
   remoto: Paciente[],
+  excluidos?: Set<string>,
 ): Paciente[] {
   const porId = new Map<string, Paciente>();
   for (const p of remoto) porId.set(p.id, p);
   for (const p of local) porId.set(p.id, p); // local sobrescreve
+  // BUG 1: tombstone — nunca ressuscita um paciente excluído localmente (mesmo
+  // que o backend ainda o devolva, ex.: exclusão feita offline).
+  if (excluidos) for (const id of excluidos) porId.delete(id);
   return Array.from(porId.values());
 }

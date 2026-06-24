@@ -61,6 +61,10 @@ async function initDB() {
   await pool.query(
     "ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS hospital_id TEXT;",
   );
+  // BUG 1: soft delete — exclusão marca deleted_at; SELECT filtra IS NULL.
+  await pool.query(
+    "ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP;",
+  );
   // CNES do hospital — chave para identificar "mesmo hospital" entre usuários.
   await pool.query(
     "ALTER TABLE hospitais ADD COLUMN IF NOT EXISTS cnes TEXT;",

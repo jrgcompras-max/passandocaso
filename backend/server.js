@@ -746,7 +746,7 @@ app.delete("/api/admin/chips-candidatos/:id", auth.autenticar, auth.exigirAdmin,
 app.get("/api/pacientes", auth.autenticar, async (req, res) => {
   try {
     const r = await db.query(
-      "SELECT dados FROM pacientes WHERE medico_id = $1 ORDER BY updated_at DESC",
+      "SELECT dados FROM pacientes WHERE medico_id = $1 AND deleted_at IS NULL ORDER BY updated_at DESC",
       [req.usuario.id],
     );
     res.json({ pacientes: r.rows.map((row) => row.dados) });
@@ -763,6 +763,7 @@ app.get("/api/pacientes/hospital/:hospitalId", auth.autenticar, async (req, res)
     const r = await db.query(
       `SELECT dados FROM pacientes
         WHERE medico_id = $1 AND COALESCE(hospital_id, 'geral') = $2
+          AND deleted_at IS NULL
         ORDER BY updated_at DESC`,
       [req.usuario.id, hospitalId],
     );
@@ -795,7 +796,8 @@ app.post("/api/pacientes/sync", auth.autenticar, async (req, res) => {
            SET medico_id = EXCLUDED.medico_id,
                hospital_id = EXCLUDED.hospital_id,
                dados = EXCLUDED.dados,
-               updated_at = NOW()`,
+               updated_at = NOW(),
+               deleted_at = NULL`,
         [p.id, req.usuario.id, p.hospitalId || "geral", dataCriacao, p],
       );
       // Trigger Fase 3: recalcula e persiste os escores em background (não bloqueia).
@@ -816,8 +818,9 @@ app.post("/api/pacientes/sync", auth.autenticar, async (req, res) => {
 app.delete("/api/pacientes/:hospitalId/:pacienteId", auth.autenticar, async (req, res) => {
   const { hospitalId, pacienteId } = req.params;
   try {
+    // BUG 1: soft delete — marca deleted_at; o SELECT filtra deleted_at IS NULL.
     await db.query(
-      `DELETE FROM pacientes
+      `UPDATE pacientes SET deleted_at = NOW(), updated_at = NOW()
         WHERE medico_id = $1 AND id = $2
           AND COALESCE(hospital_id, 'geral') = $3`,
       [req.usuario.id, pacienteId, hospitalId],
