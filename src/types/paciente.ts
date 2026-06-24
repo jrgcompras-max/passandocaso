@@ -106,6 +106,9 @@ export type Medicamento = {
   texto: string;
   /** Classe farmacológica classificada pela IA. */
   classe: string;
+  /** Data de início do uso (YYYY-MM-DD) — âncora do D+ dinâmico (BUG 7).
+   * D+ = hoje - dataInicio + 1; calculado na exibição, avança sozinho. */
+  dataInicio?: string;
 };
 
 /** Resultado laboratorial pontual (exame + data + valor), para evolução temporal. */

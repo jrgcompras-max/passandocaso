@@ -11,6 +11,7 @@ import {
 
 import { formatarDataBR, limparDataEmTexto } from "./datas";
 import { abreviarLab, agruparPorExame, grupoLab, ordemLab } from "./lab";
+import { textoComDiaAtual } from "./medicamentoDia";
 
 type Bloco = { titulo: string; itens: string[] };
 
@@ -145,7 +146,8 @@ function prescricao(p: Paciente): { atb: string[]; emUso: string[] } {
     if (t) (isAtb ? atb : emUso).push(t);
   };
 
-  for (const m of p.medicamentos || []) add(m.texto, ehAtb(m.texto, "", m.classe));
+  // BUG 7: D+ recalculado para hoje (avança sozinho a partir da data de início).
+  for (const m of p.medicamentos || []) add(textoComDiaAtual(m), ehAtb(m.texto, "", m.classe));
 
   const sec = p.secoes?.prescricaoHospitalar;
   for (const a of (sec?.anotacoes as Anotacao[]) || []) add(a.texto, ehAtb(a.texto, a.categoria));

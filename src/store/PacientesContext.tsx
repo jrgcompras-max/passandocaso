@@ -13,6 +13,7 @@ import { AppState } from "react-native";
 import { type StatusType } from "@/constants/clinicalTheme";
 import { EVOLUCAO_VAZIA } from "@/constants/evolucao";
 import { gerarPacientesExemplo } from "@/constants/pacientesExemplo";
+import { ancorarDiaUso } from "@/lib/medicamentoDia";
 import {
   buscarPacientes,
   enviarPacientes,
@@ -406,8 +407,13 @@ export function PacientesProvider({ children }: { children: ReactNode }) {
   };
 
   const atualizarPaciente = (id: string, campos: PacienteEditavel) => {
+    // BUG 7: ao salvar medicamentos, ancora a data de início do D+ (avança sozinho).
+    const ajustados =
+      "medicamentos" in campos && Array.isArray(campos.medicamentos)
+        ? { ...campos, medicamentos: ancorarDiaUso(campos.medicamentos) }
+        : campos;
     setPacientes((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, ...campos } : p)),
+      prev.map((p) => (p.id === id ? { ...p, ...ajustados } : p)),
     );
   };
 

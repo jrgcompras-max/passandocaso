@@ -1,6 +1,7 @@
 import { type Anotacao, type Paciente } from "@/types/paciente";
 
 import { abreviarLab, agruparPorExame, ordemLab } from "./lab";
+import { textoComDiaAtual } from "./medicamentoDia";
 
 /**
  * Construtor de dados do "Passar o Caso" (visual rico, fica no app). Estrutura e
@@ -115,7 +116,7 @@ export function ehAntibiotico(texto?: string, classe?: string): boolean {
 function antibioticos(p: Paciente): string[] {
   const out: string[] = [];
   for (const m of p.medicamentos || []) {
-    if (ehAntibiotico(m.texto, m.classe)) out.push(m.texto.trim());
+    if (ehAntibiotico(m.texto, m.classe)) out.push(textoComDiaAtual(m).trim());
   }
   const sec = p.secoes?.prescricaoHospitalar;
   for (const a of (sec?.anotacoes as Anotacao[]) || []) {
@@ -132,7 +133,7 @@ function antibioticos(p: Paciente): string[] {
 function medicamentosEmUso(p: Paciente): string[] {
   const out: string[] = [];
   for (const m of p.medicamentos || []) {
-    if (!ehAntibiotico(m.texto, m.classe)) out.push(m.texto.trim());
+    if (!ehAntibiotico(m.texto, m.classe)) out.push(textoComDiaAtual(m).trim());
   }
   const sec = p.secoes?.prescricaoHospitalar;
   for (const a of (sec?.anotacoes as Anotacao[]) || []) {

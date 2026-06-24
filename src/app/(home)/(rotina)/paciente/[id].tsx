@@ -41,6 +41,7 @@ import { SECOES } from "@/constants/secoes";
 import { categorizarAnotacao } from "@/lib/categorizarAnotacao";
 import { classificarMedicamento } from "@/lib/classificarMedicamento";
 import { ehAntibiotico } from "@/lib/passarCaso";
+import { textoComDiaAtual } from "@/lib/medicamentoDia";
 import {
   extrairLabsMultiData,
   mesclarResultadosLab,
@@ -4635,7 +4636,7 @@ function PrescricaoSecao({
           <View style={[styles.medRow, sel.selecionando && { flex: 1 }]}>
             <View style={styles.medInfo}>
               <View style={styles.medTituloLinha}>
-                <Text style={styles.medTexto}>{m.texto}</Text>
+                <Text style={styles.medTexto}>{textoComDiaAtual(m)}</Text>
                 {ehAntibiotico(m.texto, m.classe) && (
                   <View style={styles.badgeAtb}>
                     <Text style={styles.badgeAtbTexto}>ATB</Text>
