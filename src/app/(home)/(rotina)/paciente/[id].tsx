@@ -359,18 +359,6 @@ export default function Paciente() {
     };
   }, [id]);
 
-  // Alertas de tendência laboratorial (descritivos — conformidade ANVISA).
-  const [alertas, setAlertas] = useState<AlertaTendencia[]>([]);
-  useEffect(() => {
-    let vivo = true;
-    buscarAlertas(id, true).then((a) => {
-      if (vivo) setAlertas(a);
-    });
-    return () => {
-      vivo = false;
-    };
-  }, [id]);
-
   const insets = useSafeAreaInsets();
 
   // FEATURE 1: accordion — id da única seção aberta (null = todas fechadas).
@@ -759,7 +747,8 @@ export default function Paciente() {
                 onGerar={gerarResumo}
               />
 
-              {alertas.length > 0 && <AlertasTendenciaSecao alertas={alertas} />}
+              {/* BUG 6: card "Tendências laboratoriais" removido (alertas
+                  automáticos não confiáveis). As setas ↑↓ por valor permanecem. */}
 
               <ProblemasSecao
                 problemas={paciente.problemas ?? []}

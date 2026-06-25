@@ -193,19 +193,30 @@ const REF_LAB: { re: RegExp; min: number; max: number }[] = [
   { re: /^na\b/i, min: 135, max: 145 },
 ];
 function labsAlterados(p: Paciente): LabAlterado[] {
-  const out: LabAlterado[] = [];
   // Pediátrico (idade < 18): faixas de referência são de adultos → não classifica.
-  if (p.idade != null && p.idade < 18) return out;
-  for (const s of agruparPorExame(p.resultadosLab || [])) {
-    const ref = REF_LAB.find((r) => r.re.test(s.exame.trim()));
-    if (!ref) continue;
-    const ultimo = s.pontos[s.pontos.length - 1];
-    const v = num(ultimo.valor);
-    if (v == null) continue;
-    if (v > ref.max) out.push({ exame: abreviarLab(s.exame), valor: ultimo.valor, seta: "alta" });
-    else if (v < ref.min) out.push({ exame: abreviarLab(s.exame), valor: ultimo.valor, seta: "baixa" });
+  if (p.idade != null && p.idade < 18) return [];
+  // BUG 8: 1 entrada por exame, dedup por nome canônico (Cr/Creatinina → "Cr"),
+  // usando SOMENTE o valor da data MAIS RECENTE. Se normal na data mais recente,
+  // não exibe (mesmo que alterado em datas anteriores).
+  const ultimoPorExame = new Map<string, { exame: string; data: string; valor: string }>();
+  for (const r of p.resultadosLab || []) {
+    if (!String(r.valor ?? "").trim()) continue;
+    const chave = abreviarLab(r.exame);
+    const atual = ultimoPorExame.get(chave);
+    if (!atual || r.data.slice(0, 10) > atual.data.slice(0, 10)) {
+      ultimoPorExame.set(chave, { exame: chave, data: r.data, valor: String(r.valor) });
+    }
   }
-  return out.sort((a, b) => ordemLab(a.exame) - ordemLab(b.exame)); // ordem clínica (BUG 8)
+  const out: LabAlterado[] = [];
+  for (const { exame, valor } of ultimoPorExame.values()) {
+    const ref = REF_LAB.find((r) => r.re.test(exame));
+    if (!ref) continue;
+    const v = num(valor);
+    if (v == null) continue;
+    if (v > ref.max) out.push({ exame, valor, seta: "alta" });
+    else if (v < ref.min) out.push({ exame, valor, seta: "baixa" });
+  }
+  return out.sort((a, b) => ordemLab(a.exame) - ordemLab(b.exame)); // ordem clínica (BUG 9)
 }
 
 /** Quebra um laudo em frases (igual à tela; sem lookbehind p/ Hermes). */

@@ -325,8 +325,9 @@ export function montarTextoEvolucao(paciente: Paciente, hoje: string): string {
   const oCorpo = [
     evo?.estadoGeralExame?.trim() || null,
     evo?.neurologico?.trim() || null,
-    comPrefixo(evo?.cardiovascular, "AC"),
-    comPrefixo(evo?.respiratorio, "AP"),
+    // BUG 10: sem prefixo AC/AP no texto gerado (o achado já é autoexplicativo).
+    evo?.cardiovascular?.trim() || null,
+    evo?.respiratorio?.trim() || null,
     comPrefixo(evo?.abdominal, "Abdome"),
     comPrefixo(evo?.mmii, "MMII"),
     comPrefixo(evo?.extremidades, "Extremidades"),
