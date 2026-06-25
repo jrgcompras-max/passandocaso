@@ -208,14 +208,39 @@ function culturais(p: Paciente): string[] {
   return out;
 }
 
-/** Linha compacta dos exames laboratoriais (valor mais recente por exame).
- * Abrevia os nomes (Hb, Ht, …) e exclui culturas (vão para "- Culturais:"). */
+/**
+ * Exames laboratoriais SEPARADOS POR DATA (mais recente → mais antiga). Cada
+ * data inicia uma linha "DD/MM: " seguida dos labs daquele dia em ordem clínica
+ * (ordemLab), quebrando a cada 4 labs com indentação. Abrevia nomes e exclui
+ * culturas (vão para "- Culturais:"). Omite exames sem valor.
+ */
 function laboratorioLinha(p: Paciente): string {
-  return agruparPorExame(p.resultadosLab || [])
-    .filter((s) => grupoLab(s.exame) !== "CULTURAS")
-    .sort((a, b) => ordemLab(a.exame) - ordemLab(b.exame)) // ordem clínica (BUG 8)
-    .map((s) => `${abreviarLab(s.exame)} ${s.pontos[s.pontos.length - 1].valor}`)
-    .join(" / ");
+  const porData = new Map<string, { exame: string; valor: string }[]>();
+  for (const r of p.resultadosLab || []) {
+    if (!String(r.valor ?? "").trim()) continue;
+    if (grupoLab(r.exame) === "CULTURAS") continue;
+    const d = r.data.slice(0, 10);
+    const lista = porData.get(d) ?? [];
+    lista.push({ exame: r.exame, valor: String(r.valor).trim() });
+    porData.set(d, lista);
+  }
+  const datas = [...porData.keys()].sort((a, b) => b.localeCompare(a)); // desc
+  const linhas: string[] = [];
+  for (const d of datas) {
+    // 1 valor por exame na data (dedup por nome canônico), em ordem clínica.
+    const mapa = new Map<string, string>();
+    for (const { exame, valor } of porData.get(d) || []) mapa.set(abreviarLab(exame), valor);
+    const labs = [...mapa.entries()]
+      .sort((a, b) => ordemLab(a[0]) - ordemLab(b[0]))
+      .map(([nome, valor]) => `${nome} ${valor}`);
+    if (!labs.length) continue;
+    const prefixo = `${formatarDataBR(d).slice(0, 5)}: `; // "DD/MM: "
+    const indent = " ".repeat(prefixo.length);
+    const blocos: string[] = [];
+    for (let i = 0; i < labs.length; i += 4) blocos.push(labs.slice(i, i + 4).join(" / "));
+    linhas.push(prefixo + blocos.map((b, i) => (i === 0 ? b : indent + b)).join("\n"));
+  }
+  return linhas.join("\n");
 }
 
 /**

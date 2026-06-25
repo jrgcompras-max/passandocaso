@@ -44,7 +44,9 @@ MMII sem edema, sem empastamento
 Extremidades aquecidas, TEC<3s
 
 Exames laboratoriais:
-Hb X / Ht X / LT X / Plaq X / PCR X / Na X / K X / Cr X
+25/06: Hb X / Ht X / LT X / Plaq X
+       Na X / K X / Ur X / Cr X
+23/06: Hb X / Ht X / LT X / Plaq X
 
 Exames de imagem:
 TC de Crânio: [laudo resumido]
@@ -63,7 +65,9 @@ Regras:
 - Comorbidades e MUC em blocos separados.
 - ATB só aparece se houver cadastrado; senão `--`.
 - SSVV só aparece se preenchido.
-- Labs em linha compacta, separados por `/`.
+- Labs separados por data (mais recente → mais antiga): cada data em linha
+  `DD/MM: ` + labs do dia em ordem clínica, separados por `/`, quebrando a cada
+  ~4 labs com indentação. Só exames com valor naquela data.
 - Imagem: cada exame em linha própria.
 - Sem linhas separadoras entre seções. Sem títulos em maiúsculas.
 - Sem "Checo exames"/"Checo TC".
