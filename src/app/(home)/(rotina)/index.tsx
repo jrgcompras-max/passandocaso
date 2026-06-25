@@ -184,7 +184,10 @@ export default function Index() {
     adicionarPorCabecalho,
     atualizarPaciente,
     removerPaciente,
+    arquivarPaciente,
+    desarquivarPaciente,
   } = usePacientes();
+  const [verArquivados, setVerArquivados] = useState(false);
   const {
     hospitais,
     hospitalAtivo,
@@ -262,9 +265,12 @@ export default function Index() {
     aguardando[p.id] ?? p.status;
 
   // Pacientes do hospital selecionado (registros sem hospital = "geral").
-  const pacientesHosp = pacientes.filter(
+  // FEATURE 1: arquivados ficam fora da rotina ativa (lista própria).
+  const pacientesHospTodos = pacientes.filter(
     (p) => (p.hospitalId ?? "geral") === hospitalAtivo,
   );
+  const pacientesHosp = pacientesHospTodos.filter((p) => !p.arquivadoEm);
+  const arquivados = pacientesHospTodos.filter((p) => p.arquivadoEm);
 
   // Resultado da busca por nome (null = sem busca → mostra a lista agrupada).
   const buscaNorm = normalizar(busca);
@@ -398,6 +404,19 @@ export default function Index() {
         },
       ],
     );
+  };
+
+  // FEATURE 1: segurar o dedo no paciente → Arquivar (preserva dados) ou Excluir.
+  const menuPaciente = (id: string, nome: string) => {
+    Alert.alert(nome || "Paciente", undefined, [
+      { text: "Arquivar", onPress: () => arquivarPaciente(id) },
+      {
+        text: "Excluir",
+        style: "destructive",
+        onPress: () => confirmarExcluir(id, nome),
+      },
+      { text: "Cancelar", style: "cancel" },
+    ]);
   };
 
   // Exclusão em massa dos pacientes selecionados (BUG 8), com confirmação.
@@ -578,6 +597,17 @@ export default function Index() {
         </View>
       )}
 
+      {arquivados.length > 0 && (
+        <TouchableOpacity
+          style={styles.arquivadosLink}
+          onPress={() => setVerArquivados(true)}
+          hitSlop={6}
+        >
+          <Ionicons name="archive-outline" size={15} color={ClinicalColors.textMuted} />
+          <Text style={styles.arquivadosLinkTxt}>Arquivados ({arquivados.length})</Text>
+        </TouchableOpacity>
+      )}
+
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={[
@@ -654,6 +684,9 @@ export default function Index() {
                     >
                       <TouchableOpacity
                         style={styles.card}
+                        onLongPress={() =>
+                          !selecionando && menuPaciente(item.id, item.nomeCompleto)
+                        }
                         onPress={() =>
                           selecionando
                             ? alternarSelecionado(item.id)
@@ -916,6 +949,50 @@ export default function Index() {
         </View>
       </Modal>
 
+      {/* FEATURE 1: lista de arquivados — desarquivar (volta com dados) ou excluir. */}
+      <Modal
+        visible={verArquivados}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setVerArquivados(false)}
+      >
+        <View style={styles.arqFundo}>
+          <View style={styles.arqCaixa}>
+            <View style={styles.arqTopo}>
+              <Text style={styles.arqTitulo}>Arquivados</Text>
+              <TouchableOpacity onPress={() => setVerArquivados(false)} hitSlop={8}>
+                <Ionicons name="close" size={24} color={ClinicalColors.textMuted} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={{ maxHeight: 420 }}>
+              {arquivados.length === 0 ? (
+                <Text style={styles.arqVazio}>Nenhum paciente arquivado.</Text>
+              ) : (
+                arquivados.map((p) => (
+                  <View key={p.id} style={styles.arqLinha}>
+                    <Text style={styles.arqNome} numberOfLines={1}>
+                      {formatarNome(p.nomeCompleto) || "Sem nome"}
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.arqBtn}
+                      onPress={() => desarquivarPaciente(p.id)}
+                    >
+                      <Text style={styles.arqBtnTxt}>Desarquivar</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => confirmarExcluir(p.id, p.nomeCompleto)}
+                      hitSlop={6}
+                    >
+                      <Ionicons name="trash-outline" size={18} color={ClinicalColors.danger} />
+                    </TouchableOpacity>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
       <ModalMigracao visivel={migracaoVisivel} onConcluir={concluirMigracao} />
       <PassarPlantaoModal visivel={passarVisivel} onFechar={() => setPassarVisivel(false)} />
     </View>
@@ -1090,6 +1167,47 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   buscaInput: { flex: 1, fontSize: 15, color: ClinicalColors.text, padding: 0 },
+  // FEATURE 1: arquivados.
+  arquivadosLink: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginHorizontal: 16,
+    marginBottom: 6,
+  },
+  arquivadosLinkTxt: { fontSize: 13, color: ClinicalColors.textMuted, fontWeight: "600" },
+  arqFundo: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" },
+  arqCaixa: {
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: Radius.card,
+    borderTopRightRadius: Radius.card,
+    padding: 20,
+    paddingBottom: 32,
+  },
+  arqTopo: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  arqTitulo: { fontSize: 20, fontWeight: "700", color: ClinicalColors.text },
+  arqVazio: { fontSize: 14, color: ClinicalColors.textMuted, paddingVertical: 16, textAlign: "center" },
+  arqLinha: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 10,
+    borderTopWidth: BorderWidth.hairline,
+    borderTopColor: ClinicalColors.border,
+  },
+  arqNome: { flex: 1, fontSize: 15, color: ClinicalColors.text },
+  arqBtn: {
+    backgroundColor: ClinicalColors.primary,
+    borderRadius: Radius.badge,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  arqBtnTxt: { color: "#FFFFFF", fontSize: 13, fontWeight: "700" },
   grupoHeader: {
     flexDirection: "row",
     alignItems: "center",

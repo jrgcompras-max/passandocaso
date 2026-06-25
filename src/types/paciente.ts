@@ -190,6 +190,9 @@ export type Paciente = CabecalhoProntuario & {
   /** Identidade estável entre dias (= numeroProntuario, ou fallback gerado). */
   id: string;
   status: StatusType;
+  /** Arquivado em (ISO) — paciente fora da rotina ativa, dados preservados.
+   * Ativos: arquivadoEm ausente. Arquivados: arquivadoEm presente. (FEATURE 1) */
+  arquivadoEm?: string;
   /** Histórico do status por dia (YYYY-MM-DD → status), preenchido no reset diário. */
   historicoStatus?: Record<string, StatusType>;
   /** Hospital ao qual o paciente pertence (default "geral" para registros antigos). */

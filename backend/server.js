@@ -790,15 +790,16 @@ app.post("/api/pacientes/sync", auth.autenticar, async (req, res) => {
         (Array.isArray(p.diasAcompanhamento) && p.diasAcompanhamento[0]) ||
         new Date().toISOString().slice(0, 10);
       await db.query(
-        `INSERT INTO pacientes (id, medico_id, hospital_id, data_criacao, dados, updated_at)
-         VALUES ($1, $2, $3, $4, $5, NOW())
+        `INSERT INTO pacientes (id, medico_id, hospital_id, data_criacao, dados, updated_at, archived_at)
+         VALUES ($1, $2, $3, $4, $5, NOW(), $6)
          ON CONFLICT (id) DO UPDATE
            SET medico_id = EXCLUDED.medico_id,
                hospital_id = EXCLUDED.hospital_id,
                dados = EXCLUDED.dados,
                updated_at = NOW(),
-               deleted_at = NULL`,
-        [p.id, req.usuario.id, p.hospitalId || "geral", dataCriacao, p],
+               deleted_at = NULL,
+               archived_at = EXCLUDED.archived_at`,
+        [p.id, req.usuario.id, p.hospitalId || "geral", dataCriacao, p, p.arquivadoEm || null],
       );
       // Trigger Fase 3: recalcula e persiste os escores em background (não bloqueia).
       escores.recalcularEmBackground(p.id, p, req.usuario.id);

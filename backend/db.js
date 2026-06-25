@@ -65,6 +65,10 @@ async function initDB() {
   await pool.query(
     "ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP;",
   );
+  // FEATURE 1: arquivar paciente (fora da rotina ativa, dados preservados).
+  await pool.query(
+    "ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ;",
+  );
   // CNES do hospital — chave para identificar "mesmo hospital" entre usuários.
   await pool.query(
     "ALTER TABLE hospitais ADD COLUMN IF NOT EXISTS cnes TEXT;",

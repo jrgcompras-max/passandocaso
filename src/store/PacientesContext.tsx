@@ -107,6 +107,8 @@ type PacientesContextValue = {
     patch: Partial<EvolucaoBeiraLeito>,
   ) => void;
   removerPaciente: (id: string) => void;
+  arquivarPaciente: (id: string) => void;
+  desarquivarPaciente: (id: string) => void;
   /** Move todos os pacientes de um hospital para outro. Retorna quantos moveu. */
   migrarPacientesDeHospital: (origem: string, destino: string) => number;
   /** Insere/atualiza pacientes recebidos por passagem de plantão (upsert por id). */
@@ -454,6 +456,22 @@ export function PacientesProvider({ children }: { children: ReactNode }) {
     );
   };
 
+  // FEATURE 1: arquivar/desarquivar (preserva os dados; só sai/volta da rotina).
+  const arquivarPaciente = (id: string) => {
+    setPacientes((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, arquivadoEm: new Date().toISOString() } : p)),
+    );
+  };
+  const desarquivarPaciente = (id: string) => {
+    setPacientes((prev) =>
+      prev.map((p) => {
+        if (p.id !== id) return p;
+        const { arquivadoEm, ...resto } = p;
+        return resto;
+      }),
+    );
+  };
+
   const removerPaciente = (id: string) => {
     const hospitalId = pacientes.find((p) => p.id === id)?.hospitalId || "geral";
     // Tombstone: marca como excluído para o merge não trazer de volta (BUG 1).
@@ -489,6 +507,8 @@ export function PacientesProvider({ children }: { children: ReactNode }) {
         atualizarPendencias,
         atualizarEvolucao,
         removerPaciente,
+        arquivarPaciente,
+        desarquivarPaciente,
         migrarPacientesDeHospital,
         importarRecebidos,
       }}
