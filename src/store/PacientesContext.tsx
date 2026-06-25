@@ -138,16 +138,18 @@ export type PacienteEditavel = Partial<
 const STATUS_VALIDOS: StatusType[] = [
   "naoVisitado",
   "visitado",
+  "evoluido",
   "revisar",
   "pendente",
   "altaProvavel",
   "altaRealizada",
 ];
 
-/** Status do esquema antigo (4 estados) → novos status (6 estados). */
+/** Status do esquema antigo → novos status. BUG 5: "evoluido" é um status
+ * ATUAL válido (Evoluído) — NÃO mapear para "altaRealizada" (isso jogava todo
+ * paciente evoluído para Alta realizada no load). */
 const STATUS_LEGADO: Record<string, StatusType> = {
   discutido: "revisar",
-  evoluido: "altaRealizada",
 };
 
 /** Converte um status armazenado para o vocabulário atual (fallback: não visitado). */

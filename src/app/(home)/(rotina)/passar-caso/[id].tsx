@@ -127,15 +127,16 @@ export default function PassarCaso() {
         <Text style={s.sub}>{paciente ? subtitulo(paciente) : carregado ? "Paciente não encontrado" : "Carregando…"}</Text>
       </View>
 
-      {/* KeyboardAwareScrollView: rola até o campo focado (ex.: Conduta proposta
-          inline) para o teclado não cobri-lo. paddingBottom cobre a tab bar
-          (altura 64 + insets) + margem. */}
+      {/* BUG 1: rola até o campo focado com folga suficiente para limpar o
+          teclado E a tab bar flutuante (64 + insets). extraScrollHeight pequeno
+          deixava a Conduta proposta atrás da tab bar ao focar. */}
       <KeyboardAwareScrollView
         contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 80 }}
         keyboardShouldPersistTaps="handled"
         enableOnAndroid
         enableAutomaticScroll
-        extraScrollHeight={20}
+        extraScrollHeight={insets.bottom + 100}
+        keyboardOpeningTime={0}
       >
         {!caso ? null : (
           <>
