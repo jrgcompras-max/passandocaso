@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Modal,
   ScrollView,
   StyleSheet,
   Text,
@@ -190,83 +191,89 @@ function CardVital({
   );
 }
 
-// ── Labs: linha por exame com sparkline (cor ABIM) e expansão ─────────────────
+type LabSelecionado = { nome: string; serie: { data: string; valor: string }[] };
+
+// ── Labs: BUG 2 — lista limpa (valor + seta colorida); toque abre modal. ──────
 function LinhaLab({
   nome,
   serie,
   sexo,
   idade,
-  aberto,
-  onToggle,
-  largura,
+  onAbrir,
 }: {
   nome: string;
   serie: { data: string; valor: string }[];
   sexo?: "M" | "F";
   idade?: number;
-  aberto: boolean;
-  onToggle: () => void;
-  largura: number;
+  onAbrir: () => void;
 }) {
+  const ultimo = serie[serie.length - 1];
+  // Valor: alto = ↑ vermelho, baixo = ↓ azul, normal = preto sem seta (BUG 3).
+  const c = classificarLabSync(nome, ultimo?.valor ?? "", sexo, idade);
+  return (
+    <TouchableOpacity style={styles.labRow} onPress={onAbrir} activeOpacity={0.6}>
+      <Text style={styles.labNome}>{abreviarLab(nome)}</Text>
+      <Text style={[styles.labValor, { color: c.cor }]}>
+        {num(ultimo?.valor) ?? ultimo?.valor}
+        {c.seta !== "→" ? ` ${c.seta}` : ""}
+      </Text>
+      <Ionicons name="chevron-forward" size={15} color={C.textMuted} />
+    </TouchableOpacity>
+  );
+}
+
+/** Modal do lab (BUG 2): gráfico de linha completo + tabela de valores por data. */
+function ModalLab({
+  lab,
+  sexo,
+  idade,
+  largura,
+  onFechar,
+}: {
+  lab: LabSelecionado | null;
+  sexo?: "M" | "F";
+  idade?: number;
+  largura: number;
+  onFechar: () => void;
+}) {
+  const serie = lab?.serie ?? [];
   const valores = serie.map((p) => num(p.valor)).filter((n): n is number => n != null);
   const ultimo = serie[serie.length - 1];
-  const c = classificarLabSync(nome, ultimo?.valor ?? "", sexo, idade);
+  const c = classificarLabSync(lab?.nome ?? "", ultimo?.valor ?? "", sexo, idade);
   const fora = c.status === "alto" || c.status === "baixo";
-  // Linha do sparkline: azul dentro da referência ABIM, vermelha fora (BUG 4).
+  // Linha vermelha se alterado (último fora), azul se normal (BUG 2).
   const cor = fora ? VERMELHO : AZUL;
-  // Valor: alto = vermelho, baixo = azul, normal = preto (BUG 3) — c.cor já reflete.
-
   return (
-    <View>
-      <TouchableOpacity style={styles.labRow} onPress={onToggle} activeOpacity={0.6}>
-        <Text style={styles.labNome}>{abreviarLab(nome)}</Text>
-        <Text style={[styles.labValor, { color: c.cor }]}>
-          {num(ultimo?.valor) ?? ultimo?.valor}
-          {c.seta !== "→" ? ` ${c.seta}` : ""}
-        </Text>
-        <View style={styles.labSpark}>
-          <GraficoLinha
-            linhas={[{ valores, cor }]}
-            largura={64}
-            altura={26}
-            espessura={1.5}
-          />
-        </View>
-        <Ionicons
-          name={aberto ? "chevron-up" : "chevron-down"}
-          size={15}
-          color={C.textMuted}
-        />
-      </TouchableOpacity>
-
-      {aberto && (
-        <View style={styles.labExpand}>
-          <GraficoLinha
-            linhas={[{ valores, cor }]}
-            largura={largura}
-            altura={120}
-            espessura={2}
-            pontos
-          />
+    <Modal visible={!!lab} transparent animationType="slide" onRequestClose={onFechar}>
+      <View style={styles.modalFundo}>
+        <View style={styles.modalCaixa}>
+          <View style={styles.modalTopo}>
+            <Text style={styles.modalTitulo}>{lab ? abreviarLab(lab.nome) : ""}</Text>
+            <TouchableOpacity onPress={onFechar} hitSlop={8}>
+              <Ionicons name="close" size={22} color={C.textMuted} />
+            </TouchableOpacity>
+          </View>
+          <GraficoLinha linhas={[{ valores, cor }]} largura={largura} altura={130} espessura={2} pontos />
           {valores.length < 2 && (
             <Text style={styles.insuf}>dados insuficientes para tendência</Text>
           )}
-          <View style={styles.labHist}>
-            {serie.map((p, i) => {
-              const cc = classificarLabSync(nome, p.valor, sexo, idade);
+          <ScrollView style={{ maxHeight: 240, marginTop: 12 }}>
+            {[...serie].reverse().map((p, i) => {
+              const cc = classificarLabSync(lab?.nome ?? "", p.valor, sexo, idade);
               return (
                 <View key={i} style={styles.labHistLinha}>
                   <Text style={styles.labHistData}>{rotuloCurto(p.data)}</Text>
                   <Text style={[styles.labHistValor, { color: cc.cor }]}>
                     {num(p.valor) ?? p.valor}
+                    {cc.seta !== "→" ? ` ${cc.seta}` : ""}
                   </Text>
                 </View>
               );
             })}
-          </View>
+          </ScrollView>
         </View>
-      )}
-    </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -282,7 +289,7 @@ export default function TimelineScreen() {
 
   const [dias, setDias] = useState(7);
   const [refsOk, setRefsOk] = useState(false);
-  const [labAberto, setLabAberto] = useState<string | null>(null);
+  const [labSel, setLabSel] = useState<LabSelecionado | null>(null);
 
   // Carrega as referências ABIM (cache global) uma vez.
   useEffect(() => {
@@ -439,9 +446,7 @@ export default function TimelineScreen() {
                         serie={serie}
                         sexo={sexo}
                         idade={idade}
-                        aberto={labAberto === chave}
-                        onToggle={() => setLabAberto(labAberto === chave ? null : chave)}
-                        largura={larguraGrafico - 24}
+                        onAbrir={() => setLabSel({ nome, serie })}
                       />
                     ))}
                   </View>
@@ -452,6 +457,14 @@ export default function TimelineScreen() {
           </>
         )}
       </ScrollView>
+
+      <ModalLab
+        lab={labSel}
+        sexo={sexo}
+        idade={idade}
+        largura={larguraGrafico}
+        onFechar={() => setLabSel(null)}
+      />
     </View>
   );
 }
@@ -489,11 +502,9 @@ const styles = StyleSheet.create({
     fontSize: 11, fontWeight: "700", color: C.textMuted, textTransform: "uppercase",
     letterSpacing: 0.5, marginBottom: 6,
   },
-  labRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 7 },
+  labRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 9 },
   labNome: { width: 72, fontSize: 14.5, fontWeight: "600", color: C.text },
   labValor: { flex: 1, fontSize: 14.5, fontWeight: "700", color: C.text },
-  labSpark: { width: 64 },
-  labExpand: { paddingTop: 8, paddingBottom: 6 },
   labHist: { marginTop: 10, gap: 2 },
   labHistLinha: {
     flexDirection: "row", justifyContent: "space-between",
@@ -504,4 +515,21 @@ const styles = StyleSheet.create({
 
   disclaimer: { fontSize: 11, color: C.textMuted, fontStyle: "italic", marginTop: 4 },
   insuf: { fontSize: 11, color: C.textMuted, fontStyle: "italic", marginTop: 6 },
+
+  // BUG 2: modal do lab (gráfico completo + tabela por data).
+  modalFundo: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" },
+  modalCaixa: {
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: Radius.card,
+    borderTopRightRadius: Radius.card,
+    padding: 20,
+    paddingBottom: 32,
+  },
+  modalTopo: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 14,
+  },
+  modalTitulo: { fontSize: 18, fontWeight: "700", color: C.text },
 });
