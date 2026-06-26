@@ -486,6 +486,7 @@ app.post("/api/auth/recuperar", async (req, res) => {
   const email = String((req.body || {}).email || "").trim().toLowerCase();
   if (!email) return res.status(400).json({ erro: "Campo obrigatório: email." });
   try {
+    console.log(`[recuperar] Pedido de recuperação para "${email}".`);
     const r = await db.query("SELECT * FROM usuarios WHERE email = $1", [email]);
     const usuario = r.rows[0];
     if (usuario) {
@@ -495,7 +496,14 @@ app.post("/api/auth/recuperar", async (req, res) => {
         [token, auth.resetExpiraEm(), usuario.id],
       );
       const base = process.env.APP_WEB_URL || "https://app.passandocaso.com.br";
-      await auth.enviarEmailRecuperacao(email, `${base}/redefinir?token=${token}`);
+      const resultado = await auth.enviarEmailRecuperacao(email, `${base}/redefinir?token=${token}`);
+      console.log(
+        `[recuperar] Usuário encontrado. Provedor=${resultado.provedor || "nenhum"} ` +
+          `enviado=${resultado.enviado}${resultado.erro ? ` erro=${resultado.erro}` : ""}.`,
+      );
+    } else {
+      // Não revela ao cliente que o e-mail não existe, mas registra no servidor.
+      console.log(`[recuperar] Nenhum usuário com "${email}" — nada enviado (resposta ok p/ não vazar).`);
     }
     res.json({ ok: true });
   } catch (e) {
@@ -518,12 +526,14 @@ app.post("/api/auth/redefinir", async (req, res) => {
     const r = await db.query("SELECT * FROM usuarios WHERE reset_token = $1", [token]);
     const usuario = r.rows[0];
     if (!usuario || !usuario.reset_token_exp || new Date(usuario.reset_token_exp) < new Date()) {
+      console.log(`[redefinir] Token inválido ou expirado (usuário=${usuario ? usuario.email : "nenhum"}).`);
       return res.status(400).json({ erro: "Token inválido ou expirado." });
     }
     await db.query(
       "UPDATE usuarios SET senha_hash = $1, reset_token = NULL, reset_token_exp = NULL WHERE id = $2",
       [await auth.hashSenha(senha), usuario.id],
     );
+    console.log(`[redefinir] Senha redefinida com sucesso para "${usuario.email}".`);
     res.json({ ok: true });
   } catch (e) {
     console.error("Erro em /api/auth/redefinir:", e);

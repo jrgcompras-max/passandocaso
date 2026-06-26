@@ -121,7 +121,16 @@ function exigirAdmin(req, res, next) {
   next();
 }
 
-// --- E-mail (nodemailer, com fallback "sem e-mail") ---
+// --- E-mail (Resend via API key OU SMTP, com fallback "sem e-mail") ---
+//
+// Provedores suportados, nesta ordem de preferência:
+//   1) Resend  → defina RESEND_API_KEY (e EMAIL_FROM com domínio verificado).
+//   2) SMTP    → defina EMAIL_HOST / EMAIL_USER / EMAIL_PASS (e EMAIL_PORT).
+//   3) Nenhum  → registra o link no console e segue (enviado: false).
+//
+// EMAIL_FROM: remetente (ex.: "Passando Caso <nao-responda@passandocaso.com.br>").
+// No Resend o domínio do remetente PRECISA estar verificado no painel.
+
 let _transporter = null;
 function getTransporter() {
   if (!process.env.EMAIL_HOST || !process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
@@ -140,46 +149,92 @@ function getTransporter() {
   return _transporter;
 }
 
+/** Qual provedor de e-mail está configurado: "resend" | "smtp" | null. */
+function provedorEmail() {
+  if (process.env.RESEND_API_KEY) return "resend";
+  if (process.env.EMAIL_HOST && process.env.EMAIL_USER && process.env.EMAIL_PASS) return "smtp";
+  return null;
+}
+
+function remetentePadrao() {
+  return (
+    process.env.EMAIL_FROM ||
+    (process.env.EMAIL_USER && `Passando Caso <${process.env.EMAIL_USER}>`) ||
+    "Passando Caso <onboarding@resend.dev>"
+  );
+}
+
 /**
- * Envia o e-mail de recuperação. Sem SMTP configurado, apenas registra o link no
+ * Envio genérico (best-effort) que escolhe o provedor disponível e LOGA cada
+ * passo. Nunca lança para fora: devolve { enviado, provedor, erro? } pra quem
+ * chamou decidir o que mostrar. Sem provedor, registra no console e segue.
+ */
+async function enviarEmailBruto(to, assunto, texto, html) {
+  const provedor = provedorEmail();
+  const from = remetentePadrao();
+
+  if (!provedor) {
+    console.log(`[email] Sem provedor configurado (defina RESEND_API_KEY ou EMAIL_*). Para ${to} — ${assunto}`);
+    return { enviado: false, provedor: null, erro: "sem-provedor" };
+  }
+
+  try {
+    if (provedor === "resend") {
+      if (typeof fetch !== "function") {
+        throw new Error("fetch indisponível nesta versão do Node (precisa Node 18+) para usar o Resend.");
+      }
+      console.log(`[email] Enviando via Resend para ${to} (de: ${from})...`);
+      const resp = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ from, to: [to], subject: assunto, text: texto, html: html || `<p>${texto}</p>` }),
+      });
+      const corpo = await resp.text();
+      if (!resp.ok) {
+        console.error(`[email] Resend recusou (HTTP ${resp.status}): ${corpo}`);
+        return { enviado: false, provedor, erro: `resend ${resp.status}: ${corpo}` };
+      }
+      console.log(`[email] Resend OK para ${to}: ${corpo}`);
+      return { enviado: true, provedor };
+    }
+
+    // SMTP
+    console.log(`[email] Enviando via SMTP (${process.env.EMAIL_HOST}) para ${to} (de: ${from})...`);
+    await getTransporter().sendMail({ from, to, subject: assunto, text: texto, html: html || `<p>${texto}</p>` });
+    console.log(`[email] SMTP OK para ${to}.`);
+    return { enviado: true, provedor };
+  } catch (e) {
+    console.error(`[email] Falha ao enviar via ${provedor} para ${to}:`, e.message);
+    return { enviado: false, provedor, erro: e.message };
+  }
+}
+
+/**
+ * Envia o e-mail de recuperação. Sem provedor configurado, registra o link no
  * console e devolve { enviado: false } — o fluxo segue normalmente.
  */
 async function enviarEmailRecuperacao(email, link) {
-  const t = getTransporter();
-  if (!t) {
-    console.log(`[auth] SMTP não configurado. Link de recuperação para ${email}: ${link}`);
-    return { enviado: false };
+  if (!provedorEmail()) {
+    console.log(`[auth] Sem provedor de e-mail. Link de recuperação para ${email}: ${link}`);
+    return { enviado: false, provedor: null };
   }
-  await t.sendMail({
-    from: process.env.EMAIL_FROM || `Passando Caso <${process.env.EMAIL_USER}>`,
-    to: email,
-    subject: "Recuperação de senha — Passando Caso",
-    text:
-      `Recebemos um pedido para redefinir sua senha.\n\n` +
+  return enviarEmailBruto(
+    email,
+    "Recuperação de senha — Passando Caso",
+    `Recebemos um pedido para redefinir sua senha.\n\n` +
       `Acesse: ${link}\n\nO link expira em 1 hora. Se você não solicitou, ignore este e-mail.`,
-    html:
-      `<p>Recebemos um pedido para redefinir sua senha.</p>` +
+    `<p>Recebemos um pedido para redefinir sua senha.</p>` +
       `<p><a href="${link}">Clique aqui para redefinir</a> (o link expira em 1 hora).</p>` +
       `<p>Se você não solicitou, ignore este e-mail.</p>`,
-  });
-  return { enviado: true };
+  );
 }
 
-/** Envio genérico de e-mail (best-effort). Sem SMTP, registra no console. */
+/** Envio genérico de e-mail (best-effort). */
 async function enviarEmail(to, assunto, texto, html) {
-  const t = getTransporter();
-  if (!t) {
-    console.log(`[email] (sem SMTP) Para ${to} — ${assunto}: ${texto}`);
-    return { enviado: false };
-  }
-  await t.sendMail({
-    from: process.env.EMAIL_FROM || `Passando Caso <${process.env.EMAIL_USER}>`,
-    to,
-    subject: assunto,
-    text: texto,
-    html: html || `<p>${texto}</p>`,
-  });
-  return { enviado: true };
+  return enviarEmailBruto(to, assunto, texto, html);
 }
 
 module.exports = {
