@@ -4,8 +4,8 @@ import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Image,
-  Modal,
   PanResponder,
   ScrollView,
   StyleSheet,
@@ -31,7 +31,11 @@ type CropCtx = {
   capturarPaginas: () => Promise<string[]>;
 };
 const CropContext = createContext<CropCtx>({
-  recortar: async (u) => u,
+  // Diagnóstico: se este default for usado, o provider não está envolvendo a tela.
+  recortar: async (u) => {
+    Alert.alert("Crop indisponível", "CropProvider não está envolvendo esta tela.");
+    return u;
+  },
   capturarPaginas: async () => [],
 });
 
@@ -138,8 +142,7 @@ function PaginasModal({
 }) {
   const insets = useSafeAreaInsets();
   return (
-    <Modal visible transparent animationType="slide" onRequestClose={onCancelar}>
-      <View style={pg.fundo}>
+    <View style={pg.fundo}>
         <View style={[pg.caixa, { paddingBottom: insets.bottom + 16 }]}>
           <View style={pg.topo}>
             <Text style={pg.titulo}>
@@ -169,8 +172,7 @@ function PaginasModal({
             <Text style={pg.btnFinalTxt}>Finalizar e extrair</Text>
           </TouchableOpacity>
         </View>
-      </View>
-    </Modal>
+    </View>
   );
 }
 
@@ -293,8 +295,7 @@ function CropModal({
   const pronto = !!dim && !!rect;
 
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={onCancel}>
-      <View style={[s.fundo, { paddingTop: Math.max(insets.top, 24) }]}>
+    <View style={[s.fundo, { paddingTop: Math.max(insets.top, 24) }]}>
         <Text style={s.titulo}>Selecione a área do exame</Text>
 
         <View style={{ width: boxW, height: boxH }}>
@@ -352,13 +353,12 @@ function CropModal({
             )}
           </TouchableOpacity>
         </View>
-      </View>
-    </Modal>
+    </View>
   );
 }
 
 const s = StyleSheet.create({
-  fundo: { flex: 1, backgroundColor: "#000" },
+  fundo: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#000", zIndex: 1000, elevation: 1000 },
   titulo: { color: "#FFF", fontSize: 16, fontWeight: "600", textAlign: "center", paddingVertical: 12 },
   dim: { position: "absolute", backgroundColor: "rgba(0,0,0,0.55)" },
   moldura: { position: "absolute", borderWidth: 2, borderColor: "#FFF" },
@@ -403,7 +403,17 @@ const s = StyleSheet.create({
 });
 
 const pg = StyleSheet.create({
-  fundo: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" },
+  fundo: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "flex-end",
+    zIndex: 1000,
+    elevation: 1000,
+  },
   caixa: {
     backgroundColor: "#FFFFFF",
     borderTopLeftRadius: Radius.card,
