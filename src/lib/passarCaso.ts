@@ -1,6 +1,6 @@
 import { type Anotacao, type Paciente } from "@/types/paciente";
 
-import { abreviarLab, agruparPorExame, ordemLab } from "./lab";
+import { abreviarLab, agruparPorExame, ordemLab, valorSemUnidade } from "./lab";
 import { textoComDiaAtual } from "./medicamentoDia";
 
 /**
@@ -213,8 +213,9 @@ function labsAlterados(p: Paciente): LabAlterado[] {
     if (!ref) continue;
     const v = num(valor);
     if (v == null) continue;
-    if (v > ref.max) out.push({ exame, valor, seta: "alta" });
-    else if (v < ref.min) out.push({ exame, valor, seta: "baixa" });
+    const valorLimpo = valorSemUnidade(valor); // só o número (sem unidade)
+    if (v > ref.max) out.push({ exame, valor: valorLimpo, seta: "alta" });
+    else if (v < ref.min) out.push({ exame, valor: valorLimpo, seta: "baixa" });
   }
   return out.sort((a, b) => ordemLab(a.exame) - ordemLab(b.exame)); // ordem clínica (BUG 9)
 }

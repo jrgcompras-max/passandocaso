@@ -229,6 +229,18 @@ export function unidadeExibicaoLab(exame: string): string {
   return unidadePadraoLab(abreviarLab(exame)) ?? "";
 }
 
+/**
+ * Remove a unidade de um valor, preservando o número como digitado (vírgula
+ * decimal e milhares). Para dados antigos que guardavam "14 g/dL" → "14",
+ * "42,6 %" → "42,6", "<0,3 mg/dL" → "<0,3". Valores qualitativos
+ * (ex.: "positivo", "raros bacilos") são mantidos inteiros.
+ */
+export function valorSemUnidade(valor: string): string {
+  const t = String(valor ?? "").trim();
+  const m = t.match(/^[<>]?\s*-?\d[\d.,]*/);
+  return m ? m[0].replace(/\s+/g, "") : t;
+}
+
 /** Extrai o primeiro número de um valor (aceita vírgula decimal). */
 function num(v: string): number | null {
   const m = String(v).replace(",", ".").match(/-?\d+(\.\d+)?/);

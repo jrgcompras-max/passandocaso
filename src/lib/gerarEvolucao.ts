@@ -10,7 +10,7 @@ import {
 } from "@/types/paciente";
 
 import { formatarDataBR, limparDataEmTexto } from "./datas";
-import { abreviarLab, agruparPorExame, grupoLab, ordemLab } from "./lab";
+import { abreviarLab, agruparPorExame, grupoLab, ordemLab, valorSemUnidade } from "./lab";
 import { textoComDiaAtual } from "./medicamentoDia";
 
 type Bloco = { titulo: string; itens: string[] };
@@ -229,7 +229,8 @@ function laboratorioLinha(p: Paciente): string {
   for (const d of datas) {
     // 1 valor por exame na data (dedup por nome canônico), em ordem clínica.
     const mapa = new Map<string, string>();
-    for (const { exame, valor } of porData.get(d) || []) mapa.set(abreviarLab(exame), valor);
+    for (const { exame, valor } of porData.get(d) || [])
+      mapa.set(abreviarLab(exame), valorSemUnidade(valor)); // só o número (sem unidade)
     const labs = [...mapa.entries()]
       .sort((a, b) => ordemLab(a[0]) - ordemLab(b[0]))
       .map(([nome, valor]) => `${nome} ${valor}`);
