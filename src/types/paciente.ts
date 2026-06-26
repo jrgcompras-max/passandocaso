@@ -109,6 +109,9 @@ export type Medicamento = {
   /** Data de início do uso (YYYY-MM-DD) — âncora do D+ dinâmico (BUG 7).
    * D+ = hoje - dataInicio + 1; calculado na exibição, avança sozinho. */
   dataInicio?: string;
+  /** Data de término (YYYY-MM-DD) — medicamento finalizado/suspenso (FEATURE).
+   * Sai dos ativos; exibido como "até D{N}". Histórico preservado. */
+  finalizadoEm?: string;
 };
 
 /** Resultado laboratorial pontual (exame + data + valor), para evolução temporal. */

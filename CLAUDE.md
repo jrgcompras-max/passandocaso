@@ -79,10 +79,10 @@ Subtítulo automático: `Nome abreviado · Idade · Leito · D+`.
 Fonte de verdade: `backend/templates/passar-o-caso.template.js`.
 
 Estrutura e ordem:
-1. HDA — uma linha de contexto resumida.
-2. Atual — problemas ativos ("ativo"/"resolvendo"), um por linha.
-3. Comorbidades (chips).
-4. MUC (chips, separado de Comorbidades).
+1. Atual — problemas ativos ("ativo"/"resolvendo"), um por linha.
+2. Comorbidades (chips).
+3. MUC (chips, separado de Comorbidades).
+4. HDA — uma linha de contexto resumida.
 5. Sinais vitais alterados — só os fora do normal, em badges vermelhos.
 6. Exame físico — só os chips marcados; não exibe seções vazias.
 7. Labs alterados — só fora do normal, com seta ↑/↓.

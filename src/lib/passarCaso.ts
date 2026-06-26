@@ -116,6 +116,7 @@ export function ehAntibiotico(texto?: string, classe?: string): boolean {
 function antibioticos(p: Paciente): string[] {
   const out: string[] = [];
   for (const m of p.medicamentos || []) {
+    if (m.finalizadoEm) continue; // suspenso → fora do "em uso" (FEATURE)
     if (ehAntibiotico(m.texto, m.classe)) out.push(textoComDiaAtual(m).trim());
   }
   const sec = p.secoes?.prescricaoHospitalar;
@@ -133,6 +134,7 @@ function antibioticos(p: Paciente): string[] {
 function medicamentosEmUso(p: Paciente): string[] {
   const out: string[] = [];
   for (const m of p.medicamentos || []) {
+    if (m.finalizadoEm) continue; // suspenso → fora do "em uso" (FEATURE)
     if (!ehAntibiotico(m.texto, m.classe)) out.push(textoComDiaAtual(m).trim());
   }
   const sec = p.secoes?.prescricaoHospitalar;

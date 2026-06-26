@@ -64,7 +64,10 @@ export function ancorarDiaUso(meds: Medicamento[], hoje = hojeISO()): Medicament
 export function textoComDiaAtual(m: Medicamento, hoje = hojeISO()): string {
   const p = parseDiaUso(m.texto);
   if (!p || !m.dataInicio) return m.texto;
-  const dia = diaAtual(m.dataInicio, hoje);
-  const novoDmais = `D${dia}${p.total != null ? `/${p.total}` : ""}`;
-  return m.texto.replace(RE_DIA, novoDmais);
+  const total = p.total != null ? `/${p.total}` : "";
+  // FEATURE: finalizado → "até D{dia no término}"; ativo → D+ de hoje.
+  if (m.finalizadoEm) {
+    return m.texto.replace(RE_DIA, `até D${diaAtual(m.dataInicio, m.finalizadoEm)}${total}`);
+  }
+  return m.texto.replace(RE_DIA, `D${diaAtual(m.dataInicio, hoje)}${total}`);
 }

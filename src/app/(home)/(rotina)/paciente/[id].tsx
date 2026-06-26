@@ -4551,6 +4551,38 @@ function PrescricaoSecao({
     }
   };
 
+  // FEATURE: segurar o medicamento → Finalizar (término = hoje) ou Excluir.
+  const menuMedicamento = (m: Medicamento) => {
+    Alert.alert(m.texto, undefined, [
+      {
+        text: `Finalizar (hoje, ${formatarDataBR(hojeISO())})`,
+        onPress: () =>
+          onChange(
+            medicamentos.map((x) =>
+              x.id === m.id ? { ...x, finalizadoEm: hojeISO() } : x,
+            ),
+          ),
+      },
+      {
+        text: "Excluir",
+        style: "destructive",
+        onPress: () => onChange(medicamentos.filter((x) => x.id !== m.id)),
+      },
+      { text: "Cancelar", style: "cancel" },
+    ]);
+  };
+  const reativarMedicamento = (m: Medicamento) =>
+    onChange(
+      medicamentos.map((x) => {
+        if (x.id !== m.id) return x;
+        const { finalizadoEm, ...resto } = x;
+        return resto;
+      }),
+    );
+
+  const ativos = medicamentos.filter((m) => !m.finalizadoEm);
+  const suspensos = medicamentos.filter((m) => m.finalizadoEm);
+
   return (
     <View style={styles.prescBox}>
       <View style={styles.medLabelLinha}>
@@ -4595,7 +4627,7 @@ function PrescricaoSecao({
         </View>
       )}
 
-      {medicamentos.map((m) => {
+      {ativos.map((m) => {
         const sev = severidadeDoMed(m.texto, interacoes);
         const pos = posologias[m.id];
         const txtPos = pos ? textoPosologia(pos) : "";
@@ -4678,7 +4710,17 @@ function PrescricaoSecao({
             )}
           </View>
         );
-        if (!sel.selecionando) return <View key={m.id}>{card}</View>;
+        if (!sel.selecionando)
+          return (
+            <TouchableOpacity
+              key={m.id}
+              activeOpacity={1}
+              onLongPress={() => menuMedicamento(m)}
+              delayLongPress={400}
+            >
+              {card}
+            </TouchableOpacity>
+          );
         return (
           <TouchableOpacity
             key={m.id}
@@ -4691,6 +4733,24 @@ function PrescricaoSecao({
           </TouchableOpacity>
         );
       })}
+
+      {/* FEATURE: medicamentos suspensos (histórico preservado; "até D{N}"). */}
+      {suspensos.length > 0 && (
+        <View style={styles.suspensosBox}>
+          <Text style={styles.suspensosLabel}>Suspensos</Text>
+          {suspensos.map((m) => (
+            <TouchableOpacity
+              key={m.id}
+              activeOpacity={0.6}
+              onLongPress={() => reativarMedicamento(m)}
+              delayLongPress={400}
+            >
+              <Text style={styles.suspensoTexto}>{textoComDiaAtual(m)}</Text>
+            </TouchableOpacity>
+          ))}
+          <Text style={styles.suspensosDica}>Segure um item para reativar.</Text>
+        </View>
+      )}
 
       {sel.selecionando && (
         <BarraSelecao
@@ -5945,6 +6005,28 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   medTexto: { fontSize: 14, color: ClinicalColors.text },
+  // FEATURE: medicamentos suspensos.
+  suspensosBox: {
+    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: BorderWidth.hairline,
+    borderTopColor: ClinicalColors.border,
+  },
+  suspensosLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: ClinicalColors.textMuted,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  suspensoTexto: {
+    fontSize: 14,
+    color: ClinicalColors.textMuted,
+    paddingVertical: 5,
+    textDecorationLine: "line-through",
+  },
+  suspensosDica: { fontSize: 11, color: ClinicalColors.textMuted, fontStyle: "italic", marginTop: 4 },
   badgeInteracao: {
     flexDirection: "row",
     alignItems: "center",
