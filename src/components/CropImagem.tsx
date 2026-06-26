@@ -4,7 +4,6 @@ import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Image,
   PanResponder,
   ScrollView,
@@ -31,11 +30,7 @@ type CropCtx = {
   capturarPaginas: () => Promise<string[]>;
 };
 const CropContext = createContext<CropCtx>({
-  // Diagnóstico: se este default for usado, o provider não está envolvendo a tela.
-  recortar: async (u) => {
-    Alert.alert("Crop indisponível", "CropProvider não está envolvendo esta tela.");
-    return u;
-  },
+  recortar: async (u) => u,
   capturarPaginas: async () => [],
 });
 
