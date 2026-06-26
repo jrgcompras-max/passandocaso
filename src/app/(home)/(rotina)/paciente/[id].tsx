@@ -2539,21 +2539,32 @@ function ExameComChips({
   const selecionadoNorm = new Set(chipsSelecionados.map(normMerge));
   const livre = juntarTermos(tokens.filter((t) => !normConhecidos.has(normMerge(t))));
 
+  // BUG: a caixa "Achados adicionais" precisa de estado LOCAL — o valor salvo é
+  // normalizado (trim a cada tecla), o que apagava o espaço antes da palavra
+  // seguinte. Aqui o input mostra o texto como digitado; o store só normaliza.
+  const [livreLocal, setLivreLocal] = useState(livre);
+  useEffect(() => {
+    // Re-sincroniza apenas quando o conteúdo muda POR FORA (chip toggle, scan),
+    // sem clobberar o espaço que o usuário está digitando.
+    if (livre.trim() !== livreLocal.trim()) setLivreLocal(livre);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [livre]);
+
   const recompor = (novosChips: string[], novoLivre: string) =>
     onChange(juntarTermos([...novosChips, novoLivre]));
 
   const toggle = (chip: string) => {
     if (selecionadoNorm.has(normMerge(chip))) {
-      recompor(chipsSelecionados.filter((t) => normMerge(t) !== normMerge(chip)), livre);
+      recompor(chipsSelecionados.filter((t) => normMerge(t) !== normMerge(chip)), livreLocal);
     } else {
-      recompor([...chipsSelecionados, chip], livre);
+      recompor([...chipsSelecionados, chip], livreLocal);
     }
   };
 
   // Termos do texto livre alimentam o aprendizado (Feature 2). Evita re-logar.
   const aoSair = () => {
     onBlur();
-    const termos = livre
+    const termos = livreLocal
       .split(/\s*[,;]\s*/)
       .map((t) => t.trim())
       .filter((t) => normMerge(t).length >= 3 && !jaLogados.current.has(normMerge(t)));
@@ -2595,8 +2606,11 @@ function ExameComChips({
       </View>
       <TextInput
         style={[styles.campoInput, styles.exameLivre]}
-        value={livre}
-        onChangeText={(t) => recompor(chipsSelecionados, t)}
+        value={livreLocal}
+        onChangeText={(t) => {
+          setLivreLocal(t);
+          recompor(chipsSelecionados, t);
+        }}
         onBlur={aoSair}
         placeholder="Achados adicionais (texto livre)…"
         placeholderTextColor={ClinicalColors.textMuted}
