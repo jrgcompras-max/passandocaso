@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import {
@@ -6,6 +7,7 @@ import {
   Image,
   Modal,
   PanResponder,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -23,12 +25,23 @@ import { ClinicalColors as C, Radius } from "@/constants/clinicalTheme";
  * via expo-image-manipulator (OTA, sem build nativo novo).
  */
 
-type CropCtx = { recortar: (uri: string) => Promise<string | null> };
-const CropContext = createContext<CropCtx>({ recortar: async (u) => u });
+type CropCtx = {
+  recortar: (uri: string) => Promise<string | null>;
+  /** Captura múltiplas páginas (câmera → crop → revisão), em ordem. */
+  capturarPaginas: () => Promise<string[]>;
+};
+const CropContext = createContext<CropCtx>({
+  recortar: async (u) => u,
+  capturarPaginas: async () => [],
+});
 
 /** Hook: `const recortar = useCrop()` → `await recortar(uri)` (null = refazer/cancelar). */
 export function useCrop(): (uri: string) => Promise<string | null> {
   return useContext(CropContext).recortar;
+}
+/** Hook: captura de laudo com várias páginas → array de URIs cortadas (em ordem). */
+export function useCapturaPaginas(): () => Promise<string[]> {
+  return useContext(CropContext).capturarPaginas;
 }
 
 export function CropProvider({ children }: { children: ReactNode }) {
@@ -40,8 +53,47 @@ export function CropProvider({ children }: { children: ReactNode }) {
   const recortar = (uri: string) =>
     new Promise<string | null>((resolver) => setPedido({ uri, resolver }));
 
+  // Captura UMA página: câmera → crop; "Tirar de novo" reabre a câmera (loop).
+  const capturarUma = async (): Promise<string | null> => {
+    for (;;) {
+      const perm = await ImagePicker.requestCameraPermissionsAsync();
+      if (!perm.granted) return null;
+      const r = await ImagePicker.launchCameraAsync({ quality: 0.5 });
+      if (r.canceled) return null;
+      const cortada = await recortar(r.assets[0].uri);
+      if (cortada) return cortada;
+    }
+  };
+
+  // ── Multi-página (laudo com várias fotos) ──────────────────────────────────
+  const [paginas, setPaginas] = useState<string[] | null>(null);
+  const resolverPaginas = useRef<((p: string[]) => void) | null>(null);
+
+  const capturarPaginas = async (): Promise<string[]> => {
+    const primeira = await capturarUma();
+    if (!primeira) return [];
+    return new Promise<string[]>((resolve) => {
+      resolverPaginas.current = resolve;
+      setPaginas([primeira]);
+    });
+  };
+  const adicionarPagina = async () => {
+    const nova = await capturarUma();
+    if (nova) setPaginas((p) => [...(p ?? []), nova]);
+  };
+  const finalizarPaginas = () => {
+    resolverPaginas.current?.(paginas ?? []);
+    resolverPaginas.current = null;
+    setPaginas(null);
+  };
+  const cancelarPaginas = () => {
+    resolverPaginas.current?.([]);
+    resolverPaginas.current = null;
+    setPaginas(null);
+  };
+
   return (
-    <CropContext.Provider value={{ recortar }}>
+    <CropContext.Provider value={{ recortar, capturarPaginas }}>
       {children}
       {pedido && (
         <CropModal
@@ -56,7 +108,69 @@ export function CropProvider({ children }: { children: ReactNode }) {
           }}
         />
       )}
+      {/* Revisão das páginas — escondida enquanto o crop está aberto. */}
+      {paginas && !pedido && (
+        <PaginasModal
+          paginas={paginas}
+          onAdicionar={adicionarPagina}
+          onRemover={(i) => setPaginas((p) => (p ? p.filter((_, j) => j !== i) : p))}
+          onFinalizar={finalizarPaginas}
+          onCancelar={cancelarPaginas}
+        />
+      )}
     </CropContext.Provider>
+  );
+}
+
+/** Revisão das páginas do laudo: miniaturas, remover, adicionar, finalizar. */
+function PaginasModal({
+  paginas,
+  onAdicionar,
+  onRemover,
+  onFinalizar,
+  onCancelar,
+}: {
+  paginas: string[];
+  onAdicionar: () => void;
+  onRemover: (i: number) => void;
+  onFinalizar: () => void;
+  onCancelar: () => void;
+}) {
+  const insets = useSafeAreaInsets();
+  return (
+    <Modal visible transparent animationType="slide" onRequestClose={onCancelar}>
+      <View style={pg.fundo}>
+        <View style={[pg.caixa, { paddingBottom: insets.bottom + 16 }]}>
+          <View style={pg.topo}>
+            <Text style={pg.titulo}>
+              {paginas.length} {paginas.length === 1 ? "página" : "páginas"}
+            </Text>
+            <TouchableOpacity onPress={onCancelar} hitSlop={8}>
+              <Ionicons name="close" size={24} color={C.textMuted} />
+            </TouchableOpacity>
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
+            {paginas.map((uri, i) => (
+              <View key={i} style={pg.thumbWrap}>
+                <Image source={{ uri }} style={pg.thumb} resizeMode="cover" />
+                <Text style={pg.thumbNum}>Página {i + 1}</Text>
+                <TouchableOpacity style={pg.thumbX} onPress={() => onRemover(i)} hitSlop={6}>
+                  <Ionicons name="close-circle" size={22} color="#FFF" />
+                </TouchableOpacity>
+              </View>
+            ))}
+            <TouchableOpacity style={pg.addCard} onPress={onAdicionar}>
+              <Ionicons name="add" size={28} color={C.primary} />
+              <Text style={pg.addTxt}>Adicionar{"\n"}página</Text>
+            </TouchableOpacity>
+          </ScrollView>
+          <TouchableOpacity style={pg.btnFinal} onPress={onFinalizar}>
+            <Ionicons name="checkmark" size={18} color="#FFF" />
+            <Text style={pg.btnFinalTxt}>Finalizar e extrair</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -286,4 +400,46 @@ const s = StyleSheet.create({
     backgroundColor: C.primary,
   },
   btnPrimTxt: { color: "#FFF", fontSize: 15, fontWeight: "700" },
+});
+
+const pg = StyleSheet.create({
+  fundo: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" },
+  caixa: {
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: Radius.card,
+    borderTopRightRadius: Radius.card,
+    padding: 20,
+  },
+  topo: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 14,
+  },
+  titulo: { fontSize: 18, fontWeight: "700", color: C.text },
+  thumbWrap: { marginRight: 10, alignItems: "center" },
+  thumb: { width: 92, height: 120, borderRadius: 8, backgroundColor: "#EEE" },
+  thumbNum: { fontSize: 11, color: C.textMuted, marginTop: 4 },
+  thumbX: { position: "absolute", top: -6, right: -6, backgroundColor: "#A32D2D", borderRadius: 11 },
+  addCard: {
+    width: 92,
+    height: 120,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderStyle: "dashed",
+    borderColor: C.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  addTxt: { fontSize: 12, color: C.primary, fontWeight: "600", textAlign: "center", marginTop: 2 },
+  btnFinal: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 14,
+    borderRadius: Radius.badge,
+    backgroundColor: C.primary,
+  },
+  btnFinalTxt: { color: "#FFF", fontSize: 16, fontWeight: "700" },
 });

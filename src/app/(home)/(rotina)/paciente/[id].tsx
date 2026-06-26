@@ -50,7 +50,7 @@ import { brParaISO, diaDeInternacao, formatarDataBR, hojeISO, limparDataEmTexto,
 import { extrairDadosImagem } from "@/lib/extrairDadosImagem";
 import { formatarNome } from "@/lib/formatarNome";
 import { gerarResumoIA } from "@/lib/gerarResumoIA";
-import { useCrop } from "@/components/CropImagem";
+import { useCrop, useCapturaPaginas } from "@/components/CropImagem";
 import { converterParaJpegBase64 } from "@/lib/imagem";
 import { abreviarLab, agruparPorExame, type ExameSerie, GRUPOS_LAB, grupoLab, ordemLab, TENDENCIA_INFO, unidadeExibicaoLab } from "@/lib/lab";
 import {
@@ -1755,6 +1755,7 @@ function SecaoExpansivel({
 }) {
   const [aberto, setAberto] = useSecaoAccordion(secaoId);
   const recortar = useCrop();
+  const capturarPaginas = useCapturaPaginas();
   const [rascunho, setRascunho] = useState("");
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [extraindo, setExtraindo] = useState(false);
@@ -1959,7 +1960,42 @@ function SecaoExpansivel({
     setExtraindo(false);
   };
 
+  // FEATURE: laudo de imagem com VÁRIAS páginas — extrai cada uma e concatena
+  // o texto num único exame (na ordem das páginas).
+  const fotografarLaudoMultiplo = async () => {
+    const paginas = await capturarPaginas();
+    if (!paginas.length) return;
+    setExtraindo(true);
+    setErro(null);
+    setAviso(null);
+    try {
+      const blocos: Bloco[] = [];
+      for (let i = 0; i < paginas.length; i++) {
+        setProgresso(`Extraindo página ${i + 1} de ${paginas.length}…`);
+        const base64 = await converterParaJpegBase64(paginas[i]);
+        const json = await extrairDadosImagem<{ blocos?: Bloco[] }>(
+          base64,
+          `${instrucao} ${SUFIXO_JSON}`,
+          secaoId,
+        );
+        for (const b of json.blocos ?? []) blocos.push(b);
+      }
+      // Concatena num ÚNICO laudo: nome da 1ª página com título; itens em ordem.
+      const titulo = blocos.find((b) => b.titulo?.trim())?.titulo?.trim() || "Exame";
+      const itens = blocos.flatMap((b) => b.itens || []);
+      if (itens.length) {
+        onExtraido(JSON.stringify(mergeBlocos(extraido, [{ titulo, itens }])));
+      }
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : String(e));
+    }
+    setProgresso(null);
+    setExtraindo(false);
+  };
+
   const fotografar = async () => {
+    // Seção Imagem: fluxo de múltiplas páginas (um laudo por vários scans).
+    if (secaoId === "imagem") return fotografarLaudoMultiplo();
     const permissao = await ImagePicker.requestCameraPermissionsAsync();
     if (!permissao.granted) {
       setErro(
