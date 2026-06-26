@@ -175,6 +175,49 @@ export function grupoLab(nome: string): GrupoLab {
   return GRUPO_RE.find((g) => g.re.test(n))?.grupo ?? "OUTROS";
 }
 
+/**
+ * Unidade PADRÃO de cada lab, por sigla canônica (saída de `abreviarLab`).
+ * Fonte ÚNICA. Usada para decidir, no scan, se a unidade lida é a do sistema
+ * (guarda só o número) ou diferente (cria estrutura própria, sem converter).
+ */
+const UNIDADE_PADRAO: Record<string, string> = {
+  Hb: "g/dL", Ht: "%", LT: "/mm³", Plaq: "/mm³", Bast: "/mm³", Seg: "/mm³",
+  Linf: "/mm³", "Monó": "/mm³", Eos: "/mm³", "Basóf": "/mm³", Hemácias: "milhões/mm³",
+  VCM: "fL", HCM: "pg", CHCM: "g/dL", RDW: "%",
+  Na: "mEq/L", K: "mEq/L", Cl: "mEq/L", Mg: "mg/dL", Ca: "mg/dL",
+  U: "mg/dL", Cr: "mg/dL", TFG: "mL/min/1,73m²",
+  PCR: "mg/L", VHS: "mm/h",
+  Glic: "mg/dL", HbA1c: "%",
+  TGO: "U/L", TGP: "U/L", FA: "U/L", GGT: "U/L",
+  BT: "mg/dL", BD: "mg/dL", BI: "mg/dL", Alb: "g/dL",
+  INR: "", TAP: "segundos", TTPA: "segundos",
+  Lactato: "mmol/L", LDH: "U/L",
+  HCO3: "mEq/L", SatO2: "%",
+};
+
+/** Unidade padrão do lab (por sigla canônica) ou null se não cadastrado. */
+export function unidadePadraoLab(codigo: string): string | null {
+  const c = (codigo || "").trim();
+  return Object.prototype.hasOwnProperty.call(UNIDADE_PADRAO, c)
+    ? UNIDADE_PADRAO[c]
+    : null;
+}
+
+/** Normaliza uma unidade p/ comparação (caixa, espaços, µ→u, ³→3, ²→2). */
+function normUnidade(u: string): string {
+  return (u || "")
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .replace(/µ|μ/g, "u")
+    .replace(/³/g, "3")
+    .replace(/²/g, "2");
+}
+
+/** Duas unidades são a mesma? (comparação tolerante; NÃO converte valores). */
+export function mesmaUnidade(a: string, b: string): boolean {
+  return normUnidade(a) === normUnidade(b);
+}
+
 /** Extrai o primeiro número de um valor (aceita vírgula decimal). */
 function num(v: string): number | null {
   const m = String(v).replace(",", ".").match(/-?\d+(\.\d+)?/);

@@ -3497,11 +3497,6 @@ function setaRefLab(
   return { seta: c.status === "sem_referencia" ? "" : c.seta, cor: c.cor };
 }
 
-/** Une o valor numérico à unidade do campo, p/ armazenar no resultadosLab. */
-function valorComUnidade(campo: { unidade: string }, valor: string): string {
-  const v = valor.trim();
-  return campo.unidade ? `${v} ${campo.unidade}` : v;
-}
 
 /** Rótulo curto de data ISO → "20 jun". */
 function rotuloDiaMes(iso: string): string {
@@ -3643,11 +3638,13 @@ function LabsPorData({
     for (const c of LAB_CAMPOS) {
       const v = (form[c.key] || "").trim();
       if (v) {
+        // Guarda só o número (a unidade do campo é a padrão do sistema). Mantém
+        // os valores limpos em todas as telas (consistente com o scan).
         novosHoje.push({
           id: `${hoje}-${c.key}`,
           exame: c.key,
           data: hoje,
-          valor: valorComUnidade(c, v),
+          valor: v,
         });
       }
     }

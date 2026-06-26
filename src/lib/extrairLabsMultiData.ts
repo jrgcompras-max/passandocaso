@@ -1,6 +1,7 @@
 import { type ResultadoLab } from "@/types/paciente";
 
 import { hojeISO } from "./datas";
+import { abreviarLab, mesmaUnidade, unidadePadraoLab } from "./lab";
 import { apiFetch } from "./sessao";
 
 /**
@@ -80,14 +81,42 @@ export function mesclarResultadosLab(
     const iso = ddmmParaISO(data, dataPadraoISO);
     for (const e of exames) {
       if (!e?.nome || e.valor == null || String(e.valor).trim() === "") continue;
-      const k = chave(e.nome, iso);
+      const { numero, unidade } = separarValorUnidade(e.valor, e.unidade);
+      if (!numero) continue;
+      // BUG 2: NUNCA converte. Sigla canônica + unidade padrão do sistema.
+      const codigo = abreviarLab(e.nome.trim());
+      const padrao = unidadePadraoLab(codigo);
+      // Unidade igual à padrão (ou ausente) → guarda só o número, sob a sigla.
+      // Unidade diferente → estrutura PRÓPRIA "Sigla (unidade)", para não
+      // misturar com a padrão; preserva o dado original como lido.
+      const ehPadrao =
+        !unidade || (padrao != null && mesmaUnidade(unidade, padrao));
+      const exameFinal = ehPadrao ? codigo : `${codigo} (${unidade})`;
+      const k = chave(exameFinal, iso);
       if (vistos.has(k)) continue;
       vistos.add(k);
-      const valor = e.unidade
-        ? `${String(e.valor).trim()} ${e.unidade}`
-        : String(e.valor).trim();
-      out.push({ id: gerarId(), exame: e.nome.trim(), data: iso, valor });
+      out.push({ id: gerarId(), exame: exameFinal, data: iso, valor: numero });
     }
   }
   return out;
+}
+
+/**
+ * Separa o número da unidade. A IA já costuma devolver `unidade` à parte, mas a
+ * unidade às vezes vem grudada no valor ("14 g/dL"); aqui tratamos os dois.
+ * Preserva o formato original do número (vírgula decimal, sinal, < / >).
+ */
+function separarValorUnidade(
+  valorBruto: string,
+  unidadeBruta?: string | null,
+): { numero: string; unidade: string } {
+  const v = String(valorBruto ?? "").trim();
+  const m = v.match(/[<>]?\s*-?\d+(?:[.,]\d+)?/);
+  const numero = m ? m[0].replace(/\s+/g, "") : "";
+  let unidade = (unidadeBruta || "").trim();
+  if (!unidade && m) {
+    // Unidade que veio grudada no valor (o resto depois do número).
+    unidade = v.replace(m[0], "").trim();
+  }
+  return { numero, unidade };
 }
