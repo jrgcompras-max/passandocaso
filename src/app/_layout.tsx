@@ -12,6 +12,7 @@ import { useColorScheme, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
+import { CropProvider } from '@/components/CropImagem';
 import { ClinicalColors } from '@/constants/clinicalTheme';
 import { AuthProvider, useAuth } from '@/store/AuthContext';
 
@@ -19,7 +20,9 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AuthProvider>
-        <RootContent />
+        <CropProvider>
+          <RootContent />
+        </CropProvider>
       </AuthProvider>
     </GestureHandlerRootView>
   );

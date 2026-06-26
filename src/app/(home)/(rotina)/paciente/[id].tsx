@@ -50,6 +50,7 @@ import { brParaISO, diaDeInternacao, formatarDataBR, hojeISO, limparDataEmTexto,
 import { extrairDadosImagem } from "@/lib/extrairDadosImagem";
 import { formatarNome } from "@/lib/formatarNome";
 import { gerarResumoIA } from "@/lib/gerarResumoIA";
+import { useCrop } from "@/components/CropImagem";
 import { converterParaJpegBase64 } from "@/lib/imagem";
 import { abreviarLab, agruparPorExame, type ExameSerie, GRUPOS_LAB, grupoLab, ordemLab, TENDENCIA_INFO, unidadeExibicaoLab } from "@/lib/lab";
 import {
@@ -1753,6 +1754,7 @@ function SecaoExpansivel({
   ) => Promise<{ aviso?: string } | void>;
 }) {
   const [aberto, setAberto] = useSecaoAccordion(secaoId);
+  const recortar = useCrop();
   const [rascunho, setRascunho] = useState("");
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [extraindo, setExtraindo] = useState(false);
@@ -1965,8 +1967,16 @@ function SecaoExpansivel({
       );
       return;
     }
-    const result = await ImagePicker.launchCameraAsync({ quality: 0.5 });
-    if (!result.canceled) processarUri(result.assets[0].uri);
+    // Corte antes do scan; "Tirar de novo" reabre a câmera (loop).
+    for (;;) {
+      const result = await ImagePicker.launchCameraAsync({ quality: 0.5 });
+      if (result.canceled) return;
+      const cortada = await recortar(result.assets[0].uri);
+      if (cortada) {
+        processarUri(cortada);
+        return;
+      }
+    }
   };
 
   return (
@@ -3561,6 +3571,7 @@ function LabsPorData({
   const [freeNome, setFreeNome] = useState("");
   const [freeValor, setFreeValor] = useState("");
   const [escaneando, setEscaneando] = useState(false);
+  const recortar = useCrop();
   const [verTodos, setVerTodos] = useState(false);
   // BUG 3: data cujo detalhe (todos os exames, agrupados) está aberto no modal.
   const [dataDetalhe, setDataDetalhe] = useState<string | null>(null);
@@ -3647,11 +3658,17 @@ function LabsPorData({
   const escanearLabs = async () => {
     const permissao = await ImagePicker.requestCameraPermissionsAsync();
     if (!permissao.granted) return;
-    const r = await ImagePicker.launchCameraAsync({ quality: 0.5 });
-    if (r.canceled) return;
+    // Corte antes do scan; "Tirar de novo" reabre a câmera (loop).
+    let cortada: string | null = null;
+    for (;;) {
+      const r = await ImagePicker.launchCameraAsync({ quality: 0.5 });
+      if (r.canceled) return;
+      cortada = await recortar(r.assets[0].uri);
+      if (cortada) break;
+    }
     setEscaneando(true);
     try {
-      const base64 = await converterParaJpegBase64(r.assets[0].uri);
+      const base64 = await converterParaJpegBase64(cortada);
       const instrucao =
         SECOES.find((s) => s.id === "examesLaboratoriais")?.instrucao ?? "";
       // O backend retorna JSON estruturado (campos hb, cr, ...) + blocos derivados.

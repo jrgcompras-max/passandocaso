@@ -38,6 +38,7 @@ import { diaDeInternacao } from "@/lib/datas";
 import { formatarNomeHospital } from "@/lib/formatarNomeHospital";
 import { extrairDadosImagem } from "@/lib/extrairDadosImagem";
 import { formatarNome } from "@/lib/formatarNome";
+import { useCrop } from "@/components/CropImagem";
 import { converterParaJpegBase64 } from "@/lib/imagem";
 import { ModalMigracao } from "@/components/ModalMigracao";
 import { PassarPlantaoModal } from "@/components/PassarPlantaoModal";
@@ -188,6 +189,7 @@ export default function Index() {
     desarquivarPaciente,
   } = usePacientes();
   const [verArquivados, setVerArquivados] = useState(false);
+  const recortar = useCrop();
   const {
     hospitais,
     hospitalAtivo,
@@ -467,8 +469,16 @@ export default function Index() {
       );
       return;
     }
-    const result = await ImagePicker.launchCameraAsync({ quality: 0.5 });
-    if (!result.canceled) processarImagem(result.assets[0].uri);
+    // Corte antes do scan; "Tirar de novo" reabre a câmera (loop).
+    for (;;) {
+      const result = await ImagePicker.launchCameraAsync({ quality: 0.5 });
+      if (result.canceled) return;
+      const cortada = await recortar(result.assets[0].uri);
+      if (cortada) {
+        processarImagem(cortada);
+        return;
+      }
+    }
   };
 
   const abrirModal = () => {
