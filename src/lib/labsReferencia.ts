@@ -26,11 +26,11 @@ export type ClassificacaoLab = {
   cor: string;
 };
 
-// Cores em hex. Alto = vermelho, baixo = azul, normal = preto (cor padrão do
-// texto — antes era cinza, confundia com o azul do "baixo"; BUG 3). Sem
-// referência = cinza (estado neutro "não interpretado").
-const COR = { alto: "#A32D2D", baixo: "#1A6B8A", normal: "#000000", cinza: "#64748B" };
-const SEM_REF: ClassificacaoLab = { status: "sem_referencia", seta: "→", cor: COR.cinza };
+// Cores em hex. Alto = vermelho, baixo = azul, normal = preto. Sem referência
+// TAMBÉM = preto (BUG 4: nunca cinza — sem cinza não confunde com nada; só
+// alto/baixo recebem cor). Seta só em alto (↑) / baixo (↓).
+const COR = { alto: "#A32D2D", baixo: "#1A6B8A", normal: "#000000" };
+const SEM_REF: ClassificacaoLab = { status: "sem_referencia", seta: "→", cor: COR.normal };
 
 let cache: RefLab[] | null = null;
 let carregando: Promise<RefLab[]> | null = null;

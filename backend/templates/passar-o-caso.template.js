@@ -11,10 +11,10 @@ const SUBTITULO = "nomeAbreviado · idade · leito · D{dia}";
 
 // Ordem canônica dos cards.
 const ORDEM = [
-  { chave: "hda", label: "HDA", tipo: "linha" },
   { chave: "atual", label: "Atual", tipo: "lista-bullet-azul" },
   { chave: "comorbidades", label: "Comorbidades", tipo: "chips" },
   { chave: "muc", label: "MUC", tipo: "chips" },
+  { chave: "hda", label: "HDA", tipo: "linha" },
   { chave: "ssvvAlterados", label: "Sinais vitais alterados", tipo: "badges-vermelho" },
   { chave: "exameFisico", label: "Exame físico", tipo: "chips-marcados" },
   { chave: "labsAlterados", label: "Labs alterados", tipo: "labs-seta" },

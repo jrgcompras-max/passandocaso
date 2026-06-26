@@ -140,12 +140,7 @@ export default function PassarCaso() {
       >
         {!caso ? null : (
           <>
-            {!!caso.hda && (
-              <Card label="HDA">
-                <Text style={s.hdaTexto}>{hdaResumo || caso.hda}</Text>
-              </Card>
-            )}
-
+            {/* BUG 2: ordem — Atual, Comorbidades, MUC, HDA. */}
             {caso.atual.length > 0 && (
               <Card label="Atual">
                 <Bullets itens={caso.atual} />
@@ -161,6 +156,12 @@ export default function PassarCaso() {
             {caso.muc.length > 0 && (
               <Card label="MUC">
                 <Chips itens={caso.muc} />
+              </Card>
+            )}
+
+            {!!caso.hda && (
+              <Card label="HDA">
+                <Text style={s.hdaTexto}>{hdaResumo || caso.hda}</Text>
               </Card>
             )}
 

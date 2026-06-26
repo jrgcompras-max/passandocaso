@@ -3494,7 +3494,9 @@ function setaRefLab(
   idade?: number | null,
 ): { seta: string; cor: string } {
   const c = classificarLabSync(abreviarLab(nome), valor, sexo, idade);
-  return { seta: c.status === "sem_referencia" ? "" : c.seta, cor: c.cor };
+  // BUG 4: seta SÓ em alto (↑) / baixo (↓); normal e sem referência não têm seta.
+  const seta = c.status === "alto" || c.status === "baixo" ? c.seta : "";
+  return { seta, cor: c.cor };
 }
 
 
@@ -3514,44 +3516,23 @@ function LabHojeChip({
   label,
   exameKey,
   valor,
-  setaStr,
   sexo,
   idade,
 }: {
   label: string;
   exameKey: string;
   valor: string;
-  setaStr: string | null;
   sexo?: "M" | "F" | null;
   idade?: number | null;
 }) {
-  const [ref, setRef] = useState<ReferenciaLab | null>(null);
-  useEffect(() => {
-    let vivo = true;
-    buscarReferencia(exameKey, sexo ?? undefined).then((r) => {
-      if (vivo) setRef(r);
-    });
-    return () => {
-      vivo = false;
-    };
-  }, [exameKey, sexo]);
-
+  // BUG 4: padrão único — alto ↑ vermelho, baixo ↓ azul, normal só o valor preto.
+  const { seta, cor } = setaRefLab(exameKey, valor, sexo, idade);
   const num = valorNumerico(valor);
-  // Pediátrico (idade < 18): tabela ABIM é de adultos → não interpreta (sem cor).
-  const pediatrico = idade != null && idade < 18;
-  const status = ref && !pediatrico ? statusReferencia(num, ref) : "normal";
-  const cor =
-    status === "atencao"
-      ? "#E65100"
-      : status === "fora"
-        ? "#C77700"
-        : ClinicalColors.text;
-
   return (
     <View style={styles.labHojeChip}>
       <Text style={styles.labHojeLabel}>{label} </Text>
       <Text style={[styles.labHojeValor, { color: cor }]}>{num ?? valor}</Text>
-      {!!setaStr && <Text style={styles.labHojeSeta}> {setaStr}</Text>}
+      {!!seta && <Text style={[styles.labHojeSeta, { color: cor }]}> {seta}</Text>}
     </View>
   );
 }
@@ -3819,7 +3800,6 @@ function LabsPorData({
                       label={e.label}
                       exameKey={e.key}
                       valor={e.valor}
-                      setaStr={seta(e.key, e.valor)}
                       sexo={sexo}
                       idade={idade}
                     />
@@ -5430,7 +5410,8 @@ const styles = StyleSheet.create({
     borderColor: ClinicalColors.border,
   },
   exameChipAtivo: { backgroundColor: ClinicalColors.primary, borderColor: ClinicalColors.primary },
-  exameChipPessoal: { borderColor: ClinicalColors.accent, borderStyle: "dashed" },
+  // BUG 5: chips pessoais usam o estilo padrão (sem borda pontilhada verde).
+  exameChipPessoal: {},
   exameChipTxt: { color: ClinicalColors.text, fontSize: 13 },
   exameChipTxtAtivo: { color: "#FFFFFF", fontWeight: "600" },
   verMaisChip: { paddingVertical: 7, paddingHorizontal: 10 },

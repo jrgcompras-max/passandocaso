@@ -214,11 +214,18 @@ function culturais(p: Paciente): string[] {
  * (ordemLab), quebrando a cada 4 labs com indentação. Abrevia nomes e exclui
  * culturas (vão para "- Culturais:"). Omite exames sem valor.
  */
+// BUG 6: índices/diferencial do hemograma NÃO entram na Evolução Médica
+// (continuam no banco e na ficha). Comparado pela abreviação canônica.
+const LAB_FORA_EVOLUCAO = new Set([
+  "hcm", "chcm", "vcm", "rdw", "seg", "linf", "monó", "mono", "eos", "basóf", "basof",
+]);
+
 function laboratorioLinha(p: Paciente): string {
   const porData = new Map<string, { exame: string; valor: string }[]>();
   for (const r of p.resultadosLab || []) {
     if (!String(r.valor ?? "").trim()) continue;
     if (grupoLab(r.exame) === "CULTURAS") continue;
+    if (LAB_FORA_EVOLUCAO.has(abreviarLab(r.exame).toLowerCase())) continue;
     const d = r.data.slice(0, 10);
     const lista = porData.get(d) ?? [];
     lista.push({ exame: r.exame, valor: String(r.valor).trim() });
