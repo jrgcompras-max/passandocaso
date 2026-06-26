@@ -4481,6 +4481,9 @@ function PrescricaoSecao({
 
   // Segurança farmacológica (informativa). Falhas degradam em silêncio.
   const [interacoes, setInteracoes] = useState<Interacao[]>([]);
+  // BUG 1: assinatura das interações fechadas pelo médico. O card some ao fechar
+  // e reaparece se o conjunto de interações mudar (nova interação identificada).
+  const [interacoesFechadasSig, setInteracoesFechadasSig] = useState<string | null>(null);
   const [posologias, setPosologias] = useState<Record<string, Posologia>>({});
   const [tfg, setTfg] = useState<TFG | null>(null);
   const medTextos = medicamentos.map((m) => m.texto).join("|");
@@ -4704,9 +4707,20 @@ function PrescricaoSecao({
         />
       )}
 
-      {interacoes.length > 0 && !sel.selecionando && (
+      {(() => {
+        const sig = interacoes
+          .map((it) => `${it.medicamentoA}+${it.medicamentoB}`)
+          .sort()
+          .join(";");
+        if (!interacoes.length || sel.selecionando || sig === interacoesFechadasSig) return null;
+        return (
         <View style={styles.interacoesCard}>
-          <Text style={styles.interacoesTitulo}>Interações identificadas ({interacoes.length})</Text>
+          <View style={styles.interacoesTopo}>
+            <Text style={styles.interacoesTitulo}>Interações identificadas ({interacoes.length})</Text>
+            <TouchableOpacity onPress={() => setInteracoesFechadasSig(sig)} hitSlop={8}>
+              <Ionicons name="close" size={18} color={ClinicalColors.textMuted} />
+            </TouchableOpacity>
+          </View>
           {interacoes.map((it, i) => (
             <View key={`${it.medicamentoA}-${it.medicamentoB}-${i}`} style={styles.interacaoItem}>
               <Text style={styles.interacaoNomes}>
@@ -4727,7 +4741,8 @@ function PrescricaoSecao({
             terapêutica.
           </Text>
         </View>
-      )}
+        );
+      })()}
 
     </View>
   );
@@ -5964,11 +5979,16 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 8,
   },
+  interacoesTopo: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
   interacoesTitulo: {
     fontSize: 14,
     fontWeight: "700",
     color: ClinicalColors.text,
-    marginBottom: 8,
   },
   interacaoItem: { marginBottom: 8 },
   interacaoNomes: { fontSize: 13, fontWeight: "600", color: ClinicalColors.text },

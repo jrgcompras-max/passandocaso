@@ -151,43 +151,67 @@ const VITAIS: { key: string; label: string; unidade: string }[] = [
   { key: "fr", label: "FR", unidade: "irpm" },
 ];
 
-function CardVital({
-  cfg,
-  pa,
-  serie,
-  largura,
-}: {
-  cfg: { key: string; label: string; unidade: string };
-  pa?: { sist: number[]; diast: number[]; ultimo: string | null };
-  serie?: SerieVital;
-  largura: number;
-}) {
-  const ehPA = cfg.key === "pa";
-  const ultimo = ehPA ? pa?.ultimo : serie?.ultimo;
-  const linhas = ehPA
-    ? [
-        { valores: pa?.sist ?? [], cor: AZUL },
-        { valores: pa?.diast ?? [], cor: "#7FB3E0" },
-      ]
-    : [{ valores: serie?.valores ?? [], cor: AZUL }];
-  const nPontos = ehPA
-    ? Math.max(pa?.sist.length ?? 0, pa?.diast.length ?? 0)
-    : serie?.valores.length ?? 0;
+// BUG 3: sinal vital em LISTA COMPACTA (label + valor); toque abre modal.
+type VitalDado = {
+  key: string;
+  label: string;
+  unidade: string;
+  ultimo: string | null;
+  linhas: { valores: number[]; cor: string }[];
+  datados: { data: string; valor: string }[];
+  nPontos: number;
+};
 
+function LinhaVital({ v, onAbrir }: { v: VitalDado; onAbrir: () => void }) {
   return (
-    <View style={styles.vitalCard}>
-      <View style={styles.vitalTopo}>
-        <Text style={styles.vitalLabel}>{cfg.label}</Text>
-        <Text style={styles.vitalValor}>
-          {ultimo ?? "—"}
-          <Text style={styles.vitalUnidade}> {cfg.unidade}</Text>
-        </Text>
+    <TouchableOpacity style={styles.labRow} onPress={onAbrir} activeOpacity={0.6}>
+      <Text style={styles.labNome}>{v.label}</Text>
+      <Text style={styles.labValor}>
+        {v.ultimo ?? "—"}
+        <Text style={styles.vitalUnidade}> {v.unidade}</Text>
+      </Text>
+      <Ionicons name="chevron-forward" size={15} color={C.textMuted} />
+    </TouchableOpacity>
+  );
+}
+
+/** Modal do sinal vital (BUG 3): gráfico completo + tabela por data. */
+function ModalVital({
+  v,
+  largura,
+  onFechar,
+}: {
+  v: VitalDado | null;
+  largura: number;
+  onFechar: () => void;
+}) {
+  return (
+    <Modal visible={!!v} transparent animationType="slide" onRequestClose={onFechar}>
+      <View style={styles.modalFundo}>
+        <View style={styles.modalCaixa}>
+          <View style={styles.modalTopo}>
+            <Text style={styles.modalTitulo}>
+              {v?.label} {v?.unidade ? <Text style={styles.vitalUnidade}>({v.unidade})</Text> : null}
+            </Text>
+            <TouchableOpacity onPress={onFechar} hitSlop={8}>
+              <Ionicons name="close" size={22} color={C.textMuted} />
+            </TouchableOpacity>
+          </View>
+          <GraficoLinha linhas={v?.linhas ?? []} largura={largura} altura={130} espessura={2} pontos />
+          {(v?.nPontos ?? 0) < 2 && (
+            <Text style={styles.insuf}>dados insuficientes para tendência</Text>
+          )}
+          <ScrollView style={{ maxHeight: 240, marginTop: 12 }}>
+            {[...(v?.datados ?? [])].reverse().map((p, i) => (
+              <View key={i} style={styles.labHistLinha}>
+                <Text style={styles.labHistData}>{rotuloCurto(p.data)}</Text>
+                <Text style={styles.labHistValor}>{p.valor}</Text>
+              </View>
+            ))}
+          </ScrollView>
+        </View>
       </View>
-      <GraficoLinha linhas={linhas} largura={largura} altura={72} />
-      {nPontos < 2 && (
-        <Text style={styles.insuf}>dados insuficientes para tendência</Text>
-      )}
-    </View>
+    </Modal>
   );
 }
 
@@ -295,6 +319,7 @@ export default function TimelineScreen() {
   const [dias, setDias] = useState(7);
   const [refsOk, setRefsOk] = useState(false);
   const [labSel, setLabSel] = useState<LabSelecionado | null>(null);
+  const [vitalSel, setVitalSel] = useState<VitalDado | null>(null);
 
   // Carrega as referências ABIM (cache global) uma vez.
   useEffect(() => {
@@ -322,36 +347,43 @@ export default function TimelineScreen() {
     [paciente?.sinaisVitais, cutoff],
   );
 
-  const vitais = useMemo(() => {
-    const serie = (fn: (s: SinaisVitaisDia) => string | null | undefined): SerieVital => {
-      const valores = svDias.map(({ sv }) => num(fn(sv))).filter((n): n is number => n != null);
-      let ultimo: string | null = null;
-      for (let i = svDias.length - 1; i >= 0; i--) {
-        const x = fn(svDias[i].sv);
-        if (x != null && String(x).trim()) {
-          ultimo = String(x).trim();
-          break;
-        }
-      }
-      return { valores, ultimo };
-    };
-    const sist = svDias.map(({ sv }) => num(sv?.paSist)).filter((n): n is number => n != null);
-    const diast = svDias.map(({ sv }) => num(sv?.paDiast)).filter((n): n is number => n != null);
-    let paUltimo: string | null = null;
-    for (let i = svDias.length - 1; i >= 0; i--) {
-      const s = svDias[i].sv;
-      if (s?.paSist?.trim() && s?.paDiast?.trim()) {
-        paUltimo = `${s.paSist.trim()}/${s.paDiast.trim()}`;
-        break;
+  const vitaisLista = useMemo((): VitalDado[] => {
+    const out: VitalDado[] = [];
+    for (const cfg of VITAIS) {
+      if (cfg.key === "pa") {
+        const datados = svDias
+          .filter(({ sv }) => sv?.paSist?.trim() && sv?.paDiast?.trim())
+          .map(({ data, sv }) => ({ data, valor: `${sv.paSist.trim()}/${sv.paDiast.trim()}` }));
+        const sist = svDias.map(({ sv }) => num(sv?.paSist)).filter((n): n is number => n != null);
+        const diast = svDias.map(({ sv }) => num(sv?.paDiast)).filter((n): n is number => n != null);
+        if (!sist.length && !diast.length) continue;
+        out.push({
+          ...cfg,
+          ultimo: datados.length ? datados[datados.length - 1].valor : null,
+          linhas: [
+            { valores: sist, cor: AZUL },
+            { valores: diast, cor: "#7FB3E0" },
+          ],
+          datados,
+          nPontos: Math.max(sist.length, diast.length),
+        });
+      } else {
+        const get = (sv: SinaisVitaisDia) => (sv as Record<string, string>)[cfg.key];
+        const datados = svDias
+          .filter(({ sv }) => String(get(sv) ?? "").trim())
+          .map(({ data, sv }) => ({ data, valor: String(get(sv)).trim() }));
+        const valores = datados.map((d) => num(d.valor)).filter((n): n is number => n != null);
+        if (!valores.length) continue;
+        out.push({
+          ...cfg,
+          ultimo: datados.length ? datados[datados.length - 1].valor : null,
+          linhas: [{ valores, cor: AZUL }],
+          datados,
+          nPontos: valores.length,
+        });
       }
     }
-    const outros: Record<string, SerieVital> = {
-      fc: serie((s) => s?.fc),
-      temp: serie((s) => s?.temp),
-      sato2: serie((s) => s?.sato2),
-      fr: serie((s) => s?.fr),
-    };
-    return { pa: { sist, diast, ultimo: paUltimo }, outros };
+    return out;
   }, [svDias]);
 
   // Labs por exame (ASC) dentro da janela, agrupados por tipo na ordem canônica.
@@ -384,11 +416,6 @@ export default function TimelineScreen() {
     }));
   }, [paciente?.resultadosLab, cutoff]);
 
-  const vitaisComDados = VITAIS.filter((cfg) =>
-    cfg.key === "pa"
-      ? vitais.pa.sist.length > 0 || vitais.pa.diast.length > 0
-      : (vitais.outros[cfg.key]?.valores.length ?? 0) > 0,
-  );
 
   return (
     <View style={styles.container}>
@@ -415,25 +442,21 @@ export default function TimelineScreen() {
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 80 }}>
         {!refsOk ? (
           <ActivityIndicator color={C.primary} style={{ marginTop: 40 }} />
-        ) : vitaisComDados.length === 0 && gruposLab.length === 0 ? (
+        ) : vitaisLista.length === 0 && gruposLab.length === 0 ? (
           <Text style={styles.vazio}>
             Sem sinais vitais ou labs registrados nos últimos {dias} dias.
           </Text>
         ) : (
           <>
-            {/* SEÇÃO 1 — SINAIS VITAIS */}
-            {vitaisComDados.length > 0 && (
+            {/* SEÇÃO 1 — SINAIS VITAIS (lista compacta; toque abre o gráfico) */}
+            {vitaisLista.length > 0 && (
               <View style={styles.secao}>
                 <Text style={styles.secaoLabel}>Sinais Vitais</Text>
-                {vitaisComDados.map((cfg) => (
-                  <CardVital
-                    key={cfg.key}
-                    cfg={cfg}
-                    pa={cfg.key === "pa" ? vitais.pa : undefined}
-                    serie={cfg.key === "pa" ? undefined : vitais.outros[cfg.key]}
-                    largura={larguraGrafico}
-                  />
-                ))}
+                <View style={styles.grupoCard}>
+                  {vitaisLista.map((v) => (
+                    <LinhaVital key={v.key} v={v} onAbrir={() => setVitalSel(v)} />
+                  ))}
+                </View>
               </View>
             )}
 
@@ -470,6 +493,7 @@ export default function TimelineScreen() {
         largura={larguraGrafico}
         onFechar={() => setLabSel(null)}
       />
+      <ModalVital v={vitalSel} largura={larguraGrafico} onFechar={() => setVitalSel(null)} />
     </View>
   );
 }
