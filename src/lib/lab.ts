@@ -218,6 +218,17 @@ export function mesmaUnidade(a: string, b: string): boolean {
   return normUnidade(a) === normUnidade(b);
 }
 
+/**
+ * Unidade a EXIBIR para um exame (telas de detalhe). Como o valor guarda só o
+ * número, a unidade vem da estrutura (padrão do sistema). Se o exame já carrega
+ * a unidade no nome (estrutura própria "Sigla (unidade)") ou não tem unidade
+ * (ex.: INR), retorna "" — nada a acrescentar.
+ */
+export function unidadeExibicaoLab(exame: string): string {
+  if (/\(.+\)/.test(exame || "")) return "";
+  return unidadePadraoLab(abreviarLab(exame)) ?? "";
+}
+
 /** Extrai o primeiro número de um valor (aceita vírgula decimal). */
 function num(v: string): number | null {
   const m = String(v).replace(",", ".").match(/-?\d+(\.\d+)?/);

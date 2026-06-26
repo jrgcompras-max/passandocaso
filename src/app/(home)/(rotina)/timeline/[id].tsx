@@ -15,7 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ClinicalColors as C, Radius } from "@/constants/clinicalTheme";
 import { formatarNome } from "@/lib/formatarNome";
-import { abreviarLab, GRUPOS_LAB, grupoLab, ordemLab } from "@/lib/lab";
+import { abreviarLab, GRUPOS_LAB, grupoLab, ordemLab, unidadeExibicaoLab } from "@/lib/lab";
 import {
   classificarLabSync,
   DISCLAIMER_ABIM,
@@ -248,7 +248,12 @@ function ModalLab({
       <View style={styles.modalFundo}>
         <View style={styles.modalCaixa}>
           <View style={styles.modalTopo}>
-            <Text style={styles.modalTitulo}>{lab ? abreviarLab(lab.nome) : ""}</Text>
+            <Text style={styles.modalTitulo}>
+              {lab ? abreviarLab(lab.nome) : ""}
+              {lab && unidadeExibicaoLab(lab.nome) ? (
+                <Text style={styles.modalUnidade}>{`  ${unidadeExibicaoLab(lab.nome)}`}</Text>
+              ) : null}
+            </Text>
             <TouchableOpacity onPress={onFechar} hitSlop={8}>
               <Ionicons name="close" size={22} color={C.textMuted} />
             </TouchableOpacity>
@@ -532,4 +537,5 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   modalTitulo: { fontSize: 18, fontWeight: "700", color: C.text },
+  modalUnidade: { fontSize: 14, fontWeight: "500", color: C.textMuted },
 });

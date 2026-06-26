@@ -51,7 +51,7 @@ import { extrairDadosImagem } from "@/lib/extrairDadosImagem";
 import { formatarNome } from "@/lib/formatarNome";
 import { gerarResumoIA } from "@/lib/gerarResumoIA";
 import { converterParaJpegBase64 } from "@/lib/imagem";
-import { abreviarLab, agruparPorExame, type ExameSerie, GRUPOS_LAB, grupoLab, ordemLab, TENDENCIA_INFO } from "@/lib/lab";
+import { abreviarLab, agruparPorExame, type ExameSerie, GRUPOS_LAB, grupoLab, ordemLab, TENDENCIA_INFO, unidadeExibicaoLab } from "@/lib/lab";
 import {
   carregarReferencias,
   classificarLabSync,
@@ -4029,6 +4029,11 @@ function LabsPorData({
                           <Text style={styles.labModalNome}>{abreviarLab(x.exame)}</Text>
                           <Text style={[styles.labModalValor, { color: cor }]}>
                             {valorNumerico(x.valor) ?? x.valor} {seta}
+                            {unidadeExibicaoLab(x.exame) ? (
+                              <Text style={styles.labModalUnidade}>
+                                {` ${unidadeExibicaoLab(x.exame)}`}
+                              </Text>
+                            ) : null}
                           </Text>
                         </View>
                       );
@@ -5761,6 +5766,12 @@ const styles = StyleSheet.create({
   },
   labModalNome: { fontSize: 14, color: ClinicalColors.text },
   labModalValor: { fontSize: 14, fontWeight: "700" },
+  // Unidade discreta após o valor (padrão visual dos sinais vitais).
+  labModalUnidade: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: ClinicalColors.textMuted,
+  },
   labAddBtn: {
     backgroundColor: ClinicalColors.background,
     borderColor: ClinicalColors.primary,
