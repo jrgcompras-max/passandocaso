@@ -177,7 +177,7 @@ function PaginasModal({
 }
 
 const MIN = 48; // tamanho mínimo do retângulo (em px de tela)
-const HANDLE = 28;
+const HANDLE = 38; // área de toque do cantinho (maior = mais fácil de arrastar)
 
 function clamp(v: number, lo: number, hi: number) {
   return Math.max(lo, Math.min(hi, v));
@@ -229,49 +229,49 @@ function CropModal({
   const rectRef = useRef<Rect | null>(rect);
   rectRef.current = rect;
   const inicio = useRef<Rect>({ x: 0, y: 0, w: 0, h: 0 });
+  const dimsRef = useRef({ dispW: 0, dispH: 0 });
+  dimsRef.current = { dispW, dispH };
 
-  const makeCorner = (cx: "l" | "r", cy: "t" | "b") =>
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
-        if (rectRef.current) inicio.current = { ...rectRef.current };
-      },
-      onPanResponderMove: (_e, g) => {
-        const s = inicio.current;
-        let { x, y, w, h } = s;
-        if (cx === "l") {
-          const nx = clamp(s.x + g.dx, 0, s.x + s.w - MIN);
-          x = nx;
-          w = s.x + s.w - nx;
-        } else {
-          w = clamp(s.w + g.dx, MIN, dispW - s.x);
-        }
-        if (cy === "t") {
-          const ny = clamp(s.y + g.dy, 0, s.y + s.h - MIN);
-          y = ny;
-          h = s.y + s.h - ny;
-        } else {
-          h = clamp(s.h + g.dy, MIN, dispH - s.y);
-        }
-        setRect({ x, y, w, h });
-      },
-    });
-
-  // PanResponders estáveis por canto.
-  const cantos = useRef({
-    tl: makeCorner("l", "t"),
-    tr: makeCorner("r", "t"),
-    bl: makeCorner("l", "b"),
-    br: makeCorner("r", "b"),
-  });
-  // Recria quando as dimensões de exibição mudam (clamp depende delas).
-  cantos.current = {
-    tl: makeCorner("l", "t"),
-    tr: makeCorner("r", "t"),
-    bl: makeCorner("l", "b"),
-    br: makeCorner("r", "b"),
-  };
+  // PanResponders criados UMA ÚNICA vez (estáveis) — recriar a cada render
+  // quebrava o gesto (cantos "travados"). Leem dimensões/retângulo via refs.
+  const cantosRef = useRef<Record<string, ReturnType<typeof PanResponder.create>> | null>(null);
+  if (!cantosRef.current) {
+    const make = (cx: "l" | "r", cy: "t" | "b") =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderGrant: () => {
+          if (rectRef.current) inicio.current = { ...rectRef.current };
+        },
+        onPanResponderMove: (_e, g) => {
+          const { dispW: dW, dispH: dH } = dimsRef.current;
+          const s = inicio.current;
+          let { x, y, w, h } = s;
+          if (cx === "l") {
+            const nx = clamp(s.x + g.dx, 0, s.x + s.w - MIN);
+            x = nx;
+            w = s.x + s.w - nx;
+          } else {
+            w = clamp(s.w + g.dx, MIN, dW - s.x);
+          }
+          if (cy === "t") {
+            const ny = clamp(s.y + g.dy, 0, s.y + s.h - MIN);
+            y = ny;
+            h = s.y + s.h - ny;
+          } else {
+            h = clamp(s.h + g.dy, MIN, dH - s.y);
+          }
+          setRect({ x, y, w, h });
+        },
+      });
+    cantosRef.current = {
+      tl: make("l", "t"),
+      tr: make("r", "t"),
+      bl: make("l", "b"),
+      br: make("r", "b"),
+    };
+  }
+  const cantos = cantosRef.current;
 
   const confirmar = async () => {
     if (!rect || !dim || processando) return;
@@ -313,24 +313,19 @@ function CropModal({
               <View style={[s.dim, { left: offX, top: offY + rect.y + rect.h, width: dispW, height: dispH - rect.y - rect.h }]} />
               <View style={[s.dim, { left: offX, top: offY + rect.y, width: rect.x, height: rect.h }]} />
               <View style={[s.dim, { left: offX + rect.x + rect.w, top: offY + rect.y, width: dispW - rect.x - rect.w, height: rect.h }]} />
-              {/* Moldura. */}
-              <View style={[s.moldura, { left: offX + rect.x, top: offY + rect.y, width: rect.w, height: rect.h }]} />
-              {/* Cantos arrastáveis. */}
+              {/* Cantinhos (colchetes em L) — arrastáveis, sem moldura cheia. */}
               {(
                 [
-                  ["tl", rect.x, rect.y],
-                  ["tr", rect.x + rect.w, rect.y],
-                  ["bl", rect.x, rect.y + rect.h],
-                  ["br", rect.x + rect.w, rect.y + rect.h],
+                  ["tl", offX + rect.x, offY + rect.y, s.brTL],
+                  ["tr", offX + rect.x + rect.w - HANDLE, offY + rect.y, s.brTR],
+                  ["bl", offX + rect.x, offY + rect.y + rect.h - HANDLE, s.brBL],
+                  ["br", offX + rect.x + rect.w - HANDLE, offY + rect.y + rect.h - HANDLE, s.brBR],
                 ] as const
-              ).map(([k, hx, hy]) => (
+              ).map(([k, left, top, st]) => (
                 <View
                   key={k}
-                  {...cantos.current[k].panHandlers}
-                  style={[
-                    s.canto,
-                    { left: offX + hx - HANDLE / 2, top: offY + hy - HANDLE / 2 },
-                  ]}
+                  {...cantos[k].panHandlers}
+                  style={[s.cantoBase, st, { left, top }]}
                 />
               ))}
             </>
@@ -361,16 +356,12 @@ const s = StyleSheet.create({
   fundo: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#000", zIndex: 1000, elevation: 1000 },
   titulo: { color: "#FFF", fontSize: 16, fontWeight: "600", textAlign: "center", paddingVertical: 12 },
   dim: { position: "absolute", backgroundColor: "rgba(0,0,0,0.55)" },
-  moldura: { position: "absolute", borderWidth: 2, borderColor: "#FFF" },
-  canto: {
-    position: "absolute",
-    width: HANDLE,
-    height: HANDLE,
-    borderRadius: HANDLE / 2,
-    backgroundColor: C.primary,
-    borderWidth: 2,
-    borderColor: "#FFF",
-  },
+  // Cantinhos em L (sem bola): só duas bordas brancas por canto.
+  cantoBase: { position: "absolute", width: HANDLE, height: HANDLE, borderColor: "#FFF" },
+  brTL: { borderTopWidth: 3, borderLeftWidth: 3 },
+  brTR: { borderTopWidth: 3, borderRightWidth: 3 },
+  brBL: { borderBottomWidth: 3, borderLeftWidth: 3 },
+  brBR: { borderBottomWidth: 3, borderRightWidth: 3 },
   barra: {
     flexDirection: "row",
     gap: 12,
