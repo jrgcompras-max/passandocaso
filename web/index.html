@@ -551,8 +551,8 @@
           `* Alergias: --`,
         ].join("\n");
 
-        const hda = secaoLinhas(p, "historia");
-        const hda = hda.length ? `*HDA: ${hda.join(" ")}` : null;
+        const hdaLinhas = secaoLinhas(p, "historia");
+        const hda = hdaLinhas.length ? `*HDA: ${hdaLinhas.join(" ")}` : null;
         const sConsc = [
           e && e.nivelConsciencia ? rotulo("consciencia", e.nivelConsciencia).toLowerCase() : null,
           e && e.orientacao ? rotulo("orientacao", e.orientacao).toLowerCase() : null,
