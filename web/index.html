@@ -345,8 +345,8 @@
     <script>
       // ======== CONFIG ========
       const API_URL = "https://api.passandocaso.com.br";
-      let token = sessionStorage.getItem("pc_token") || "";
-      let usuario = JSON.parse(sessionStorage.getItem("pc_usuario") || "null");
+      let token = localStorage.getItem("pc_token") || "";
+      let usuario = JSON.parse(localStorage.getItem("pc_usuario") || "null");
 
       // ======== ESTADO ========
       let pacientes = [];
@@ -651,8 +651,8 @@
       }
       function aplicarSessao(t, u) {
         token = t; usuario = u;
-        sessionStorage.setItem("pc_token", t);
-        sessionStorage.setItem("pc_usuario", JSON.stringify(u));
+        localStorage.setItem("pc_token", t);
+        localStorage.setItem("pc_usuario", JSON.stringify(u));
       }
       async function entrar() {
         const email = document.getElementById("li-email").value.trim();
@@ -694,8 +694,8 @@
       }
       function sair() {
         token = ""; usuario = null; ativoId = null;
-        sessionStorage.removeItem("pc_token");
-        sessionStorage.removeItem("pc_usuario");
+        localStorage.removeItem("pc_token");
+        localStorage.removeItem("pc_usuario");
         document.getElementById("app").classList.add("hidden");
         document.getElementById("tela-bloqueio").classList.add("hidden");
         document.getElementById("tela-login").classList.remove("hidden");
@@ -721,7 +721,7 @@
         try {
           const me = await apiGet("/api/auth/me");
           usuario = me.usuario;
-          sessionStorage.setItem("pc_usuario", JSON.stringify(usuario));
+          localStorage.setItem("pc_usuario", JSON.stringify(usuario));
         } catch (e) {
           if (!usuario) return; // sessão derrubada (sair já tratou)
         }
