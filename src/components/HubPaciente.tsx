@@ -45,6 +45,7 @@ export function HubPaciente({
   paciente,
   caso,
   diaInternacao,
+  registrosCount,
   ordemSecoes,
   destaques,
   onEditar,
@@ -55,6 +56,8 @@ export function HubPaciente({
   paciente: Paciente;
   caso: CasoData;
   diaInternacao: number | null;
+  /** Nº de registros na timeline (detalhe do card Evolução). */
+  registrosCount?: number;
   /** Ordem das seções na grade (Fase 2 — aprendizado). Default: GRID_SECOES. */
   ordemSecoes?: SecaoGrid[];
   /** Seções em destaque (Fase 2 — 2 mais acessadas). */
@@ -83,6 +86,39 @@ export function HubPaciente({
         .filter((g): g is (typeof GRID_SECOES)[number] => !!g)
     : GRID_SECOES;
   const ehDestaque = (k: SecaoGrid) => !!destaques?.includes(k);
+
+  // Detalhe sutil por card: transforma a grade de "menu" em resumo navegável.
+  // `alerta` = vermelho (fora da referência); senão cinza. null = sem detalhe.
+  const detalheSecao = (k: SecaoGrid): { texto: string; alerta?: boolean } | null => {
+    const n = (qtd: number, sing: string, plur: string) =>
+      `${qtd} ${qtd === 1 ? sing : plur}`;
+    switch (k) {
+      case "clinico": {
+        const q = caso.atual.length;
+        return q ? { texto: n(q, "problema", "problemas") } : null;
+      }
+      case "labs": {
+        const q = caso.labsAlterados.length;
+        return q ? { texto: n(q, "alterado", "alterados"), alerta: true } : null;
+      }
+      case "imagem": {
+        const q = caso.imagem.length;
+        return q ? { texto: n(q, "laudo", "laudos") } : null;
+      }
+      case "prescricao": {
+        const q = paciente.medicamentos?.length ?? 0;
+        return q ? { texto: `${q} med${q === 1 ? "" : "s"}` } : null;
+      }
+      case "evolucao": {
+        const q = registrosCount ?? 0;
+        return q ? { texto: n(q, "registro", "registros") } : null;
+      }
+      case "beiraLeito": {
+        const q = caso.ssvvAlterados.length;
+        return q ? { texto: `${q} SV alt.`, alerta: true } : null;
+      }
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -162,19 +198,30 @@ export function HubPaciente({
       <View style={styles.grid}>
         {[0, 1].map((linha) => (
           <View key={linha} style={styles.gridLinha}>
-            {ordem.slice(linha * 3, linha * 3 + 3).map((g) => (
-              <TouchableOpacity
-                key={g.key}
-                style={[styles.gridCard, ehDestaque(g.key) && styles.gridCardDestaque]}
-                activeOpacity={0.8}
-                onPress={() => onAbrirSecao(g.key)}
-              >
-                <View style={[styles.gridIcone, { backgroundColor: g.cor + "1A" }]}>
-                  <Ionicons name={g.icon} size={24} color={g.cor} />
-                </View>
-                <Text style={styles.gridLabel}>{g.label}</Text>
-              </TouchableOpacity>
-            ))}
+            {ordem.slice(linha * 3, linha * 3 + 3).map((g) => {
+              const det = detalheSecao(g.key);
+              return (
+                <TouchableOpacity
+                  key={g.key}
+                  style={[styles.gridCard, ehDestaque(g.key) && styles.gridCardDestaque]}
+                  activeOpacity={0.8}
+                  onPress={() => onAbrirSecao(g.key)}
+                >
+                  <View style={[styles.gridIcone, { backgroundColor: g.cor + "1A" }]}>
+                    <Ionicons name={g.icon} size={24} color={g.cor} />
+                  </View>
+                  <Text style={styles.gridLabel}>{g.label}</Text>
+                  {det && (
+                    <Text
+                      style={[styles.gridDetalhe, det.alerta && styles.gridDetalheAlerta]}
+                      numberOfLines={1}
+                    >
+                      {det.texto}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
           </View>
         ))}
       </View>
@@ -302,4 +349,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   gridLabel: { fontSize: 12.5, fontWeight: "600", color: C.text },
+  gridDetalhe: { fontSize: 11, fontWeight: "600", color: C.textMuted },
+  gridDetalheAlerta: { color: "#A3392E" },
 });

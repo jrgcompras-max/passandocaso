@@ -885,6 +885,7 @@ export default function Paciente() {
           paciente={paciente}
           caso={caso}
           diaInternacao={diaInternacao}
+          registrosCount={registrosCount}
           ordemSecoes={ordemSecoes}
           destaques={secoesDestaque}
           onEditar={iniciarEdicao}
