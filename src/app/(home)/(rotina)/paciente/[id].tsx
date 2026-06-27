@@ -40,7 +40,14 @@ import { CHECKLIST_ALTA } from "@/constants/checklistAlta";
 import { SECOES } from "@/constants/secoes";
 import { categorizarAnotacao } from "@/lib/categorizarAnotacao";
 import { classificarMedicamento } from "@/lib/classificarMedicamento";
-import { ehAntibiotico } from "@/lib/passarCaso";
+import { ehAntibiotico, montarCaso } from "@/lib/passarCaso";
+import { HubPaciente, type SecaoGrid } from "@/components/HubPaciente";
+import {
+  type AcessoSecao,
+  carregarAcessosSecao,
+  ordenarSecoes,
+  registrarAcessoSecao,
+} from "@/lib/secoesAcesso";
 import { textoComDiaAtual } from "@/lib/medicamentoDia";
 import {
   extrairLabsMultiData,
@@ -125,6 +132,26 @@ function useSecaoAccordion(
 const STATUS_OPCOES = Object.keys(StatusColors) as StatusType[];
 const STATUS_CLINICO_OPCOES = Object.keys(StatusClinicoColors) as StatusClinico[];
 const PRIORIDADE_OPCOES = Object.keys(PrioridadeColors) as Prioridade[];
+
+/** Quais SecaoId do loop SECOES aparecem dentro de cada card da grade do hub. */
+const SECOES_DO_GRID: Record<SecaoGrid, SecaoId[]> = {
+  clinico: ["historia", "comorbidades", "medicacoesUsoContinuo"],
+  labs: ["examesLaboratoriais"],
+  imagem: ["imagem"],
+  prescricao: ["prescricaoHospitalar"],
+  beiraLeito: ["sinaisVitaisIntercorrencias"],
+  evolucao: [],
+};
+
+/** Título exibido na barra de voltar de cada seção. */
+const TITULO_SECAO: Record<SecaoGrid, string> = {
+  clinico: "Clínico",
+  labs: "Labs",
+  imagem: "Imagem",
+  prescricao: "Prescrição",
+  evolucao: "Evolução",
+  beiraLeito: "Beira-Leito",
+};
 
 /** Categorias de anotação por seção (chave usada pela IA + rótulo + cor do badge). */
 type CategoriaAnotacao = { chave: string; label: string; cor: string };
@@ -364,6 +391,38 @@ export default function Paciente() {
 
   // FEATURE 1: accordion — id da única seção aberta (null = todas fechadas).
   const [secaoAberta, setSecaoAberta] = useState<string | null>(null);
+
+  // REDESIGN HUB: seção aberta a partir da grade (null = tela hub).
+  const [secaoAtiva, setSecaoAtiva] = useState<SecaoGrid | null>(null);
+  // Abre uma seção pela grade e já expande seu primeiro acordeão (evita 2º
+  // toque). null = volta ao hub e fecha os acordeões.
+  const abrirSecao = (k: SecaoGrid | null) => {
+    setSecaoAtiva(k);
+    setSecaoAberta(k ? (SECOES_DO_GRID[k][0] ?? null) : null);
+  };
+
+  // FASE 2 — aprendizado: acessos do usuário às seções (ordena/destaca a grade).
+  const [acessosSecao, setAcessosSecao] = useState<AcessoSecao[]>([]);
+  useEffect(() => {
+    let vivo = true;
+    carregarAcessosSecao().then((a) => {
+      if (vivo) setAcessosSecao(a);
+    });
+    return () => {
+      vivo = false;
+    };
+  }, []);
+  const { ordem: ordemSecoes, destaques: secoesDestaque } =
+    ordenarSecoes(acessosSecao);
+  // Abre a seção pela grade e registra o acesso (best-effort).
+  const abrirSecaoGrade = (k: SecaoGrid) => {
+    registrarAcessoSecao(k);
+    if (k === "evolucao") {
+      router.push({ pathname: "/timeline/[id]", params: { id } });
+    } else {
+      abrirSecao(k);
+    }
+  };
 
   // Destaque de interações GRAVES no header (scroll até a Prescrição ao tocar).
   const scrollRef = useRef<KeyboardAwareScrollView>(null);
@@ -774,8 +833,15 @@ export default function Paciente() {
   );
 
   // As seções só aparecem no modo de visualização de um paciente existente.
-  const mostrarSecoes = !!paciente && !editando;
   const hoje = hojeISO();
+  // REDESIGN HUB: tela hub (grade) quando nenhuma seção está aberta.
+  const naHub = !!paciente && !editando && secaoAtiva === null;
+  // Cabeçalho clínico completo: na edição ou dentro da seção "Clínico" (e nos
+  // estados de carregando/não encontrado, quando ainda não há paciente).
+  const mostrarCabecalho = !paciente || editando || secaoAtiva === "clinico";
+  // Seções do loop SECOES visíveis conforme a seção aberta pela grade.
+  const secoesVisiveis: SecaoId[] = secaoAtiva ? SECOES_DO_GRID[secaoAtiva] : [];
+  const caso = paciente ? montarCaso(paciente, hoje) : null;
   // Checklist de alta só aparece quando o status é de alta (provável/realizada).
   const mostrarChecklistAlta =
     !!paciente &&
@@ -798,7 +864,41 @@ export default function Paciente() {
       enableAutomaticScroll
       extraScrollHeight={20}
     >
-      {cabecalho}
+      {/* Barra de voltar — aparece dentro de uma seção aberta pela grade. */}
+      {!!paciente && !editando && secaoAtiva !== null && (
+        <TouchableOpacity
+          style={styles.voltarHub}
+          onPress={() => abrirSecao(null)}
+          hitSlop={8}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="chevron-back" size={22} color={ClinicalColors.primary} />
+          <Text style={styles.voltarHubTxt}>{TITULO_SECAO[secaoAtiva]}</Text>
+        </TouchableOpacity>
+      )}
+
+      {mostrarCabecalho && cabecalho}
+
+      {/* TELA HUB: card de resumo + botões + grade de seções. */}
+      {naHub && paciente && caso && (
+        <HubPaciente
+          paciente={paciente}
+          caso={caso}
+          diaInternacao={diaInternacao}
+          ordemSecoes={ordemSecoes}
+          destaques={secoesDestaque}
+          onEditar={iniciarEdicao}
+          onAbrirSecao={abrirSecaoGrade}
+          onEvolucaoMedica={() => {
+            if (paciente) salvarSnapshotDiario(paciente);
+            router.push({ pathname: "/evolucao/[id]", params: { id } });
+          }}
+          onPassarCaso={() => {
+            if (paciente) salvarSnapshotDiario(paciente);
+            router.push({ pathname: "/passar-caso/[id]", params: { id } });
+          }}
+        />
+      )}
 
       <Modal
         visible={!!modalDataLabs}
@@ -863,8 +963,8 @@ export default function Paciente() {
         </View>
       </Modal>
 
-      {mostrarSecoes &&
-        SECOES.map((item) => (
+      {!!paciente && !editando &&
+        SECOES.filter((s) => secoesVisiveis.includes(s.id)).map((item) => (
           <View
             key={item.id}
             onLayout={
@@ -1077,7 +1177,9 @@ export default function Paciente() {
           />
           </View>
         ))}
-      {mostrarSecoes && (
+      {/* Seção Beira-Leito: avaliação à beira-leito + conduta + checklist de alta.
+          Os botões "Evolução Médica" / "Passar o Caso" agora ficam no hub. */}
+      {!!paciente && !editando && secaoAtiva === "beiraLeito" && (
         <>
           <EvolucaoBeiraLeitoSecao
             key={hoje}
@@ -1101,34 +1203,6 @@ export default function Paciente() {
               onChange={(c) => atualizarPaciente(id, { checklistAlta: c })}
             />
           )}
-          <View style={styles.botoesCasoRow}>
-            <TouchableOpacity
-              style={styles.botaoPassarCaso}
-              activeOpacity={0.85}
-              onPress={() => {
-                if (paciente) salvarSnapshotDiario(paciente);
-                router.push({ pathname: "/evolucao/[id]", params: { id } });
-              }}
-            >
-              <View style={styles.passarCasoIcone}>
-                <Ionicons name="document-text-outline" size={15} color="#0E7A5A" />
-              </View>
-              <Text style={styles.botaoPassarCasoTexto}>Evolução Médica</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.botaoPassarCaso}
-              activeOpacity={0.85}
-              onPress={() => {
-                if (paciente) salvarSnapshotDiario(paciente);
-                router.push({ pathname: "/passar-caso/[id]", params: { id } });
-              }}
-            >
-              <View style={styles.passarCasoIcone}>
-                <Ionicons name="albums-outline" size={15} color="#0E7A5A" />
-              </View>
-              <Text style={styles.botaoPassarCasoTexto}>Passar o Caso</Text>
-            </TouchableOpacity>
-          </View>
         </>
       )}
     </KeyboardAwareScrollView>
@@ -5073,6 +5147,14 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 12,
   },
+  voltarHub: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    marginBottom: 10,
+    marginLeft: -4,
+  },
+  voltarHubTxt: { fontSize: 17, fontWeight: "600", color: ClinicalColors.primary },
   titulo: {
     flex: 1,
     fontSize: 24,

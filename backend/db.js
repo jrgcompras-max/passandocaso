@@ -163,6 +163,18 @@ async function initDB() {
     );
   `);
 
+  // === Redesign hub — aprendizado de acesso às seções da ficha ===
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS secoes_acesso_usuario (
+      usuario_id TEXT NOT NULL REFERENCES usuarios(id),
+      secao TEXT NOT NULL,
+      contagem INTEGER NOT NULL DEFAULT 0,
+      ultima_abertura TIMESTAMP DEFAULT NOW(),
+      criado_em TIMESTAMP DEFAULT NOW(),
+      PRIMARY KEY (usuario_id, secao)
+    );
+  `);
+
   // === FASE 3 — Evolução temporal (snapshot diário por paciente) ===
   await pool.query(`
     CREATE TABLE IF NOT EXISTS evolucoes_diarias (

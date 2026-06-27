@@ -541,6 +541,41 @@ app.post("/api/auth/redefinir", async (req, res) => {
   }
 });
 
+// --- Aprendizado de acesso às seções da ficha (redesign hub) ---
+
+/** Registra um acesso a uma seção (incrementa contagem do usuário). */
+app.post("/api/secoes/acesso", auth.autenticar, async (req, res) => {
+  const secao = String((req.body || {}).secao || "").trim();
+  if (!secao) return res.status(400).json({ erro: "Campo obrigatório: secao." });
+  try {
+    await db.query(
+      `INSERT INTO secoes_acesso_usuario (usuario_id, secao, contagem, ultima_abertura)
+         VALUES ($1, $2, 1, NOW())
+       ON CONFLICT (usuario_id, secao)
+         DO UPDATE SET contagem = secoes_acesso_usuario.contagem + 1, ultima_abertura = NOW()`,
+      [req.usuario.id, secao],
+    );
+    res.json({ ok: true });
+  } catch (e) {
+    console.error("Erro em POST /api/secoes/acesso:", e);
+    res.status(500).json({ erro: e.message || "Falha ao registrar acesso." });
+  }
+});
+
+/** Lista os acessos do usuário (para ordenar/destacar a grade do hub). */
+app.get("/api/secoes/acesso", auth.autenticar, async (req, res) => {
+  try {
+    const r = await db.query(
+      "SELECT secao, contagem, ultima_abertura, criado_em FROM secoes_acesso_usuario WHERE usuario_id = $1",
+      [req.usuario.id],
+    );
+    res.json({ acessos: r.rows });
+  } catch (e) {
+    console.error("Erro em GET /api/secoes/acesso:", e);
+    res.status(500).json({ erro: e.message || "Falha ao carregar acessos." });
+  }
+});
+
 // --- Super Admin (admin.passandocaso.com.br) ---
 
 /** Status efetivo do usuário (trial pode ter expirado pela data). */
