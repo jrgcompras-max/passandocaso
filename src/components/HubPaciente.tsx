@@ -85,7 +85,7 @@ export function HubPaciente({
   const ehDestaque = (k: SecaoGrid) => !!destaques?.includes(k);
 
   return (
-    <View>
+    <View style={styles.container}>
       {/* HEADER compacto */}
       <View style={styles.header}>
         <View style={styles.headerInfo}>
@@ -157,18 +157,6 @@ export function HubPaciente({
         )}
       </View>
 
-      {/* BOTÕES DE AÇÃO */}
-      <View style={styles.botoesRow}>
-        <TouchableOpacity style={styles.botaoAcao} activeOpacity={0.85} onPress={onEvolucaoMedica}>
-          <Ionicons name="document-text-outline" size={16} color="#0E7A5A" />
-          <Text style={styles.botaoAcaoTxt}>Evolução Médica</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.botaoAcao} activeOpacity={0.85} onPress={onPassarCaso}>
-          <Ionicons name="albums-outline" size={16} color="#0E7A5A" />
-          <Text style={styles.botaoAcaoTxt}>Passar o Caso</Text>
-        </TouchableOpacity>
-      </View>
-
       {/* GRADE DE SEÇÕES */}
       <View style={styles.grid}>
         {ordem.map((g) => (
@@ -185,11 +173,29 @@ export function HubPaciente({
           </TouchableOpacity>
         ))}
       </View>
+
+      {/* Espaçador flexível: empurra os botões pro rodapé, preenchendo o vazio. */}
+      <View style={styles.espacador} />
+
+      {/* BOTÕES DE AÇÃO (rodapé) */}
+      <View style={styles.botoesRow}>
+        <TouchableOpacity style={styles.botaoAcao} activeOpacity={0.85} onPress={onEvolucaoMedica}>
+          <Ionicons name="document-text-outline" size={16} color="#0E7A5A" />
+          <Text style={styles.botaoAcaoTxt}>Evolução Médica</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.botaoAcao} activeOpacity={0.85} onPress={onPassarCaso}>
+          <Ionicons name="albums-outline" size={16} color="#0E7A5A" />
+          <Text style={styles.botaoAcaoTxt}>Passar o Caso</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  // flex:1 + espaçador deixam os botões no rodapé, preenchendo a tela.
+  container: { flex: 1 },
+  espacador: { flex: 1, minHeight: 20 },
   header: {
     flexDirection: "row",
     alignItems: "center",

@@ -5019,6 +5019,9 @@ const styles = StyleSheet.create({
   containerConteudo: {
     paddingTop: 8,
     paddingHorizontal: 16,
+    // flexGrow:1 deixa o conteúdo preencher ao menos a altura da tela — assim o
+    // espaçador do hub empurra os botões pro rodapé (sem afetar telas longas).
+    flexGrow: 1,
     // paddingBottom é aplicado inline com insets.bottom (clear da tab bar flutuante).
   },
   bannerRecebido: {
