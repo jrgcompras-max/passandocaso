@@ -2,7 +2,7 @@
   "expo": {
     "name": "Passando Caso",
     "slug": "passandocaso-app",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "passandocaso",
@@ -64,6 +64,12 @@
           "icon": "./assets/images/icon.png",
           "color": "#007AFF",
           "sounds": []
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Use o Face ID para desbloquear o Passando Caso e proteger os dados dos pacientes."
         }
       ]
     ],

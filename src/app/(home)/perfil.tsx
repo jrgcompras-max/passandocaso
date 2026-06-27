@@ -16,6 +16,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ModalEspecialidade } from "@/components/ModalEspecialidade";
 import { ClinicalColors as C, Radius } from "@/constants/clinicalTheme";
 import {
+  ativarBiometria,
+  biometriaAtivada,
+  biometriaDisponivel,
+  desativarBiometria,
+  nomeBiometria,
+} from "@/lib/biometria";
+import {
   type ChipPessoal,
   fixarChip,
   listarPessoais,
@@ -75,6 +82,39 @@ export default function PerfilScreen() {
   // Funcionalidades clínicas (toggles). Default ATIVADO (escores !== false).
   const escoresAtivado = usuario?.features_ativas?.escores !== false;
   const [salvandoFeature, setSalvandoFeature] = useState(false);
+
+  // Desbloqueio biométrico (Face ID / Touch ID). Só aparece se o aparelho tiver.
+  const [bioDisponivel, setBioDisponivel] = useState(false);
+  const [bioAtiva, setBioAtiva] = useState(false);
+  const [bioNome, setBioNome] = useState("Face ID");
+  const [salvandoBio, setSalvandoBio] = useState(false);
+  useEffect(() => {
+    void (async () => {
+      if (await biometriaDisponivel()) {
+        setBioDisponivel(true);
+        setBioNome(await nomeBiometria());
+        setBioAtiva(await biometriaAtivada());
+      }
+    })();
+  }, []);
+  const alternarBio = async (valor: boolean) => {
+    if (salvandoBio) return;
+    setSalvandoBio(true);
+    try {
+      if (valor) {
+        const ok = await ativarBiometria();
+        setBioAtiva(ok);
+        if (!ok) {
+          Alert.alert("Não foi possível ativar", "A autenticação não foi concluída.");
+        }
+      } else {
+        await desativarBiometria();
+        setBioAtiva(false);
+      }
+    } finally {
+      setSalvandoBio(false);
+    }
+  };
 
   // Chips do exame físico aprendidos (Feature 2): fixar / remover.
   const [chipsPessoais, setChipsPessoais] = useState<Record<string, ChipPessoal[]>>({});
@@ -286,6 +326,29 @@ export default function PerfilScreen() {
             />
           </View>
         </View>
+
+        {/* SEGURANÇA — desbloqueio biométrico (só se o aparelho suportar) */}
+        {bioDisponivel && (
+          <>
+            <Text style={styles.secaoLabel}>Segurança</Text>
+            <View style={styles.cardCampos}>
+              <View style={styles.featureRow}>
+                <View style={styles.featureInfo}>
+                  <Text style={styles.featureTitulo}>Desbloquear com {bioNome}</Text>
+                  <Text style={styles.featureSub}>
+                    Pede {bioNome} ao abrir o app, protegendo os dados dos pacientes.
+                  </Text>
+                </View>
+                <Switch
+                  value={bioAtiva}
+                  onValueChange={alternarBio}
+                  disabled={salvandoBio}
+                  trackColor={{ true: C.accent, false: "#E5E5EA" }}
+                />
+              </View>
+            </View>
+          </>
+        )}
 
         {/* CHIPS DO EXAME FÍSICO (aprendidos) */}
         {secoesComChips.length > 0 && (

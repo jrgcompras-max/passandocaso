@@ -7,13 +7,15 @@ import {
   useSegments,
 } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useColorScheme, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
+import { BloqueioBiometrico } from '@/components/BloqueioBiometrico';
 import { CropProvider } from '@/components/CropImagem';
 import { ClinicalColors } from '@/constants/clinicalTheme';
+import { autenticarBiometria, biometriaAtivada, nomeBiometria } from '@/lib/biometria';
 import { AuthProvider, useAuth } from '@/store/AuthContext';
 
 export default function RootLayout() {
@@ -30,9 +32,15 @@ export default function RootLayout() {
 
 function RootContent() {
   const colorScheme = useColorScheme();
-  const { usuario, carregando } = useAuth();
+  const { usuario, carregando, sair } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+
+  // Bloqueio biométrico: na primeira vez que a sessão fica pronta, se o
+  // desbloqueio estiver ativado, tranca o app até o Face ID/Touch ID autenticar.
+  const [bloqueado, setBloqueado] = useState(false);
+  const [nomeBio, setNomeBio] = useState('Face ID');
+  const checadoRef = useRef(false);
 
   // Gate de autenticação: redireciona conforme a sessão. Só age após o boot
   // (carregando = false), garantindo que o token já esteja em memória antes de
@@ -43,6 +51,34 @@ function RootContent() {
     if (!usuario && !noAuth) router.replace('/login');
     else if (usuario && noAuth) router.replace('/');
   }, [usuario, carregando, segments, router]);
+
+  useEffect(() => {
+    if (carregando) return;
+    if (!usuario) {
+      // Logout: libera para a próxima sessão checar de novo.
+      checadoRef.current = false;
+      setBloqueado(false);
+      return;
+    }
+    if (checadoRef.current) return;
+    checadoRef.current = true;
+    void (async () => {
+      if (await biometriaAtivada()) {
+        setNomeBio(await nomeBiometria());
+        setBloqueado(true);
+        if (await autenticarBiometria()) setBloqueado(false);
+      }
+    })();
+  }, [carregando, usuario]);
+
+  const desbloquear = useCallback(async () => {
+    if (await autenticarBiometria()) setBloqueado(false);
+  }, []);
+
+  const sairDoBloqueio = useCallback(() => {
+    setBloqueado(false);
+    void sair();
+  }, [sair]);
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
@@ -56,6 +92,13 @@ function RootContent() {
         <View style={{ flex: 1, backgroundColor: ClinicalColors.background }} />
       ) : (
         <Stack screenOptions={{ headerShown: false }} />
+      )}
+      {bloqueado && (
+        <BloqueioBiometrico
+          nome={nomeBio}
+          onDesbloquear={desbloquear}
+          onSair={sairDoBloqueio}
+        />
       )}
     </ThemeProvider>
   );
