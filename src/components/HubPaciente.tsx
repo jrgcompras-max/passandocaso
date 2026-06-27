@@ -157,25 +157,27 @@ export function HubPaciente({
         )}
       </View>
 
-      {/* GRADE DE SEÇÕES */}
+      {/* GRADE DE SEÇÕES — 2 linhas que crescem para preencher a tela (cards
+          ficam mais altos quando há espaço, em vez de deixar um buraco). */}
       <View style={styles.grid}>
-        {ordem.map((g) => (
-          <TouchableOpacity
-            key={g.key}
-            style={[styles.gridCard, ehDestaque(g.key) && styles.gridCardDestaque]}
-            activeOpacity={0.8}
-            onPress={() => onAbrirSecao(g.key)}
-          >
-            <View style={[styles.gridIcone, { backgroundColor: g.cor + "1A" }]}>
-              <Ionicons name={g.icon} size={24} color={g.cor} />
-            </View>
-            <Text style={styles.gridLabel}>{g.label}</Text>
-          </TouchableOpacity>
+        {[0, 1].map((linha) => (
+          <View key={linha} style={styles.gridLinha}>
+            {ordem.slice(linha * 3, linha * 3 + 3).map((g) => (
+              <TouchableOpacity
+                key={g.key}
+                style={[styles.gridCard, ehDestaque(g.key) && styles.gridCardDestaque]}
+                activeOpacity={0.8}
+                onPress={() => onAbrirSecao(g.key)}
+              >
+                <View style={[styles.gridIcone, { backgroundColor: g.cor + "1A" }]}>
+                  <Ionicons name={g.icon} size={24} color={g.cor} />
+                </View>
+                <Text style={styles.gridLabel}>{g.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         ))}
       </View>
-
-      {/* Espaçador flexível: empurra os botões pro rodapé, preenchendo o vazio. */}
-      <View style={styles.espacador} />
 
       {/* BOTÕES DE AÇÃO (rodapé) */}
       <View style={styles.botoesRow}>
@@ -193,9 +195,8 @@ export function HubPaciente({
 }
 
 const styles = StyleSheet.create({
-  // flex:1 + espaçador deixam os botões no rodapé, preenchendo a tela.
+  // flex:1 deixa o hub preencher a tela (o grid cresce; botões no rodapé).
   container: { flex: 1 },
-  espacador: { flex: 1, minHeight: 20 },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -272,18 +273,23 @@ const styles = StyleSheet.create({
   botaoAcaoTxt: { fontSize: 14, fontWeight: "700", color: "#0E7A5A" },
 
   grid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
+    flex: 1,
     gap: 8,
     marginTop: 12,
   },
+  gridLinha: {
+    flexDirection: "row",
+    flex: 1,
+    gap: 8,
+  },
   gridCard: {
-    width: "31.5%",
+    flex: 1,
     backgroundColor: C.surface,
     borderRadius: Radius.card,
     borderWidth: 0.5,
     borderColor: C.border,
     alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 16,
     gap: 8,
   },
