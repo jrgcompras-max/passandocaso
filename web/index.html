@@ -94,6 +94,9 @@
       .hub-lbl { font-size: 13px; font-weight: 600; color: var(--text); }
       .hub-det { font-size: 11px; font-weight: 600; color: var(--muted); }
       .hub-secao { margin-top: 4px; }
+      .hub-acoes { display: flex; gap: 8px; margin: 4px 0 10px; }
+      .hub-btn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px; background: #E5F7EE; color: #0E7A5A; font-size: 14px; font-weight: 700; padding: 13px; border-radius: 12px; border: none; cursor: pointer; }
+      .hub-btn:hover { background: #d6f0e2; }
       .chip-pend { font-size: 11px; font-weight: 600; color: var(--warn-fg); background: var(--warn-bg); border-radius: 6px; padding: 1px 7px; }
       .badge { font-size: 11px; font-weight: 600; border-radius: 6px; padding: 3px 9px; white-space: nowrap; }
 
@@ -403,13 +406,20 @@
       };
       const PROB_STATUS = { ativo: "Ativo", resolvendo: "Resolvendo", resolvido: "Resolvido" };
       // Hub desktop: tiles do grid de seções (ícone colorido + label).
+      const _svg = (p) => `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
       const GRID_WEB = [
-        { key: "clinico", label: "Clínico", ic: "🩺", cor: "#1A6B8A" },
-        { key: "labs", label: "Labs", ic: "🔬", cor: "#AF52DE" },
-        { key: "imagem", label: "Imagem", ic: "🩻", cor: "#EA8C00" },
-        { key: "prescricao", label: "Prescrição", ic: "💊", cor: "#E0555B" },
-        { key: "evolucao", label: "Evolução", ic: "📈", cor: "#0E7A5A" },
-        { key: "beiraLeito", label: "Beira-Leito", ic: "🛏️", cor: "#0F2D52" },
+        { key: "clinico", label: "Clínico", cor: "#007AFF",
+          ic: _svg('<rect x="3" y="7.5" width="18" height="12.5" rx="2.5"/><path d="M8 7.5V5.5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M12 11.5v5M9.5 14h5"/>') },
+        { key: "labs", label: "Labs", cor: "#AF52DE",
+          ic: _svg('<path d="M9.5 3h5M10.5 3v5.5L5.6 17a2 2 0 0 0 1.8 3h9.2a2 2 0 0 0 1.8-3l-4.9-8.5V3"/><path d="M7.5 14.5h9"/>') },
+        { key: "imagem", label: "Imagem", cor: "#FF9500",
+          ic: _svg('<path d="M4 8.5V6.5A2.5 2.5 0 0 1 6.5 4H8M16 4h1.5A2.5 2.5 0 0 1 20 6.5V8.5M20 15.5v2A2.5 2.5 0 0 1 17.5 20H16M8 20H6.5A2.5 2.5 0 0 1 4 17.5v-2"/><path d="M7.5 12h9"/>') },
+        { key: "prescricao", label: "Prescrição", cor: "#FF6B6B",
+          ic: _svg('<path d="M10.4 3.6a4.8 4.8 0 0 1 6.8 6.8l-6.8 6.8a4.8 4.8 0 1 1-6.8-6.8z"/><path d="M6.8 7.2l6.8 6.8"/>') },
+        { key: "evolucao", label: "Evolução", cor: "#34C759",
+          ic: _svg('<path d="M3 16.5l5.5-5.5 4 4 8-8"/><path d="M16 7h4.5v4.5"/>') },
+        { key: "beiraLeito", label: "Beira-Leito", cor: "#0A4D68",
+          ic: _svg('<path d="M3 9v10M3 14h18M21 19v-5a2 2 0 0 0-2-2H9v2"/><circle cx="6.5" cy="11" r="1.6"/>') },
       ];
       const SECOES_FOTO = [
         { id: "comorbidadesMedicacoes", titulo: "Comorbidades e MUC" },
@@ -973,8 +983,6 @@
             <textarea id="resumo-input" onblur="setResumo(this.value)" placeholder="Ex: D8 internação. Afebril há 48h. PCR em queda.">${esc(p.resumoRapido || "")}</textarea>
           </div>
 
-          <button class="btn-passar" onclick="abrirPassarCaso()">📋 Passar o Caso</button>
-
           <div class="hub-grid">
             ${GRID_WEB.map((g) => {
               const det = detalheTileWeb(p, g.key);
@@ -984,6 +992,10 @@
                 ${det ? `<div class="hub-det">${det}</div>` : ""}
               </div>`;
             }).join("")}
+          </div>
+          <div class="hub-acoes">
+            <button class="hub-btn" onclick="abrirPassarCaso()">📄 Evolução Médica</button>
+            <button class="hub-btn" onclick="abrirPassarCaso()">📋 Passar o Caso</button>
           </div>
           <div class="hub-secao">${conteudoSecaoWeb(p, secaoWeb)}</div>
         `;
