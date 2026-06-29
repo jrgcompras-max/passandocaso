@@ -107,6 +107,13 @@
       .evo-tab2 th:first-child { text-align: left; }
       .evo-tab2 td { padding: 5px 8px; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap; }
       .evo-tab2 .evo-nome { text-align: left; font-weight: 600; color: var(--text); }
+      /* Labs (#6): lista limpa agrupada, sem grid pesado. */
+      .lab-grupo { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 14px 0 4px; }
+      .lab-linha { display: flex; align-items: baseline; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+      .lab-nome { flex: 0 0 72px; font-weight: 700; color: var(--text); font-size: 14px; }
+      .lab-vals { flex: 1; display: flex; flex-wrap: wrap; gap: 12px; }
+      .lab-pt { font-size: 14px; white-space: nowrap; }
+      .lab-data { color: var(--muted); font-size: 12px; }
       .chip-pend { font-size: 11px; font-weight: 600; color: var(--warn-fg); background: var(--warn-bg); border-radius: 6px; padding: 1px 7px; }
       .badge { font-size: 11px; font-weight: 600; border-radius: 6px; padding: 3px 9px; white-space: nowrap; }
 
@@ -787,15 +794,18 @@
         const lista = document.getElementById("sb-lista");
         lista.innerHTML = '<div class="vazio" style="padding:16px">Carregando...</div>';
         try {
-          const [rp, re, rh] = await Promise.all([
+          const [rp, re, rh, rr] = await Promise.all([
             apiGet("/api/pacientes"),
             apiGet("/api/evolucao/" + hojeISO()).catch(() => ({ evolucoes: [] })),
             apiGet("/api/hospitais").catch(() => ({ hospitais: [] })),
+            apiGet("/api/labs/referencia").catch(() => ({ referencias: [] })),
           ]);
           // #4: merge local-first — não deixa a resposta do servidor sobrescrever
           // edições locais pendentes (sync em debounce); só adiciona/atualiza o resto.
           pacientes = mesclar(pacientes, rp.pacientes || []);
           hospitais = rh.hospitais || [];
+          // #6: referências ABIM (para ↑ vermelho / ↓ azul nos labs).
+          if (Array.isArray(rr.referencias) && rr.referencias.length) refsLab = rr.referencias;
           evolucoesDia = {};
           for (const e of re.evolucoes || []) evolucoesDia[e.pacienteId] = e.texto;
           renderHospitais();
@@ -1212,19 +1222,92 @@
       }
       function delAnot(sid, aid) { mut((p) => { const sec = (p.secoes || {})[sid]; if (sec) sec.anotacoes = (sec.anotacoes || []).filter((a) => a.id !== aid); }); renderDetalhe(); }
 
-      // ---- Exames laboratoriais ----
+      // ---- Labs: abreviação/agrupamento/ordem/classificação (porte do app, fonte única) ----
+      const LAB_ABREV = [
+        { re: /glic.*lcr|lcr.*glic/i, abbr: "Glic LCR" }, { re: /lactato.*lcr|lcr.*lactato/i, abbr: "Lactato LCR" },
+        { re: /prote[ií]na?s?.*lcr|lcr.*prote[ií]/i, abbr: "Prot LCR" }, { re: /c[eé]lulas?\s*nuclead.*lcr|cel\s*nuc.*lcr/i, abbr: "Cel Nuc LCR" },
+        { re: /eritr[oó]citos?.*lcr|eritr.*lcr/i, abbr: "Eritr LCR" }, { re: /cloret.*lcr|clor.*lcr/i, abbr: "Clor LCR" },
+        { re: /bacterioscop.*lcr|bact.*lcr/i, abbr: "Bact LCR" }, { re: /fungos?.*lcr|lcr.*fungos?/i, abbr: "Fungos LCR" },
+        { re: /hemoglob|^hb$/i, abbr: "Hb" }, { re: /hemat[oó]cr|^ht$/i, abbr: "Ht" },
+        { re: /^hcm$|hemoglobina corpuscular m[eé]dia/i, abbr: "HCM" }, { re: /^chcm$|concentra[çc].*hemoglob/i, abbr: "CHCM" },
+        { re: /^vcm$|volume corpuscular m[eé]dio/i, abbr: "VCM" }, { re: /^rdw$/i, abbr: "RDW" },
+        { re: /hem[aá]cias|eritr[oó]citos/i, abbr: "Hemácias" }, { re: /leuc[oó]|^lt$/i, abbr: "LT" },
+        { re: /bast[õo]|^bast/i, abbr: "Bast" }, { re: /segment|^seg$/i, abbr: "Seg" },
+        { re: /linf[oó]cit|^linf$/i, abbr: "Linf" }, { re: /mon[oó]cit|^mon[oó]$/i, abbr: "Monó" },
+        { re: /eosin[oó]f|^eos$/i, abbr: "Eos" }, { re: /bas[oó]f|^bas[oó]f$/i, abbr: "Basóf" },
+        { re: /plaquet|^plaq$|^plt$/i, abbr: "Plaq" }, { re: /prote[ií]na c|^pcr$/i, abbr: "PCR" },
+        { re: /creatin|^cr$/i, abbr: "Cr" }, { re: /ur[eé]ia|^u$/i, abbr: "U" },
+        { re: /pot[aá]ssio|^k$/i, abbr: "K" }, { re: /s[oó]dio|^na$/i, abbr: "Na" },
+        { re: /magn[eé]sio|^mg$/i, abbr: "Mg" }, { re: /lactato/i, abbr: "Lactato" },
+        { re: /bilirrubina\s*d|^bd$/i, abbr: "BD" }, { re: /bilirrubina\s*i|^bi$/i, abbr: "BI" },
+        { re: /bilirrubina|^bt$/i, abbr: "BT" }, { re: /aspartato|^tgo$|^ast$/i, abbr: "TGO" },
+        { re: /alanina|^tgp$|^alt$/i, abbr: "TGP" }, { re: /fosfatase|^fa$/i, abbr: "FA" },
+        { re: /gama|^ggt$/i, abbr: "GGT" }, { re: /albumin|^alb$/i, abbr: "Alb" },
+        { re: /^inr$|rni/i, abbr: "INR" }, { re: /atividade de protromb|^tap$/i, abbr: "TAP" },
+        { re: /^ttpa$|tromboplastina/i, abbr: "TTPA" }, { re: /filtra[çc]|^tfg$/i, abbr: "TFG" },
+        { re: /hemossedimenta|^vhs$/i, abbr: "VHS" }, { re: /desidrogenase l|^ldh$/i, abbr: "LDH" },
+        { re: /glic/i, abbr: "Glic" },
+      ];
+      function abreviarLab(nome) { const n = (nome || "").trim(); return (LAB_ABREV.find((a) => a.re.test(n)) || {}).abbr || n; }
+      const GRUPOS_LAB = ["HEMOGRAMA", "BIOQUÍMICA", "GASOMETRIA", "LÍQUOR", "URINA", "CULTURAS", "OUTROS"];
+      const GRUPO_RE = [
+        { grupo: "LÍQUOR", re: /lcr|l[ií]quor/i },
+        { grupo: "CULTURAS", re: /cultura|hemocult|urocult|^hmc$|^urc$|swab/i },
+        { grupo: "GASOMETRIA", re: /gasometr|^ph$|pco2|^po2$|hco3|bicarbonat|excesso de base|^be$|^sato2$/i },
+        { grupo: "URINA", re: /urina|^eas$|sum[aá]rio urin|urin[aá]ri|leucocit[uú]ria|hemat[uú]ria/i },
+        { grupo: "HEMOGRAMA", re: /hemoglob|^hb$|hemat[oó]cr|^ht$|^hcm$|^chcm$|^vcm$|^rdw$|hem[aá]cias|eritr[oó]cit|leuc[oó]|^lt$|bast|segment|^seg$|linf[oó]|^linf$|mon[oó]cit|^mon[oó]$|eosin|^eos$|bas[oó]f|plaquet|^plaq$|^plt$/i },
+        { grupo: "BIOQUÍMICA", re: /prote[ií]na c|^pcr$|creatin|^cr$|ur[eé]ia|^u$|pot[aá]ssio|^k$|s[oó]dio|^na$|magn[eé]sio|^mg$|lactato|bilirrubina|^bd$|^bi$|^bt$|aspartato|^tgo$|^ast$|alanina|^tgp$|^alt$|fosfatase|^fa$|gama|^ggt$|albumin|^alb$|^inr$|rni|protromb|^tap$|^ttpa$|tromboplastina|filtra[çc]|^tfg$|hemossedimenta|^vhs$|desidrogenase|^ldh$|glic|c[aá]lcio|^ca$|f[oó]sforo|amilase|lipase|^cpk$|troponina/i },
+      ];
+      function grupoLab(nome) { const n = (nome || "").trim(); return (GRUPO_RE.find((g) => g.re.test(n)) || {}).grupo || "OUTROS"; }
+      const ORDEM_LAB = [/\bhb\b|hemoglob/i, /\bht\b|hemat[oó]cr/i, /\blt\b|leuc[oó]/i, /\bplaq\b|\bplt\b|plaquet/i, /\bna\b|s[oó]dio/i, /\bk\b|pot[aá]ssio/i, /\bcl\b|cloreto/i, /\bmg\b|magn[eé]sio/i, /\bur?\b|ur[eé]ia/i, /\bcr\b|creatin/i, /\btfg\b|filtra[çc]/i, /\bpcr\b|prote[ií]na c/i, /\bvhs\b/i, /glic/i, /\btgo\b|^ast$/i, /\btgp\b|^alt$/i, /\bfa\b|fosfatase/i, /\bggt\b|gama/i, /\bbt\b/i, /\bbd\b/i, /\bbi\b/i, /\balb/i, /\binr\b|rni/i, /\btap\b/i, /\bttpa\b/i, /lactato/i];
+      function ordemLab(nome) { const t = (nome || "").trim(); const i = ORDEM_LAB.findIndex((re) => re.test(t)); return i === -1 ? ORDEM_LAB.length : i; }
+      // Referências (ABIM): carregadas de /api/labs/referencia; classifica alto/baixo/normal.
+      let refsLab = [];
+      const _LAB_COR = { alto: "#A32D2D", baixo: "#1A6B8A", normal: "#000000" };
+      function classificarLab(codigo, valor, sexo, idade) {
+        if (idade != null && idade < 18) return { status: "sem", cor: _LAB_COR.normal };
+        if (!refsLab.length) return { status: "sem", cor: _LAB_COR.normal };
+        const chave = (codigo || "").trim().toLowerCase(); if (!chave) return { status: "sem", cor: _LAB_COR.normal };
+        const sx = sexo === "M" || sexo === "F" ? sexo : "ambos";
+        const cand = refsLab.filter((r) => (r.codigo || "").toLowerCase() === chave || (r.nome || "").toLowerCase() === chave);
+        if (!cand.length) return { status: "sem", cor: _LAB_COR.normal };
+        const ref = cand.find((r) => r.sexo === sx) || cand.find((r) => r.sexo === "ambos");
+        if (!ref) return { status: "sem", cor: _LAB_COR.normal };
+        const m = String(valor).replace(",", ".").match(/-?\d+(\.\d+)?/); const v = m ? parseFloat(m[0]) : null;
+        if (v == null) return { status: "sem", cor: _LAB_COR.normal };
+        if (ref.valorMin != null && v < ref.valorMin) return { status: "baixo", cor: _LAB_COR.baixo };
+        if (ref.valorMax != null && v > ref.valorMax) return { status: "alto", cor: _LAB_COR.alto };
+        return { status: "normal", cor: _LAB_COR.normal };
+      }
+
+      // ---- Exames laboratoriais (redesign #6: lista limpa, agrupada, abreviada) ----
       function secExames(p, s) {
-        const series = agruparLab(p.resultadosLab || []);
-        const datas = [...new Set((p.resultadosLab || []).map((r) => r.data))].sort();
+        const lista = (p.resultadosLab || []).filter((r) => r.exame);
+        const sexo = p.sexo || null, idade = p.idade != null ? p.idade : null;
+        // Consolida por abreviação (dedup de "Cr"/"Creatinina" no display).
+        const porAbbr = {};
+        for (const r of lista) { const a = abreviarLab(r.exame); (porAbbr[a] = porAbbr[a] || []).push(r); }
+        const abbrs = Object.keys(porAbbr);
         let tabela;
-        if (!series.length) tabela = '<div class="vazio">Nenhum resultado por data ainda.</div>';
+        if (!abbrs.length) tabela = '<div class="vazio">Nenhum resultado ainda.</div>';
         else {
-          tabela = `<div style="overflow-x:auto"><table class="labs"><thead><tr><th>Exame</th>${datas.map((d) => `<th>${formatarDataBR(d).slice(0, 5)}</th>`).join("")}<th>Tend.</th></tr></thead><tbody>`;
-          for (const se of series) {
-            const porData = {}; se.pontos.forEach((pt) => (porData[pt.data] = pt.valor));
-            tabela += `<tr><td class="ex">${esc(se.exame)}</td>${datas.map((d) => `<td>${esc(porData[d] || "")}</td>`).join("")}<td style="color:${se.tendencia ? se.tendencia.cor : "var(--muted)"}">${se.tendencia ? se.tendencia.icone : ""}</td></tr>`;
+          const porGrupo = {};
+          for (const a of abbrs) { const g = grupoLab(a); (porGrupo[g] = porGrupo[g] || []).push(a); }
+          tabela = "";
+          for (const g of GRUPOS_LAB) {
+            const exs = (porGrupo[g] || []).sort((x, y) => ordemLab(x) - ordemLab(y));
+            if (!exs.length) continue;
+            tabela += `<div class="lab-grupo">${g}</div>`;
+            for (const a of exs) {
+              const pts = porAbbr[a].slice().sort((x, y) => (x.data < y.data ? 1 : x.data > y.data ? -1 : 0));
+              const vals = pts.slice(0, 4).map((pt) => {
+                const cl = classificarLab(a, pt.valor, sexo, idade);
+                const seta = cl.status === "alto" ? " ↑" : cl.status === "baixo" ? " ↓" : "";
+                return `<span class="lab-pt"><b style="color:${cl.cor}">${esc(pt.valor)}${seta}</b> <span class="lab-data">${formatarDataBR(pt.data).slice(0, 5)}</span></span>`;
+              }).join("");
+              tabela += `<div class="lab-linha"><span class="lab-nome">${esc(a)}</span><span class="lab-vals">${vals}</span></div>`;
+            }
           }
-          tabela += "</tbody></table></div>";
         }
         const form = `<div id="form-lab" style="margin-top:12px">
           <div class="grid2"><div class="field"><label class="label">Exame</label><input id="lab-ex" placeholder="PCR"></div>
@@ -1233,10 +1316,11 @@
           <button class="btn-ghost" onclick="addLab()">+ Adicionar resultado</button></div>`;
         const sec = (p.secoes || {})[s.id] || { anotacoes: [], extraido: "" };
         const anot = `<div style="margin-top:14px"><span class="label">Anotações</span>${(sec.anotacoes || []).map((a) => `<div class="anot"><div><div class="hora">${esc(a.horario || "")}</div><div class="at">${esc(a.texto)}</div></div><span onclick="delAnot('${s.id}','${a.id}')" style="cursor:pointer">🗑️</span></div>`).join("")}<div class="field" style="margin-top:8px"><textarea id="anot-${s.id}" placeholder="Nova anotação..."></textarea></div><button class="btn-ghost" onclick="addAnot('${s.id}')">Salvar anotação</button></div>`;
-        return acc("sec_" + s.id, s.titulo, series.length || null, tabela + form + anot, null);
+        return acc("sec_" + s.id, s.titulo, abbrs.length || null, tabela + form + anot, null);
       }
       function addLab() {
-        const ex = document.getElementById("lab-ex").value.trim(), dt = document.getElementById("lab-dt").value || hojeISO(), v = document.getElementById("lab-v").value.trim();
+        // #6: normaliza o nome no salvamento (Cr/Creatinina → "Cr") para não duplicar.
+        const ex = abreviarLab(document.getElementById("lab-ex").value.trim()), dt = document.getElementById("lab-dt").value || hojeISO(), v = document.getElementById("lab-v").value.trim();
         if (!ex || !v) return;
         mut((p) => { p.resultadosLab = p.resultadosLab || []; p.resultadosLab.push({ id: "w" + Date.now(), exame: ex, data: dt, valor: v }); });
         renderDetalhe();
