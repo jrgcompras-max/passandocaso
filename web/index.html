@@ -97,6 +97,16 @@
       .hub-acoes { display: flex; gap: 8px; margin: 4px 0 10px; }
       .hub-btn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px; background: #E5F7EE; color: #0E7A5A; font-size: 14px; font-weight: 700; padding: 13px; border-radius: 12px; border: none; cursor: pointer; }
       .hub-btn:hover { background: #d6f0e2; }
+      /* Ver Evolução (#5): abas de período + tabelas temporais compactas. */
+      .evo-tabs { display: flex; gap: 6px; margin: 4px 0 10px; }
+      .evo-tab { padding: 6px 14px; font-size: 13px; font-weight: 600; color: var(--muted); background: var(--bg); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; }
+      .evo-tab.ativo { color: #fff; background: var(--primary); border-color: var(--primary); }
+      .evo-grupo { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 14px 0 6px; }
+      .evo-tab2 { width: 100%; border-collapse: collapse; font-size: 13px; }
+      .evo-tab2 th { font-size: 11px; font-weight: 600; color: var(--muted); text-align: right; padding: 4px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+      .evo-tab2 th:first-child { text-align: left; }
+      .evo-tab2 td { padding: 5px 8px; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap; }
+      .evo-tab2 .evo-nome { text-align: left; font-weight: 600; color: var(--text); }
       .chip-pend { font-size: 11px; font-weight: 600; color: var(--warn-fg); background: var(--warn-bg); border-radius: 6px; padding: 1px 7px; }
       .badge { font-size: 11px; font-weight: 600; border-radius: 6px; padding: 3px 9px; white-space: nowrap; }
 
@@ -367,6 +377,7 @@
       let pacientes = [];
       let ativoId = null;
       let secaoWeb = "clinico"; // hub desktop: tile/seção aberta no painel do paciente
+      let periodoEvo = 30; // "Ver Evolução": janela em dias (7/14/30)
       let evolucoesDia = {}; // pacienteId -> texto
       let medEditId = null; // medicamento com classe em edição inline
       const abertos = new Set(); // chaves de acordeões abertos
@@ -937,9 +948,49 @@
         if (k === "labs") return secExames(p, { id: "examesLaboratoriais", titulo: "Exames Laboratoriais" });
         if (k === "imagem") return secFoto(p, { id: "imagem", titulo: "Imagem" });
         if (k === "prescricao") return secFoto(p, { id: "prescricaoHospitalar", titulo: "Prescrição Hospitalar", medicacao: true });
-        if (k === "evolucao") return secEvolucao(p);
-        if (k === "beiraLeito") return secSinaisVitais(p, { id: "sinaisVitaisIntercorrencias", titulo: "Sinais Vitais e Intercorrências" }) + (ehAlta ? secChecklist(p) : "");
+        // #5: "Evolução" = Ver Evolução (temporal). "Beira-Leito" = exame físico +
+        // sinais vitais do dia + checklist de alta.
+        if (k === "evolucao") return secVerEvolucao(p);
+        if (k === "beiraLeito") return secEvolucao(p) + secSinaisVitais(p, { id: "sinaisVitaisIntercorrencias", titulo: "Sinais Vitais e Intercorrências" }) + (ehAlta ? secChecklist(p) : "");
         return "";
+      }
+
+      // #5: "Ver Evolução" — sinais vitais e labs ao longo do tempo, com abas de
+      // período (7/14/30 dias). Reusa agruparLab (séries + tendência) do web.
+      function setPeriodoEvo(n) { periodoEvo = n; renderDetalhe(); }
+      function secVerEvolucao(p) {
+        const series = agruparLab(p.resultadosLab || []);
+        const sv = p.sinaisVitais || {};
+        const corte = new Date(); corte.setDate(corte.getDate() - periodoEvo);
+        const corteISO = corte.toISOString().slice(0, 10);
+        const todas = [...new Set([
+          ...Object.keys(sv),
+          ...(p.resultadosLab || []).map((r) => r.data),
+        ])].filter((d) => d && d >= corteISO).sort().reverse();
+        const tabs = `<div class="evo-tabs">${[7, 14, 30].map((n) => `<button class="evo-tab ${periodoEvo === n ? "ativo" : ""}" onclick="setPeriodoEvo(${n})">${n}D</button>`).join("")}</div>`;
+        if (!todas.length) return tabs + '<div class="vazio" style="padding:12px">Sem registros de sinais vitais ou labs neste período.</div>';
+
+        const svCampos = [["paSist", "PA sist"], ["paDiast", "PA diast"], ["fc", "FC"], ["fr", "FR"], ["sato2", "SatO₂"], ["temp", "Tax"], ["glicemia", "HGT"], ["diurese", "Diurese"]];
+        const svDatas = todas.filter((d) => sv[d]);
+        let svHtml = "";
+        if (svDatas.length) {
+          const linhas = svCampos.filter((c) => svDatas.some((d) => (sv[d] || {})[c[0]]));
+          if (linhas.length) {
+            svHtml = `<div class="evo-grupo">Sinais vitais</div><div style="overflow-x:auto"><table class="evo-tab2"><thead><tr><th></th>${svDatas.map((d) => `<th>${formatarDataBR(d).slice(0, 5)}</th>`).join("")}</tr></thead><tbody>${linhas.map((c) => `<tr><td class="evo-nome">${c[1]}</td>${svDatas.map((d) => `<td>${esc((sv[d] || {})[c[0]] || "")}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+          }
+        }
+        let labHtml = "";
+        const labDatas = todas.filter((d) => (p.resultadosLab || []).some((r) => r.data === d));
+        if (series.length && labDatas.length) {
+          let linhas = "";
+          for (const se of series) {
+            const porData = {}; se.pontos.forEach((pt) => (porData[pt.data] = pt.valor));
+            if (!labDatas.some((d) => porData[d])) continue;
+            linhas += `<tr><td class="evo-nome">${esc(se.exame)}</td>${labDatas.map((d) => `<td>${esc(porData[d] || "")}</td>`).join("")}<td style="color:${se.tendencia ? se.tendencia.cor : "var(--muted)"}">${se.tendencia ? se.tendencia.icone : ""}</td></tr>`;
+          }
+          if (linhas) labHtml = `<div class="evo-grupo">Labs</div><div style="overflow-x:auto"><table class="evo-tab2"><thead><tr><th></th>${labDatas.map((d) => `<th>${formatarDataBR(d).slice(0, 5)}</th>`).join("")}<th>Tend.</th></tr></thead><tbody>${linhas}</tbody></table></div>`;
+        }
+        return tabs + svHtml + labHtml;
       }
 
       function renderDetalhe() {
