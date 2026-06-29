@@ -382,13 +382,14 @@
       const STATUS = {
         naoVisitado: { label: "Não visitado", bg: "#FEE2E2", fg: "#991B1B" },
         visitado: { label: "Visitado", bg: "#FEF9C3", fg: "#854D0E" },
+        evoluido: { label: "Evoluído", bg: "#E0F2FE", fg: "#0369A1" },
         revisar: { label: "Revisar", bg: "#FFEDD5", fg: "#9A3412" },
         pendente: { label: "Pendente", bg: "#EDE9FE", fg: "#6B21A8" },
         altaProvavel: { label: "Alta provável", bg: "#DCFCE7", fg: "#166534" },
         altaRealizada: { label: "Alta realizada", bg: "#F1F5F9", fg: "#475569" },
       };
-      const ORDEM_GRUPOS = ["naoVisitado", "revisar", "pendente", "visitado", "altaProvavel", "altaRealizada"];
-      const ORDEM_AVANCO = ["naoVisitado", "visitado", "revisar", "pendente", "altaProvavel", "altaRealizada"];
+      const ORDEM_GRUPOS = ["naoVisitado", "revisar", "pendente", "visitado", "evoluido", "altaProvavel", "altaRealizada"];
+      const ORDEM_AVANCO = ["naoVisitado", "visitado", "evoluido", "revisar", "pendente", "altaProvavel", "altaRealizada"];
       const STATUS_CLINICO = {
         melhora: { label: "Melhora clínica", cor: "#0E7A5A", bg: "#DCFCE7" },
         estavel: { label: "Estável", cor: "#1A6B8A", bg: "#DBEAFE" },
@@ -848,6 +849,14 @@
           if (!grupo.length) continue;
           html += `<div class="sep">— ${STATUS[st].label} (${grupo.length}) —</div>`;
           html += grupo.map(cardSidebar).join("");
+        }
+        // Rede de segurança: paciente com status fora dos grupos conhecidos (ex.:
+        // status novo do app que o web ainda não tem) NUNCA some — cai em "Outros".
+        const conhecidos = new Set(ORDEM_GRUPOS);
+        const outros = visiveis.filter((p) => !conhecidos.has(grupoDe(p)));
+        if (outros.length) {
+          html += `<div class="sep">— Outros (${outros.length}) —</div>`;
+          html += outros.map(cardSidebar).join("");
         }
         lista.innerHTML = html;
       }
