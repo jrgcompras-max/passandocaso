@@ -969,7 +969,7 @@
       // período (7/14/30 dias). Reusa agruparLab (séries + tendência) do web.
       function setPeriodoEvo(n) { periodoEvo = n; renderDetalhe(); }
       function secVerEvolucao(p) {
-        const series = agruparLab(p.resultadosLab || []);
+        const sexo = p.sexo || null, idade = p.idade != null ? p.idade : null;
         const sv = p.sinaisVitais || {};
         const corte = new Date(); corte.setDate(corte.getDate() - periodoEvo);
         const corteISO = corte.toISOString().slice(0, 10);
@@ -989,16 +989,35 @@
             svHtml = `<div class="evo-grupo">Sinais vitais</div><div style="overflow-x:auto"><table class="evo-tab2"><thead><tr><th></th>${svDatas.map((d) => `<th>${formatarDataBR(d).slice(0, 5)}</th>`).join("")}</tr></thead><tbody>${linhas.map((c) => `<tr><td class="evo-nome">${c[1]}</td>${svDatas.map((d) => `<td>${esc((sv[d] || {})[c[0]] || "")}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
           }
         }
-        let labHtml = "";
+        // Labs agrupados por categoria (Hemograma/Bioquímica/.../Outros),
+        // consolidando por abreviação e colorindo por referência (igual à seção Labs).
         const labDatas = todas.filter((d) => (p.resultadosLab || []).some((r) => r.data === d));
-        if (series.length && labDatas.length) {
-          let linhas = "";
-          for (const se of series) {
-            const porData = {}; se.pontos.forEach((pt) => (porData[pt.data] = pt.valor));
-            if (!labDatas.some((d) => porData[d])) continue;
-            linhas += `<tr><td class="evo-nome">${esc(se.exame)}</td>${labDatas.map((d) => `<td>${esc(porData[d] || "")}</td>`).join("")}<td style="color:${se.tendencia ? se.tendencia.cor : "var(--muted)"}">${se.tendencia ? se.tendencia.icone : ""}</td></tr>`;
+        let labHtml = "";
+        if (labDatas.length) {
+          const porAbbr = {};
+          for (const r of (p.resultadosLab || [])) {
+            if (!r.exame || !labDatas.includes(r.data)) continue;
+            const a = abreviarLab(r.exame);
+            porAbbr[a] = porAbbr[a] || {};
+            porAbbr[a][r.data] = r.valor;
           }
-          if (linhas) labHtml = `<div class="evo-grupo">Labs</div><div style="overflow-x:auto"><table class="evo-tab2"><thead><tr><th></th>${labDatas.map((d) => `<th>${formatarDataBR(d).slice(0, 5)}</th>`).join("")}<th>Tend.</th></tr></thead><tbody>${linhas}</tbody></table></div>`;
+          const porGrupo = {};
+          for (const a of Object.keys(porAbbr)) { const g = grupoLab(a); (porGrupo[g] = porGrupo[g] || []).push(a); }
+          for (const g of GRUPOS_LAB) {
+            const exs = (porGrupo[g] || []).sort((x, y) => ordemLab(x) - ordemLab(y));
+            if (!exs.length) continue;
+            labHtml += `<div class="evo-grupo">${g}</div><div style="overflow-x:auto"><table class="evo-tab2"><thead><tr><th></th>${labDatas.map((d) => `<th>${formatarDataBR(d).slice(0, 5)}</th>`).join("")}</tr></thead><tbody>`;
+            for (const a of exs) {
+              labHtml += `<tr><td class="evo-nome">${esc(a)}</td>${labDatas.map((d) => {
+                const val = porAbbr[a][d];
+                if (val == null || val === "") return "<td></td>";
+                const cl = classificarLab(a, val, sexo, idade);
+                const seta = cl.status === "alto" ? " ↑" : cl.status === "baixo" ? " ↓" : "";
+                return `<td style="color:${cl.cor};font-weight:600">${esc(val)}${seta}</td>`;
+              }).join("")}</tr>`;
+            }
+            labHtml += "</tbody></table></div>";
+          }
         }
         return tabs + svHtml + labHtml;
       }
